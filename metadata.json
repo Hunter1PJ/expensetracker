@@ -1,0 +1,6 @@
+{
+  "name": "ExpenseTracker",
+  "description": "A premium personal finance application focused on simplicity, speed, privacy, and clean design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
