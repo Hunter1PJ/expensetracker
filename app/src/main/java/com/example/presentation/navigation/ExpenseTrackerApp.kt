@@ -444,25 +444,27 @@ fun ExpenseTrackerApp(
                     }
                 },
                 floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = {
-                            previousDestination = currentDestination
-                            currentDestination = NavDestination.AddTransaction
-                        },
-                        shape = ExpenseTrackerRadius.button,
-                        containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
-                        contentColor = androidx.compose.ui.graphics.Color.White,
-                        elevation = FloatingActionButtonDefaults.elevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        ),
-                        modifier = Modifier.testTag("add_transaction_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = stringResource(R.string.action_add_transaction),
-                            modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
-                        )
+                    if (currentDestination == NavDestination.Home) {
+                        FloatingActionButton(
+                            onClick = {
+                                previousDestination = currentDestination
+                                currentDestination = NavDestination.AddTransaction
+                            },
+                            shape = ExpenseTrackerRadius.button,
+                            containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            elevation = FloatingActionButtonDefaults.elevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            ),
+                            modifier = Modifier.testTag("add_transaction_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.action_add_transaction),
+                                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
+                            )
+                        }
                     }
                 }
             ) { innerPadding ->

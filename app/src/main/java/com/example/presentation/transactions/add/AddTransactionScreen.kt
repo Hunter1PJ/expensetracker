@@ -172,19 +172,25 @@ fun AddTransactionScreenContent(
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState)
-                .imePadding()
-                .padding(
-                    horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                    vertical = ExpenseTrackerSpacing.screenVertical
-                ),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 680.dp)
+                    .verticalScroll(scrollState)
+                    .imePadding()
+                    .padding(
+                        horizontal = ExpenseTrackerSpacing.screenHorizontal,
+                        vertical = ExpenseTrackerSpacing.screenVertical
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
+            ) {
             // Error Banner
             AnimatedVisibility(visible = uiState.error != null) {
                 uiState.error?.let { err ->
@@ -590,6 +596,7 @@ fun AddTransactionScreenContent(
             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxl))
         }
     }
+}
 
     // Material 3 DatePickerDialog
     if (showDatePicker) {

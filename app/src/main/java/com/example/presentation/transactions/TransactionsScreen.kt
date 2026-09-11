@@ -112,7 +112,7 @@ fun TransactionsScreenContent(
                     onClick = onNavigateToAddTransaction,
                     containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = CircleShape,
+                    shape = ExpenseTrackerRadius.button,
                     modifier = Modifier.testTag("add_transaction_fab")
                 ) {
                     Icon(

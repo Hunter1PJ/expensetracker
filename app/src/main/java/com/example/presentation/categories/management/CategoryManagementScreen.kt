@@ -26,13 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -44,7 +39,6 @@ import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -57,12 +51,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.domain.model.Category
+import com.example.domain.model.CategoryType
 import com.example.presentation.common.FinanceVisuals
+import com.example.presentation.components.BackgroundGlowDecoration
 import com.example.presentation.components.EmptyState
+import com.example.presentation.components.ErrorBanner
 import com.example.presentation.components.ExpenseTrackerCard
+import com.example.presentation.components.ExpenseTrackerConfirmationDialog
+import com.example.presentation.components.HeroCard
+import com.example.presentation.components.IconAvatar
 import com.example.presentation.components.LoadingState
 import com.example.presentation.components.PrimaryButton
 import com.example.ui.theme.ExpenseTrackerRadius
@@ -117,12 +118,21 @@ fun CategoryManagementContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = stringResource(R.string.title_category_management),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    Column {
+                        Text(
+                            text = stringResource(R.string.title_category_management),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "EXPENSE & INCOME TAGS",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.2.sp,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(
@@ -159,150 +169,158 @@ fun CategoryManagementContent(
             }
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(
-                    horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                    vertical = ExpenseTrackerSpacing.screenVertical
-                ),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Error banner
-            AnimatedVisibility(visible = uiState.error != null) {
-                uiState.error?.let { err ->
-                    val errorMessage = when (err) {
-                        CategoryManagementError.CategoryNotFound -> stringResource(R.string.error_category_not_found)
-                        CategoryManagementError.SystemCategoryCannotBeArchived -> stringResource(R.string.error_system_category_cannot_archive)
-                        is CategoryManagementError.ArchiveFailed -> err.message ?: stringResource(R.string.error_archive_category_failed)
-                    }
+            BackgroundGlowDecoration(alpha = 0.10f)
 
-                    ExpenseTrackerCard(
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = ExpenseTrackerSpacing.screenHorizontal,
+                        vertical = ExpenseTrackerSpacing.screenVertical
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Error banner
+                AnimatedVisibility(visible = uiState.error != null) {
+                    uiState.error?.let { err ->
+                        val errorMessage = when (err) {
+                            CategoryManagementError.CategoryNotFound -> stringResource(R.string.error_category_not_found)
+                            CategoryManagementError.SystemCategoryCannotBeArchived -> stringResource(R.string.error_system_category_cannot_archive)
+                            is CategoryManagementError.ArchiveFailed -> err.message ?: stringResource(R.string.error_archive_category_failed)
+                        }
+
+                        ErrorBanner(
+                            message = errorMessage,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 540.dp)
+                                .padding(bottom = ExpenseTrackerSpacing.md),
+                            testTag = "category_management_error_banner"
+                        )
+                    }
+                }
+
+                // Filter Tabs in card-like container
+                Surface(
+                    shape = ExpenseTrackerRadius.card,
+                    color = ExpenseTrackerTheme.extendedColors.surface,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        ExpenseTrackerTheme.extendedColors.borderSubtle
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 540.dp)
+                ) {
+                    ScrollableTabRow(
+                        selectedTabIndex = uiState.selectedTab.ordinal,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        edgePadding = ExpenseTrackerSpacing.xs,
+                        divider = {},
                         modifier = Modifier
                             .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                            .padding(bottom = ExpenseTrackerSpacing.md),
-                        containerColor = ExpenseTrackerTheme.extendedColors.financialNegativeContainer.copy(alpha = 0.4f),
-                        borderColor = ExpenseTrackerTheme.extendedColors.financialNegative,
-                        testTag = "category_management_error_banner"
+                            .padding(vertical = 4.dp)
+                            .testTag("category_filter_tabs")
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ErrorOutline,
-                                contentDescription = null,
-                                tint = ExpenseTrackerTheme.extendedColors.financialNegative,
-                                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
-                            )
-                            Text(
-                                text = errorMessage,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.weight(1f)
+                        CategoryFilterTab.entries.forEach { tab ->
+                            val isSelected = uiState.selectedTab == tab
+                            val tabLabel = when (tab) {
+                                CategoryFilterTab.ALL -> stringResource(R.string.tab_all)
+                                CategoryFilterTab.EXPENSE -> stringResource(R.string.tab_expense)
+                                CategoryFilterTab.INCOME -> stringResource(R.string.tab_income)
+                                CategoryFilterTab.BOTH -> stringResource(R.string.tab_both)
+                            }
+
+                            Tab(
+                                selected = isSelected,
+                                onClick = { onTabSelected(tab) },
+                                text = {
+                                    Text(
+                                        text = tabLabel,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                selectedContentColor = MaterialTheme.colorScheme.primary,
+                                unselectedContentColor = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
                             )
                         }
                     }
                 }
-            }
 
-            // Filter Tabs
-            ScrollableTabRow(
-                selectedTabIndex = uiState.selectedTab.ordinal,
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary,
-                edgePadding = 0.dp,
-                divider = {},
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 540.dp)
-                    .testTag("category_filter_tabs")
-            ) {
-                CategoryFilterTab.entries.forEach { tab ->
-                    val isSelected = uiState.selectedTab == tab
-                    val tabLabel = when (tab) {
-                        CategoryFilterTab.ALL -> stringResource(R.string.tab_all)
-                        CategoryFilterTab.EXPENSE -> stringResource(R.string.tab_expense)
-                        CategoryFilterTab.INCOME -> stringResource(R.string.tab_income)
-                        CategoryFilterTab.BOTH -> stringResource(R.string.tab_both)
-                    }
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
 
-                    Tab(
-                        selected = isSelected,
-                        onClick = { onTabSelected(tab) },
-                        text = {
-                            Text(
-                                text = tabLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        selectedContentColor = MaterialTheme.colorScheme.primary,
-                        unselectedContentColor = ExpenseTrackerTheme.extendedColors.textSecondary,
-                        modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
+                if (uiState.isLoading) {
+                    LoadingState(
+                        message = stringResource(R.string.loading_categories),
+                        modifier = Modifier.fillMaxSize(),
+                        testTag = "categories_loading_state"
                     )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
-
-            if (uiState.isLoading) {
-                LoadingState(
-                    message = stringResource(R.string.loading_categories),
-                    modifier = Modifier.fillMaxSize(),
-                    testTag = "categories_loading_state"
-                )
-            } else if (uiState.filteredCategories.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .widthIn(max = 540.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
+                } else if (uiState.filteredCategories.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .widthIn(max = 540.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        EmptyState(
-                            title = stringResource(R.string.no_categories_yet_title),
-                            description = stringResource(R.string.no_categories_yet_desc),
-                            icon = Icons.Outlined.Category,
-                            testTag = "no_categories_empty_state"
-                        )
-                        PrimaryButton(
-                            text = stringResource(R.string.action_add_category),
-                            onClick = onNavigateToAddCategory,
-                            testTag = "empty_state_add_category_button"
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
+                        ) {
+                            EmptyState(
+                                title = stringResource(R.string.no_categories_yet_title),
+                                description = stringResource(R.string.no_categories_yet_desc),
+                                icon = Icons.Outlined.Category,
+                                testTag = "no_categories_empty_state"
+                            )
+                            PrimaryButton(
+                                text = stringResource(R.string.action_add_category),
+                                onClick = onNavigateToAddCategory,
+                                testTag = "empty_state_add_category_button"
+                            )
+                        }
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                        .weight(1f)
-                        .testTag("categories_list"),
-                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(
-                        items = uiState.filteredCategories,
-                        key = { it.id }
-                    ) { category ->
-                        CategoryItemCard(
-                            category = category,
-                            onClick = {
-                                if (!category.isSystem) {
-                                    onEditCategory(category.id)
-                                }
-                            },
-                            onArchive = { onArchiveClicked(category) },
-                            testTag = "category_card_${category.id}"
-                        )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 540.dp)
+                            .weight(1f)
+                            .testTag("categories_list"),
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
+                        contentPadding = PaddingValues(bottom = 88.dp)
+                    ) {
+                        // Category Overview Card
+                        item(key = "categories_overview_hero") {
+                            CategoryOverviewCard(
+                                totalCount = uiState.allCategories.size,
+                                filteredCount = uiState.filteredCategories.size,
+                                selectedTab = uiState.selectedTab
+                            )
+                        }
+
+                        items(
+                            items = uiState.filteredCategories,
+                            key = { it.id }
+                        ) { category ->
+                            CategoryItemCard(
+                                category = category,
+                                onClick = {
+                                    if (!category.isSystem) {
+                                        onEditCategory(category.id)
+                                    }
+                                },
+                                onArchive = { onArchiveClicked(category) },
+                                testTag = "category_card_${category.id}"
+                            )
+                        }
                     }
                 }
             }
@@ -312,56 +330,71 @@ fun CategoryManagementContent(
     // Archive Confirmation Dialog
     if (uiState.categoryToArchive != null) {
         val category = uiState.categoryToArchive
-        AlertDialog(
+        ExpenseTrackerConfirmationDialog(
+            title = stringResource(R.string.dialog_archive_category_title, category.name),
+            message = stringResource(R.string.dialog_archive_category_message),
+            confirmText = stringResource(R.string.action_archive),
+            dismissText = stringResource(R.string.action_cancel),
+            isDestructive = true,
+            onConfirm = onConfirmArchive,
             onDismissRequest = onDismissArchiveDialog,
-            title = {
-                Text(
-                    text = stringResource(R.string.dialog_archive_category_title, category.name),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.dialog_archive_category_message),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = onConfirmArchive,
-                    enabled = !uiState.isArchiving,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ExpenseTrackerTheme.extendedColors.financialNegative,
-                        contentColor = Color.White
-                    ),
-                    shape = ExpenseTrackerRadius.button,
-                    modifier = Modifier.testTag("confirm_archive_category_button")
-                ) {
-                    if (uiState.isArchiving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(text = stringResource(R.string.action_archive))
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = onDismissArchiveDialog,
-                    enabled = !uiState.isArchiving,
-                    modifier = Modifier.testTag("cancel_archive_category_button")
-                ) {
-                    Text(text = stringResource(R.string.action_cancel))
-                }
-            },
-            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-            shape = ExpenseTrackerRadius.card
+            confirmTestTag = "confirm_archive_category_button",
+            dismissTestTag = "cancel_archive_category_button",
+            testTag = "archive_category_confirmation_dialog"
         )
+    }
+}
+
+@Composable
+private fun CategoryOverviewCard(
+    totalCount: Int,
+    filteredCount: Int,
+    selectedTab: CategoryFilterTab,
+    modifier: Modifier = Modifier
+) {
+    HeroCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("categories_overview_hero")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "CATEGORIES DIRECTORY",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.1.sp,
+                    color = ExpenseTrackerTheme.extendedColors.primaryPurple
+                )
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
+                Text(
+                    text = "$filteredCount Active ${if (filteredCount == 1) "Category" else "Categories"}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.16f))
+                    .border(1.dp, ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.3f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Category,
+                    contentDescription = null,
+                    tint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
+                )
+            }
+        }
     }
 }
 
@@ -382,9 +415,9 @@ private fun CategoryItemCard(
             .fillMaxWidth()
             .clickable(enabled = !category.isSystem, onClick = onClick)
             .testTag(testTag),
-        shape = ExpenseTrackerRadius.card,
-        containerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-        borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
+        shape = ExpenseTrackerRadius.cardInteractive,
+        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
     ) {
         Row(
@@ -398,21 +431,14 @@ private fun CategoryItemCard(
                 horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
             ) {
                 // Icon Avatar
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .border(1.dp, accentColor.copy(alpha = 0.4f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
-                    )
-                }
+                IconAvatar(
+                    icon = icon,
+                    contentDescription = category.name,
+                    tint = accentColor,
+                    backgroundColor = accentColor.copy(alpha = 0.15f),
+                    borderColor = accentColor.copy(alpha = 0.35f),
+                    size = 46.dp
+                )
 
                 // Name & Metadata
                 Column(
@@ -431,35 +457,54 @@ private fun CategoryItemCard(
                     ) {
                         // Type Tag
                         Surface(
-                            shape = RoundedCornerShape(ExpenseTrackerRadius.xs),
-                            color = ExpenseTrackerTheme.extendedColors.surfaceHighlight
+                            shape = ExpenseTrackerRadius.chipPill,
+                            color = when (category.type) {
+                                CategoryType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegativeContainer.copy(alpha = 0.5f)
+                                CategoryType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositiveContainer.copy(alpha = 0.5f)
+                                CategoryType.BOTH -> ExpenseTrackerTheme.extendedColors.surfaceHighlight
+                            },
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                ExpenseTrackerTheme.extendedColors.borderSubtle
+                            )
                         ) {
                             Text(
                                 text = typeLabel,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                fontWeight = FontWeight.Medium,
+                                color = when (category.type) {
+                                    CategoryType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegative
+                                    CategoryType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                    CategoryType.BOTH -> ExpenseTrackerTheme.extendedColors.textSecondary
+                                },
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
 
                         // System Tag if applicable
                         if (category.isSystem) {
                             Surface(
-                                shape = RoundedCornerShape(ExpenseTrackerRadius.xs),
-                                color = MaterialTheme.colorScheme.primaryContainer
+                                shape = ExpenseTrackerRadius.chipPill,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                )
                             ) {
                                 Text(
                                     text = stringResource(R.string.badge_system),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
                         }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))
 
             // Right side: Archive button or lock indicator for system categories
             if (!category.isSystem) {

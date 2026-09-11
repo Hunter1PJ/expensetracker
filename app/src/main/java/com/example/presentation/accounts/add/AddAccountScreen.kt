@@ -29,8 +29,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +66,8 @@ import com.example.domain.model.CurrencyInfo
 import com.example.presentation.common.ColorOption
 import com.example.presentation.common.FinanceVisuals
 import com.example.presentation.common.IconOption
+import com.example.presentation.components.BackgroundGlowDecoration
+import com.example.presentation.components.ErrorBanner
 import com.example.presentation.components.ExpenseTrackerCard
 import com.example.presentation.components.LoadingState
 import com.example.presentation.components.SectionHeader
@@ -128,16 +131,25 @@ fun AddAccountScreenContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = if (uiState.isEditMode) {
-                            stringResource(R.string.title_edit_account)
-                        } else {
-                            stringResource(R.string.title_add_account)
-                        },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    Column {
+                        Text(
+                            text = if (uiState.isEditMode) {
+                                stringResource(R.string.title_edit_account)
+                            } else {
+                                stringResource(R.string.title_add_account)
+                            },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = if (uiState.isEditMode) "UPDATE WALLET CONFIGURATION" else "CONFIGURE NEW WALLET",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.2.sp,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(
@@ -166,382 +178,359 @@ fun AddAccountScreenContent(
                     .padding(innerPadding)
             )
         } else {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .verticalScroll(scrollState)
-                    .imePadding()
-                    .padding(
-                        horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                        vertical = ExpenseTrackerSpacing.screenVertical
-                    ),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
             ) {
-                // Error Banner
-                AnimatedVisibility(visible = uiState.error != null) {
-                    uiState.error?.let { err ->
-                        val errorMessage = when (err) {
-                            AddAccountError.NameRequired -> stringResource(R.string.error_account_name_required)
-                            is AddAccountError.InvalidInitialBalance -> err.message ?: stringResource(R.string.error_invalid_initial_balance)
-                            AddAccountError.AccountNotFound -> stringResource(R.string.error_account_not_found)
-                            is AddAccountError.SaveFailed -> err.message ?: stringResource(R.string.error_save_account_failed)
-                        }
+                BackgroundGlowDecoration(alpha = 0.08f)
 
-                        ExpenseTrackerCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .widthIn(max = 540.dp),
-                            containerColor = ExpenseTrackerTheme.extendedColors.financialNegativeContainer.copy(alpha = 0.4f),
-                            borderColor = ExpenseTrackerTheme.extendedColors.financialNegative,
-                            testTag = "add_account_error_banner"
-                        ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .imePadding()
+                        .padding(
+                            horizontal = ExpenseTrackerSpacing.screenHorizontal,
+                            vertical = ExpenseTrackerSpacing.screenVertical
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
+                ) {
+                    // Error Banner
+                    AnimatedVisibility(visible = uiState.error != null) {
+                        uiState.error?.let { err ->
+                            val errorMessage = when (err) {
+                                AddAccountError.NameRequired -> stringResource(R.string.error_account_name_required)
+                                is AddAccountError.InvalidInitialBalance -> err.message ?: stringResource(R.string.error_invalid_initial_balance)
+                                AddAccountError.AccountNotFound -> stringResource(R.string.error_account_not_found)
+                                is AddAccountError.SaveFailed -> err.message ?: stringResource(R.string.error_save_account_failed)
+                            }
+
+                            ErrorBanner(
+                                message = errorMessage,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = 540.dp),
+                                testTag = "add_account_error_banner"
+                            )
+                        }
+                    }
+
+                    // Card 1: Account Information & Type
+                    ExpenseTrackerCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 540.dp),
+                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                            SectionHeader(title = stringResource(R.string.account_name_label))
+
+                            OutlinedTextField(
+                                value = uiState.name,
+                                onValueChange = onNameChanged,
+                                placeholder = {
+                                    Text(
+                                        text = stringResource(R.string.account_name_hint),
+                                        color = ExpenseTrackerTheme.extendedColors.textTertiary
+                                    )
+                                },
+                                singleLine = true,
+                                shape = ExpenseTrackerRadius.button,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                    unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("account_name_input_field")
+                            )
+
+                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+                            SectionHeader(title = stringResource(R.string.account_type_label))
+
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("account_type_selector"),
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                            ) {
+                                AccountType.entries.forEach { type ->
+                                    val isSelected = uiState.type == type
+                                    val typeLabel = FinanceVisuals.getAccountTypeLabel(type)
+
+                                    Surface(
+                                        shape = ExpenseTrackerRadius.chipPill,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            width = if (isSelected) 1.5.dp else 1.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.borderSubtle
+                                        ),
+                                        modifier = Modifier
+                                            .clip(ExpenseTrackerRadius.chipPill)
+                                            .clickable { onTypeChanged(type) }
+                                            .testTag("account_type_${type.name.lowercase()}")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(
+                                                horizontal = ExpenseTrackerSpacing.md,
+                                                vertical = ExpenseTrackerSpacing.sm
+                                            ),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                                        ) {
+                                            Text(
+                                                text = typeLabel,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
+                                            )
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Card 2: Currency & Initial Balance
+                    ExpenseTrackerCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 540.dp),
+                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ErrorOutline,
-                                    contentDescription = null,
-                                    tint = ExpenseTrackerTheme.extendedColors.financialNegative,
-                                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
-                                )
-                                Text(
-                                    text = errorMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                SectionHeader(title = stringResource(R.string.currency_label))
+                                if (!uiState.isCurrencyEditable) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = stringResource(R.string.currency_locked_desc),
+                                        tint = ExpenseTrackerTheme.extendedColors.textTertiary,
+                                        modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
+                                    )
+                                }
+                            }
+
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("currency_selector"),
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                            ) {
+                                CurrencyInfo.SUPPORTED_CURRENCIES.forEach { currency ->
+                                    val isSelected = uiState.selectedCurrency.currencyCode == currency.currencyCode
+
+                                    Surface(
+                                        shape = ExpenseTrackerRadius.chipPill,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            width = if (isSelected) 1.5.dp else 1.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.borderSubtle
+                                        ),
+                                        modifier = Modifier
+                                            .clip(ExpenseTrackerRadius.chipPill)
+                                            .clickable(enabled = uiState.isCurrencyEditable) {
+                                                onCurrencyChanged(currency)
+                                            }
+                                            .testTag("currency_chip_${currency.currencyCode.lowercase()}")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(
+                                                horizontal = ExpenseTrackerSpacing.md,
+                                                vertical = ExpenseTrackerSpacing.sm
+                                            ),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                                        ) {
+                                            Text(
+                                                text = "${currency.currencyCode} (${currency.symbol})",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
+                                            )
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                            ) {
+                                SectionHeader(title = stringResource(R.string.initial_balance_label))
+                                if (!uiState.isInitialBalanceEditable) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = stringResource(R.string.initial_balance_locked_desc),
+                                        tint = ExpenseTrackerTheme.extendedColors.textTertiary,
+                                        modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
+                                    )
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = uiState.initialBalanceInput,
+                                onValueChange = onInitialBalanceChanged,
+                                enabled = uiState.isInitialBalanceEditable,
+                                placeholder = {
+                                    Text(
+                                        text = "0",
+                                        color = ExpenseTrackerTheme.extendedColors.textTertiary
+                                    )
+                                },
+                                leadingIcon = {
+                                    Text(
+                                        text = uiState.selectedCurrency.symbol,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(start = ExpenseTrackerSpacing.md)
+                                    )
+                                },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                shape = ExpenseTrackerRadius.button,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                    unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                    disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated.copy(alpha = 0.5f),
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                                    disabledBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("initial_balance_input_field")
+                            )
+                        }
+                    }
+
+                    // Card 3: Visual Appearance (Icon & Color)
+                    ExpenseTrackerCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 540.dp),
+                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                            SectionHeader(title = stringResource(R.string.icon_label))
+
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("account_icon_picker"),
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                            ) {
+                                FinanceVisuals.ACCOUNT_ICONS.forEach { iconOption ->
+                                    val isSelected = uiState.selectedIconName == iconOption.id
+                                    IconPickerItem(
+                                        iconOption = iconOption,
+                                        isSelected = isSelected,
+                                        onClick = { onIconChanged(iconOption.id) },
+                                        testTag = "account_icon_${iconOption.id}"
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+                            SectionHeader(title = stringResource(R.string.color_label))
+
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("account_color_picker"),
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                            ) {
+                                FinanceVisuals.CURATED_COLORS.forEach { colorOption ->
+                                    val isSelected = uiState.selectedColorHex.equals(colorOption.hex, ignoreCase = true)
+                                    ColorPickerItem(
+                                        colorOption = colorOption,
+                                        isSelected = isSelected,
+                                        onClick = { onColorChanged(colorOption.hex) },
+                                        testTag = "account_color_${colorOption.hex.removePrefix("#").lowercase()}"
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                // 1. Account Name Input
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                ) {
-                    SectionHeader(title = stringResource(R.string.account_name_label))
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
+                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
 
-                    OutlinedTextField(
-                        value = uiState.name,
-                        onValueChange = onNameChanged,
-                        placeholder = {
-                            Text(
-                                text = stringResource(R.string.account_name_hint),
-                                color = ExpenseTrackerTheme.extendedColors.textTertiary
-                            )
-                        },
-                        singleLine = true,
+                    // Save Button
+                    Button(
+                        onClick = onSaveAccount,
+                        enabled = !uiState.isSaving,
                         shape = ExpenseTrackerRadius.button,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-                            unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.cardBorder
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
+                            disabledContentColor = ExpenseTrackerTheme.extendedColors.textSecondary
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("account_name_input_field")
-                    )
-                }
-
-                // 2. Account Type Selector
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                ) {
-                    SectionHeader(title = stringResource(R.string.account_type_label))
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("account_type_selector"),
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                            .widthIn(max = 540.dp)
+                            .height(54.dp)
+                            .testTag("save_account_button")
                     ) {
-                        AccountType.entries.forEach { type ->
-                            val isSelected = uiState.type == type
-                            val typeLabel = FinanceVisuals.getAccountTypeLabel(type)
-
-                            Surface(
-                                shape = ExpenseTrackerRadius.chip,
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else ExpenseTrackerTheme.extendedColors.cardBackground,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    width = if (isSelected) 1.5.dp else 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.cardBorder
-                                ),
-                                modifier = Modifier
-                                    .clip(ExpenseTrackerRadius.chip)
-                                    .clickable { onTypeChanged(type) }
-                                    .testTag("account_type_${type.name.lowercase()}")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(
-                                        horizontal = ExpenseTrackerSpacing.md,
-                                        vertical = ExpenseTrackerSpacing.sm
-                                    ),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                                ) {
-                                    Text(
-                                        text = typeLabel,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
-                                    )
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 3. Currency Selector (Immutable in edit mode)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                    ) {
-                        SectionHeader(title = stringResource(R.string.currency_label))
-                        if (!uiState.isCurrencyEditable) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = stringResource(R.string.currency_locked_desc),
-                                tint = ExpenseTrackerTheme.extendedColors.textTertiary,
-                                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
+                        if (uiState.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
                             )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("currency_selector"),
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                    ) {
-                        CurrencyInfo.SUPPORTED_CURRENCIES.forEach { currency ->
-                            val isSelected = uiState.selectedCurrency.currencyCode == currency.currencyCode
-
-                            Surface(
-                                shape = ExpenseTrackerRadius.chip,
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else ExpenseTrackerTheme.extendedColors.cardBackground,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    width = if (isSelected) 1.5.dp else 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.cardBorder
-                                ),
-                                modifier = Modifier
-                                    .clip(ExpenseTrackerRadius.chip)
-                                    .clickable(enabled = uiState.isCurrencyEditable) {
-                                        onCurrencyChanged(currency)
-                                    }
-                                    .testTag("currency_chip_${currency.currencyCode.lowercase()}")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(
-                                        horizontal = ExpenseTrackerSpacing.md,
-                                        vertical = ExpenseTrackerSpacing.sm
-                                    ),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                                ) {
-                                    Text(
-                                        text = "${currency.currencyCode} (${currency.symbol})",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
-                                    )
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 4. Initial Balance Input (Immutable in edit mode)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                    ) {
-                        SectionHeader(title = stringResource(R.string.initial_balance_label))
-                        if (!uiState.isInitialBalanceEditable) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = stringResource(R.string.initial_balance_locked_desc),
-                                tint = ExpenseTrackerTheme.extendedColors.textTertiary,
-                                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                    OutlinedTextField(
-                        value = uiState.initialBalanceInput,
-                        onValueChange = onInitialBalanceChanged,
-                        enabled = uiState.isInitialBalanceEditable,
-                        placeholder = {
+                            Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))
+                            Text(text = stringResource(R.string.action_saving))
+                        } else {
                             Text(
-                                text = "0",
-                                color = ExpenseTrackerTheme.extendedColors.textTertiary
-                            )
-                        },
-                        leadingIcon = {
-                            Text(
-                                text = uiState.selectedCurrency.symbol,
+                                text = if (uiState.isEditMode) {
+                                    stringResource(R.string.action_update_account)
+                                } else {
+                                    stringResource(R.string.action_save_account)
+                                },
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = ExpenseTrackerSpacing.md)
-                            )
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        shape = ExpenseTrackerRadius.button,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-                            unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-                            disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
-                            disabledBorderColor = ExpenseTrackerTheme.extendedColors.cardBorder.copy(alpha = 0.5f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("initial_balance_input_field")
-                    )
-                }
-
-                // 5. Icon Selector
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                ) {
-                    SectionHeader(title = stringResource(R.string.icon_label))
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("account_icon_picker"),
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                    ) {
-                        FinanceVisuals.ACCOUNT_ICONS.forEach { iconOption ->
-                            val isSelected = uiState.selectedIconName == iconOption.id
-                            IconPickerItem(
-                                iconOption = iconOption,
-                                isSelected = isSelected,
-                                onClick = { onIconChanged(iconOption.id) },
-                                testTag = "account_icon_${iconOption.id}"
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxl))
                 }
-
-                // 6. Color Selector
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                ) {
-                    SectionHeader(title = stringResource(R.string.color_label))
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("account_color_picker"),
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                    ) {
-                        FinanceVisuals.CURATED_COLORS.forEach { colorOption ->
-                            val isSelected = uiState.selectedColorHex.equals(colorOption.hex, ignoreCase = true)
-                            ColorPickerItem(
-                                colorOption = colorOption,
-                                isSelected = isSelected,
-                                onClick = { onColorChanged(colorOption.hex) },
-                                testTag = "account_color_${colorOption.hex.removePrefix("#").lowercase()}"
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
-
-                // 7. Save Button
-                Button(
-                    onClick = onSaveAccount,
-                    enabled = !uiState.isSaving,
-                    shape = ExpenseTrackerRadius.button,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
-                        disabledContentColor = ExpenseTrackerTheme.extendedColors.textSecondary
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                        .height(52.dp)
-                        .testTag("save_account_button")
-                ) {
-                    if (uiState.isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))
-                        Text(text = stringResource(R.string.action_saving))
-                    } else {
-                        Text(
-                            text = if (uiState.isEditMode) {
-                                stringResource(R.string.action_update_account)
-                            } else {
-                                stringResource(R.string.action_save_account)
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxl))
             }
         }
     }
@@ -560,11 +549,11 @@ fun IconPickerItem(
             .size(48.dp)
             .clip(ExpenseTrackerRadius.chip)
             .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer else ExpenseTrackerTheme.extendedColors.cardBackground
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer else ExpenseTrackerTheme.extendedColors.surfaceElevated
             )
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.cardBorder,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.borderSubtle,
                 shape = ExpenseTrackerRadius.chip
             )
             .clickable(onClick = onClick)

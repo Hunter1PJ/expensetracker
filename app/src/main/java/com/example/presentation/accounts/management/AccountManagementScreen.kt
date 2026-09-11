@@ -26,12 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -41,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -54,12 +49,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.domain.model.Account
 import com.example.presentation.common.FinanceVisuals
+import com.example.presentation.components.BackgroundGlowDecoration
 import com.example.presentation.components.EmptyState
+import com.example.presentation.components.ErrorBanner
 import com.example.presentation.components.ExpenseTrackerCard
+import com.example.presentation.components.ExpenseTrackerConfirmationDialog
+import com.example.presentation.components.HeroCard
+import com.example.presentation.components.IconAvatar
 import com.example.presentation.components.LoadingState
 import com.example.presentation.components.PrimaryButton
 import com.example.ui.theme.ExpenseTrackerRadius
@@ -112,12 +113,21 @@ fun AccountManagementContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = stringResource(R.string.title_account_management),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    Column {
+                        Text(
+                            text = stringResource(R.string.title_account_management),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "PORTFOLIO & BALANCES",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.2.sp,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(
@@ -154,105 +164,97 @@ fun AccountManagementContent(
             }
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(
-                    horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                    vertical = ExpenseTrackerSpacing.screenVertical
-                ),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Error banner
-            AnimatedVisibility(visible = uiState.error != null) {
-                uiState.error?.let { err ->
-                    val errorMessage = when (err) {
-                        AccountManagementError.AccountNotFound -> stringResource(R.string.error_account_not_found)
-                        is AccountManagementError.ArchiveFailed -> err.message ?: stringResource(R.string.error_archive_account_failed)
-                    }
+            BackgroundGlowDecoration(alpha = 0.10f)
 
-                    ExpenseTrackerCard(
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = ExpenseTrackerSpacing.screenHorizontal,
+                        vertical = ExpenseTrackerSpacing.screenVertical
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Error banner
+                AnimatedVisibility(visible = uiState.error != null) {
+                    uiState.error?.let { err ->
+                        val errorMessage = when (err) {
+                            AccountManagementError.AccountNotFound -> stringResource(R.string.error_account_not_found)
+                            is AccountManagementError.ArchiveFailed -> err.message ?: stringResource(R.string.error_archive_account_failed)
+                        }
+
+                        ErrorBanner(
+                            message = errorMessage,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 540.dp)
+                                .padding(bottom = ExpenseTrackerSpacing.md),
+                            testTag = "account_management_error_banner"
+                        )
+                    }
+                }
+
+                if (uiState.isLoading) {
+                    LoadingState(
+                        message = stringResource(R.string.loading_accounts),
+                        modifier = Modifier.fillMaxSize(),
+                        testTag = "accounts_loading_state"
+                    )
+                } else if (uiState.accounts.isEmpty()) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                            .padding(bottom = ExpenseTrackerSpacing.md),
-                        containerColor = ExpenseTrackerTheme.extendedColors.financialNegativeContainer.copy(alpha = 0.4f),
-                        borderColor = ExpenseTrackerTheme.extendedColors.financialNegative,
-                        testTag = "account_management_error_banner"
+                            .fillMaxSize()
+                            .widthIn(max = 540.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ErrorOutline,
-                                contentDescription = null,
-                                tint = ExpenseTrackerTheme.extendedColors.financialNegative,
-                                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
+                            EmptyState(
+                                title = stringResource(R.string.no_accounts_yet_title),
+                                description = stringResource(R.string.no_accounts_yet_desc),
+                                icon = Icons.Outlined.AccountBalanceWallet,
+                                testTag = "no_accounts_management_empty_state"
                             )
-                            Text(
-                                text = errorMessage,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.weight(1f)
+                            PrimaryButton(
+                                text = stringResource(R.string.action_add_account),
+                                onClick = onNavigateToAddAccount,
+                                testTag = "empty_state_add_account_button"
                             )
                         }
                     }
-                }
-            }
-
-            if (uiState.isLoading) {
-                LoadingState(
-                    message = stringResource(R.string.loading_accounts),
-                    modifier = Modifier.fillMaxSize(),
-                    testTag = "accounts_loading_state"
-                )
-            } else if (uiState.accounts.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .widthIn(max = 540.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 540.dp)
+                            .weight(1f)
+                            .testTag("accounts_list"),
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
+                        contentPadding = PaddingValues(bottom = 88.dp)
                     ) {
-                        EmptyState(
-                            title = stringResource(R.string.no_accounts_yet_title),
-                            description = stringResource(R.string.no_accounts_yet_desc),
-                            icon = Icons.Outlined.AccountBalanceWallet,
-                            testTag = "no_accounts_management_empty_state"
-                        )
-                        PrimaryButton(
-                            text = stringResource(R.string.action_add_account),
-                            onClick = onNavigateToAddAccount,
-                            testTag = "empty_state_add_account_button"
-                        )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                        .weight(1f)
-                        .testTag("accounts_list"),
-                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(
-                        items = uiState.accounts,
-                        key = { it.account.id }
-                    ) { item ->
-                        AccountItemCard(
-                            item = item,
-                            onClick = { onEditAccount(item.account.id) },
-                            onArchive = { onArchiveClicked(item.account) },
-                            testTag = "account_card_${item.account.id}"
-                        )
+                        // Portfolio Header Card
+                        item(key = "accounts_overview_hero") {
+                            AccountPortfolioOverviewCard(accounts = uiState.accounts)
+                        }
+
+                        items(
+                            items = uiState.accounts,
+                            key = { it.account.id }
+                        ) { item ->
+                            AccountItemCard(
+                                item = item,
+                                onClick = { onEditAccount(item.account.id) },
+                                onArchive = { onArchiveClicked(item.account) },
+                                testTag = "account_card_${item.account.id}"
+                            )
+                        }
                     }
                 }
             }
@@ -262,56 +264,69 @@ fun AccountManagementContent(
     // Archive Confirmation Dialog
     if (uiState.accountToArchive != null) {
         val account = uiState.accountToArchive
-        AlertDialog(
+        ExpenseTrackerConfirmationDialog(
+            title = stringResource(R.string.dialog_archive_account_title, account.name),
+            message = stringResource(R.string.dialog_archive_account_message),
+            confirmText = stringResource(R.string.action_archive),
+            dismissText = stringResource(R.string.action_cancel),
+            isDestructive = true,
+            onConfirm = onConfirmArchive,
             onDismissRequest = onDismissArchiveDialog,
-            title = {
-                Text(
-                    text = stringResource(R.string.dialog_archive_account_title, account.name),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.dialog_archive_account_message),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = onConfirmArchive,
-                    enabled = !uiState.isArchiving,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ExpenseTrackerTheme.extendedColors.financialNegative,
-                        contentColor = Color.White
-                    ),
-                    shape = ExpenseTrackerRadius.button,
-                    modifier = Modifier.testTag("confirm_archive_button")
-                ) {
-                    if (uiState.isArchiving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(text = stringResource(R.string.action_archive))
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = onDismissArchiveDialog,
-                    enabled = !uiState.isArchiving,
-                    modifier = Modifier.testTag("cancel_archive_button")
-                ) {
-                    Text(text = stringResource(R.string.action_cancel))
-                }
-            },
-            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-            shape = ExpenseTrackerRadius.card
+            confirmTestTag = "confirm_archive_button",
+            dismissTestTag = "cancel_archive_button",
+            testTag = "archive_account_confirmation_dialog"
         )
+    }
+}
+
+@Composable
+private fun AccountPortfolioOverviewCard(
+    accounts: List<AccountItemUiState>,
+    modifier: Modifier = Modifier
+) {
+    HeroCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("accounts_portfolio_hero")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "ACTIVE ACCOUNTS",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.1.sp,
+                    color = ExpenseTrackerTheme.extendedColors.primaryPurple
+                )
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
+                Text(
+                    text = "${accounts.size} ${if (accounts.size == 1) "Account" else "Accounts"}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.16f))
+                    .border(1.dp, ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.3f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AccountBalance,
+                    contentDescription = null,
+                    tint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
+                )
+            }
+        }
     }
 }
 
@@ -333,9 +348,9 @@ private fun AccountItemCard(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .testTag(testTag),
-        shape = ExpenseTrackerRadius.card,
-        containerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-        borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
+        shape = ExpenseTrackerRadius.cardInteractive,
+        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
     ) {
         Row(
@@ -349,21 +364,14 @@ private fun AccountItemCard(
                 horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
             ) {
                 // Icon Avatar
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .border(1.dp, accentColor.copy(alpha = 0.4f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
-                    )
-                }
+                IconAvatar(
+                    icon = icon,
+                    contentDescription = account.name,
+                    tint = accentColor,
+                    backgroundColor = accentColor.copy(alpha = 0.15f),
+                    borderColor = accentColor.copy(alpha = 0.35f),
+                    size = 46.dp
+                )
 
                 // Account Name & Metadata
                 Column(
@@ -382,33 +390,43 @@ private fun AccountItemCard(
                     ) {
                         // Type Tag
                         Surface(
-                            shape = RoundedCornerShape(ExpenseTrackerRadius.xs),
-                            color = ExpenseTrackerTheme.extendedColors.surfaceHighlight
+                            shape = ExpenseTrackerRadius.chipPill,
+                            color = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                ExpenseTrackerTheme.extendedColors.borderSubtle
+                            )
                         ) {
                             Text(
                                 text = typeLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
 
                         // Currency Tag
                         Surface(
-                            shape = RoundedCornerShape(ExpenseTrackerRadius.xs),
-                            color = ExpenseTrackerTheme.extendedColors.surfaceHighlight
+                            shape = ExpenseTrackerRadius.chipPill,
+                            color = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.3f)
+                            )
                         ) {
                             Text(
                                 text = account.initialBalance.currencyCode,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                color = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))
 
             // Right side: Balance & Archive
             Row(
