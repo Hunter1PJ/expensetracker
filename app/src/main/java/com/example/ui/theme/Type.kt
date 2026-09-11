@@ -164,3 +164,18 @@ val Typography = Typography(
         lineHeightStyle = defaultLineHeightStyle
     )
 )
+
+/**
+ * Semantic typography aliases for financial applications.
+ */
+object ExpenseTrackerTypography {
+    val displayBalance: TextStyle get() = Typography.displayLarge
+    val largeNumber: TextStyle get() = Typography.displayMedium
+    val pageTitle: TextStyle get() = Typography.headlineLarge
+    val sectionTitle: TextStyle get() = Typography.headlineSmall
+    val cardTitle: TextStyle get() = Typography.titleMedium
+    val body: TextStyle get() = Typography.bodyLarge
+    val bodyMuted: TextStyle get() = Typography.bodyMedium
+    val label: TextStyle get() = Typography.labelLarge
+    val caption: TextStyle get() = Typography.labelSmall
+}

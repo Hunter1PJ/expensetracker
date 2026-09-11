@@ -1,6 +1,7 @@
 package com.example.domain.model
 
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * Domain model representing a financial ledger transaction.
@@ -25,5 +26,6 @@ data class Transaction(
     val transactionTime: Instant,
     val note: String? = null,
     val recurringRuleId: Long? = null,
+    val recurringOccurrenceDate: LocalDate? = null,
     val createdAt: Instant = Instant.now()
 )

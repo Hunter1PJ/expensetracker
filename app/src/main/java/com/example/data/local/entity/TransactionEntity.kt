@@ -7,6 +7,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.domain.model.TransactionType
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * Room Entity representing a single ledger transaction (Expense, Income, or Transfer).
@@ -52,6 +53,7 @@ import java.time.Instant
         Index(value = ["category_id"]),
         Index(value = ["transaction_time"]),
         Index(value = ["recurring_rule_id"]),
+        Index(value = ["recurring_rule_id", "recurring_occurrence_date"]),
         Index(value = ["account_id", "transaction_time"])
     ]
 )
@@ -74,6 +76,8 @@ data class TransactionEntity(
     val note: String?,
     @ColumnInfo(name = "recurring_rule_id")
     val recurringRuleId: Long?,
+    @ColumnInfo(name = "recurring_occurrence_date")
+    val recurringOccurrenceDate: LocalDate? = null,
     @ColumnInfo(name = "created_at")
     val createdAt: Instant
 )

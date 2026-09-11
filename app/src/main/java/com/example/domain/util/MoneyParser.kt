@@ -17,7 +17,7 @@ object MoneyParser {
      */
     fun getDecimalPlaces(currencyCode: String): Int {
         return when (currencyCode.uppercase().trim()) {
-            "JPY", "KRW", "VND", "CLP", "PYG", "RWF", "UGX", "BIF", "DJF", "GNF", "KMF" -> 0
+            "JPY", "KRW", "VND", "CLP", "PYG", "RWF", "UGX", "BIF", "DJF", "GNF", "KMF", "UZS" -> 0
             "BHD", "JOD", "KWD", "OMR", "TND" -> 3
             else -> 2
         }
@@ -111,37 +111,96 @@ object MoneyParser {
 
     /**
      * Formats a [Money] object into a display string without floating-point arithmetic.
-     * E.g. Money(1250L, "USD") -> "$12.50" or "12.50 USD".
+     * Supports grouping separators (commas), explicit signs (+/-), and prefix/suffix currency symbols.
+     *
+     * Examples:
+     * - USD 1250L -> "$12.50" (or "$1,250.50" with useGrouping)
+     * - UZS 4850000L -> "4,850,000 so'm" or "4850000 so'm"
+     * - EUR 98000L -> "€980.00"
+     * - JPY 12000L -> "¥12,000"
      */
-    fun format(money: Money, includeSymbol: Boolean = true): String {
+    fun format(
+        money: Money,
+        includeSymbol: Boolean = true,
+        useGrouping: Boolean = false,
+        showExplicitSign: Boolean = false,
+        showCurrencyCode: Boolean = false
+    ): String {
         val decimals = getDecimalPlaces(money.currencyCode)
-        val isNegative = money.amountInMinorUnits < 0
+        val isNegative = money.amountInMinorUnits < 0L
+        val isPositive = money.amountInMinorUnits > 0L
         val absoluteUnits = if (isNegative) -money.amountInMinorUnits else money.amountInMinorUnits
 
-        val formattedAmount = if (decimals == 0) {
-            absoluteUnits.toString()
+        val wholeNumber: Long
+        val fractionStr: String
+
+        if (decimals == 0) {
+            wholeNumber = absoluteUnits
+            fractionStr = ""
         } else {
             var divisor = 1L
             for (i in 0 until decimals) {
                 divisor *= 10L
             }
-            val whole = absoluteUnits / divisor
+            wholeNumber = absoluteUnits / divisor
             val fraction = absoluteUnits % divisor
-            val fractionStr = fraction.toString().padStart(decimals, '0')
-            "$whole.$fractionStr"
+            fractionStr = fraction.toString().padStart(decimals, '0')
         }
 
-        val sign = if (isNegative) "-" else ""
+        val wholeFormatted = if (useGrouping) {
+            val rawWhole = wholeNumber.toString()
+            val grouped = StringBuilder()
+            val offset = rawWhole.length % 3
+            for (i in rawWhole.indices) {
+                if (i > 0 && (i - offset) % 3 == 0) {
+                    grouped.append(',')
+                }
+                grouped.append(rawWhole[i])
+            }
+            grouped.toString()
+        } else {
+            wholeNumber.toString()
+        }
+
+        val formattedAmount = if (fractionStr.isNotEmpty()) {
+            "$wholeFormatted.$fractionStr"
+        } else {
+            wholeFormatted
+        }
+
+        val sign = when {
+            isNegative -> "-"
+            showExplicitSign && isPositive -> "+"
+            else -> ""
+        }
 
         if (!includeSymbol) {
             return "$sign$formattedAmount"
         }
 
-        val symbol = getCurrencySymbol(money.currencyCode)
-        return if (symbol.isNotEmpty()) {
-            "$sign$symbol$formattedAmount"
+        val currencyUpper = money.currencyCode.uppercase().trim()
+        val baseFormatted = when (currencyUpper) {
+            "USD" -> "$sign$$formattedAmount"
+            "EUR" -> "$sign€$formattedAmount"
+            "GBP" -> "$sign£$formattedAmount"
+            "JPY" -> "$sign¥$formattedAmount"
+            "KRW" -> "$sign₩$formattedAmount"
+            "CNY" -> "$sign¥$formattedAmount"
+            "RUB" -> "$sign₽$formattedAmount"
+            "INR" -> "$sign₹$formattedAmount"
+            "UZS" -> if (sign.isNotEmpty()) "$sign$formattedAmount so\'m" else "$formattedAmount so\'m"
+            else -> if (sign.isNotEmpty()) "$sign$formattedAmount $currencyUpper" else "$formattedAmount $currencyUpper"
+        }
+
+        return if (showCurrencyCode) {
+            val alreadyHasCurrencyInBase = currencyUpper !in listOf("USD", "EUR", "GBP", "JPY", "KRW", "CNY", "RUB", "INR", "UZS")
+            if (alreadyHasCurrencyInBase) {
+                baseFormatted
+            } else {
+                "$baseFormatted $currencyUpper"
+            }
         } else {
-            "$sign$formattedAmount ${money.currencyCode}"
+            baseFormatted
         }
     }
 
@@ -151,9 +210,10 @@ object MoneyParser {
             "EUR" -> "€"
             "GBP" -> "£"
             "JPY" -> "¥"
+            "KRW" -> "₩"
             "CNY" -> "¥"
             "RUB" -> "₽"
-            "UZS" -> "UZS "
+            "UZS" -> "so'm"
             "INR" -> "₹"
             else -> "$currencyCode "
         }

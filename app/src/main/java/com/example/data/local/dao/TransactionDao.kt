@@ -15,6 +15,12 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY transaction_time DESC, created_at DESC")
     fun observeAllTransactions(): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions ORDER BY transaction_time DESC, created_at DESC LIMIT :limit")
+    fun observeRecentTransactions(limit: Int): Flow<List<TransactionEntity>>
+
+    @Query("SELECT * FROM transactions ORDER BY transaction_time DESC, created_at DESC LIMIT :limit")
+    suspend fun getRecentTransactions(limit: Int): List<TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE account_id = :accountId OR destination_account_id = :accountId ORDER BY transaction_time DESC")
     fun observeTransactionsByAccount(accountId: Long): Flow<List<TransactionEntity>>
 
@@ -24,10 +30,10 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE category_id = :categoryId ORDER BY transaction_time DESC")
     fun observeTransactionsByCategory(categoryId: Long): Flow<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions WHERE transaction_time >= :startTime AND transaction_time <= :endTime ORDER BY transaction_time DESC")
+    @Query("SELECT * FROM transactions WHERE transaction_time >= :startTime AND transaction_time < :endTime ORDER BY transaction_time DESC")
     fun observeTransactionsBetween(startTime: Instant, endTime: Instant): Flow<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions WHERE transaction_time >= :startTime AND transaction_time <= :endTime ORDER BY transaction_time DESC")
+    @Query("SELECT * FROM transactions WHERE transaction_time >= :startTime AND transaction_time < :endTime ORDER BY transaction_time DESC")
     suspend fun getTransactionsBetween(startTime: Instant, endTime: Instant): List<TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE id = :id")

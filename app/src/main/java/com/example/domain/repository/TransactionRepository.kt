@@ -10,6 +10,8 @@ import java.time.Instant
  */
 interface TransactionRepository {
     fun observeAllTransactions(): Flow<List<Transaction>>
+    fun observeRecentTransactions(limit: Int): Flow<List<Transaction>>
+    suspend fun getRecentTransactions(limit: Int): List<Transaction>
     fun observeTransactionsByAccount(accountId: Long): Flow<List<Transaction>>
     suspend fun getTransactionsByAccount(accountId: Long): List<Transaction>
     fun observeTransactionsByCategory(categoryId: Long): Flow<List<Transaction>>

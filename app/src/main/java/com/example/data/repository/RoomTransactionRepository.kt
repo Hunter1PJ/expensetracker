@@ -19,6 +19,16 @@ class RoomTransactionRepository(
         }
     }
 
+    override fun observeRecentTransactions(limit: Int): Flow<List<Transaction>> {
+        return transactionDao.observeRecentTransactions(limit).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun getRecentTransactions(limit: Int): List<Transaction> {
+        return transactionDao.getRecentTransactions(limit).map { it.toDomain() }
+    }
+
     override fun observeTransactionsByAccount(accountId: Long): Flow<List<Transaction>> {
         return transactionDao.observeTransactionsByAccount(accountId).map { entities ->
             entities.map { it.toDomain() }

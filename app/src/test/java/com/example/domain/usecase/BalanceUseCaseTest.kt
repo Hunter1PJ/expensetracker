@@ -135,4 +135,40 @@ class BalanceUseCaseTest {
             getAccountBalanceUseCase(9999L)
         }
     }
+
+    @Test(expected = ArithmeticException::class)
+    fun calculateBalance_overflowOnAddition_throwsArithmeticException() {
+        runBlocking {
+            // Directly insert a transaction that causes overflow when added to initial balance
+            transactionRepository.insertTransaction(
+                Transaction(
+                    id = 0L,
+                    type = TransactionType.INCOME,
+                    amount = Money(Long.MAX_VALUE - 10L, "USD"),
+                    accountId = accountAId,
+                    categoryId = salaryCategoryId,
+                    transactionTime = Instant.now()
+                )
+            )
+            // Initial balance is 100000L. 100000L + (Long.MAX_VALUE - 10L) overflows Long.MAX_VALUE
+            getAccountBalanceUseCase(accountAId)
+        }
+    }
+
+    @Test(expected = DomainException.CurrencyMismatch::class)
+    fun calculateBalance_currencyMismatchInTransaction_throwsCurrencyMismatch() {
+        runBlocking {
+            transactionRepository.insertTransaction(
+                Transaction(
+                    id = 0L,
+                    type = TransactionType.INCOME,
+                    amount = Money(50000L, "EUR"), // Account is USD
+                    accountId = accountAId,
+                    categoryId = salaryCategoryId,
+                    transactionTime = Instant.now()
+                )
+            )
+            getAccountBalanceUseCase(accountAId)
+        }
+    }
 }

@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,18 +39,38 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ExpenseTrackerApplication
 import com.example.R
 import com.example.di.AppContainer
-import com.example.presentation.budgets.BudgetsPlaceholderScreen
+import com.example.presentation.accounts.add.AddAccountScreen
+import com.example.presentation.accounts.add.AddAccountViewModel
+import com.example.presentation.accounts.management.AccountManagementScreen
+import com.example.presentation.accounts.management.AccountManagementViewModel
+import com.example.presentation.budgets.BudgetsScreen
+import com.example.presentation.budgets.BudgetsViewModel
+import com.example.presentation.budgets.addedit.AddEditBudgetScreen
+import com.example.presentation.budgets.addedit.AddEditBudgetViewModel
+import com.example.presentation.categories.add.AddCategoryScreen
+import com.example.presentation.categories.add.AddCategoryViewModel
+import com.example.presentation.categories.management.CategoryManagementScreen
+import com.example.presentation.categories.management.CategoryManagementViewModel
 import com.example.presentation.home.HomeScreen
 import com.example.presentation.home.HomeViewModel
-import com.example.presentation.settings.SettingsPlaceholderScreen
-import com.example.presentation.statistics.StatisticsPlaceholderScreen
-import com.example.presentation.transactions.TransactionsPlaceholderScreen
+import com.example.presentation.recurring.RecurringTransactionsScreen
+import com.example.presentation.recurring.RecurringTransactionsViewModel
+import com.example.presentation.recurring.addedit.AddEditRecurringTransactionScreen
+import com.example.presentation.recurring.addedit.AddEditRecurringTransactionViewModel
+import com.example.presentation.settings.SettingsScreen
+import com.example.presentation.statistics.StatisticsScreen
+import com.example.presentation.statistics.StatisticsViewModel
+import com.example.presentation.transactions.TransactionsScreen
+import com.example.presentation.transactions.TransactionsViewModel
 import com.example.presentation.transactions.add.AddTransactionScreen
 import com.example.presentation.transactions.add.AddTransactionViewModel
+import com.example.presentation.transactions.detail.TransactionDetailScreen
+import com.example.presentation.transactions.detail.TransactionDetailViewModel
+import com.example.presentation.transactions.edit.EditTransactionScreen
+import com.example.presentation.transactions.edit.EditTransactionViewModel
 import com.example.ui.theme.ExpenseTrackerRadius
 import com.example.ui.theme.ExpenseTrackerSpacing
 import com.example.ui.theme.ExpenseTrackerTheme
@@ -72,174 +93,495 @@ fun ExpenseTrackerApp(
 
     var currentDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
     var previousDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
+    var selectedEditAccountId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedEditCategoryId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedEditBudgetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedEditRecurringRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedTransactionId by rememberSaveable { mutableStateOf<Long?>(null) }
 
-    if (currentDestination == NavDestination.AddTransaction) {
-        val resolvedAddTransactionViewModel: AddTransactionViewModel = addTransactionViewModel ?: remember(resolvedContainer) {
-            resolvedContainer?.createAddTransactionViewModel() ?: AddTransactionViewModel(
-                observeActiveAccountsUseCase = resolvedContainer!!.observeActiveAccountsUseCase,
-                observeCategoriesByTypeUseCase = resolvedContainer.observeCategoriesByTypeUseCase,
-                createTransactionUseCase = resolvedContainer.createTransactionUseCase
+    val settingsState by remember(resolvedContainer) {
+        resolvedContainer?.settingsRepository?.settings ?: kotlinx.coroutines.flow.flowOf()
+    }.collectAsState(initial = null)
+
+    when (currentDestination) {
+        NavDestination.AddTransaction -> {
+            val resolvedAddTransactionViewModel: AddTransactionViewModel = addTransactionViewModel ?: remember(resolvedContainer) {
+                resolvedContainer?.createAddTransactionViewModel() ?: AddTransactionViewModel(
+                    observeActiveAccountsUseCase = resolvedContainer!!.observeActiveAccountsUseCase,
+                    observeCategoriesByTypeUseCase = resolvedContainer.observeCategoriesByTypeUseCase,
+                    createTransactionUseCase = resolvedContainer.createTransactionUseCase
+                )
+            }
+
+            AddTransactionScreen(
+                viewModel = resolvedAddTransactionViewModel,
+                onNavigateBack = {
+                    currentDestination = previousDestination
+                }
             )
         }
 
-        AddTransactionScreen(
-            viewModel = resolvedAddTransactionViewModel,
-            onNavigateBack = {
-                currentDestination = previousDestination
-            }
-        )
-    } else {
-        Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("expense_tracker_root_scaffold"),
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                text = if (currentDestination == NavDestination.Home) {
-                                    stringResource(R.string.app_name)
-                                } else {
-                                    currentDestination.label
-                                },
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = stringResource(R.string.foundation_subtitle).uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.5.sp,
-                                color = ExpenseTrackerTheme.extendedColors.textSecondary
-                            )
-                        }
-                    },
-                    actions = {
-                        // Initials Avatar
-                        Box(
-                            modifier = Modifier
-                                .padding(end = ExpenseTrackerSpacing.md)
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(ExpenseTrackerTheme.extendedColors.surfaceElevated)
-                                .border(
-                                    width = 1.dp,
-                                    color = ExpenseTrackerTheme.extendedColors.cardBorder,
-                                    shape = CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "ET",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        titleContentColor = MaterialTheme.colorScheme.onBackground
-                    )
+        NavDestination.TransactionDetail -> {
+            val txId = selectedTransactionId ?: 0L
+            val detailViewModel: TransactionDetailViewModel = remember(resolvedContainer, txId) {
+                resolvedContainer?.createTransactionDetailViewModel(txId) ?: TransactionDetailViewModel(
+                    transactionId = txId,
+                    getTransactionUseCase = resolvedContainer!!.getTransactionUseCase,
+                    getAccountUseCase = resolvedContainer.getAccountUseCase,
+                    getCategoryUseCase = resolvedContainer.getCategoryUseCase,
+                    deleteTransactionUseCase = resolvedContainer.deleteTransactionUseCase
                 )
-            },
-            bottomBar = {
-                NavigationBar(
-                    containerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier
-                        .border(
-                            width = 1.dp,
-                            color = ExpenseTrackerTheme.extendedColors.cardBorder.copy(alpha = 0.6f)
-                        )
-                        .testTag("bottom_navigation_bar")
-                ) {
-                    NavDestination.items.forEach { destination ->
-                        val isSelected = currentDestination == destination
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = {
-                                previousDestination = currentDestination
-                                currentDestination = destination
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = destination.icon,
-                                    contentDescription = destination.label,
-                                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
-                                )
-                            },
-                            label = {
+            }
+
+            TransactionDetailScreen(
+                viewModel = detailViewModel,
+                onNavigateBack = {
+                    currentDestination = previousDestination
+                },
+                onNavigateToEdit = { editTxId ->
+                    selectedTransactionId = editTxId
+                    currentDestination = NavDestination.EditTransaction
+                },
+                confirmBeforeDelete = settingsState?.confirmBeforeDelete ?: true
+            )
+        }
+
+        NavDestination.EditTransaction -> {
+            val txId = selectedTransactionId ?: 0L
+            val editViewModel: EditTransactionViewModel = remember(resolvedContainer, txId) {
+                resolvedContainer?.createEditTransactionViewModel(txId) ?: EditTransactionViewModel(
+                    transactionId = txId,
+                    getTransactionUseCase = resolvedContainer!!.getTransactionUseCase,
+                    updateTransactionUseCase = resolvedContainer.updateTransactionUseCase,
+                    observeActiveAccountsUseCase = resolvedContainer.observeActiveAccountsUseCase,
+                    observeCategoriesByTypeUseCase = resolvedContainer.observeCategoriesByTypeUseCase,
+                    getAccountUseCase = resolvedContainer.getAccountUseCase,
+                    getCategoryUseCase = resolvedContainer.getCategoryUseCase
+                )
+            }
+
+            EditTransactionScreen(
+                viewModel = editViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.TransactionDetail
+                }
+            )
+        }
+
+        NavDestination.AccountManagement -> {
+            val accountManagementViewModel: AccountManagementViewModel = remember(resolvedContainer) {
+                resolvedContainer?.createAccountManagementViewModel() ?: AccountManagementViewModel(
+                    observeActiveAccountsUseCase = resolvedContainer!!.observeActiveAccountsUseCase,
+                    observeAccountBalanceUseCase = resolvedContainer.observeAccountBalanceUseCase,
+                    archiveAccountUseCase = resolvedContainer.archiveAccountUseCase
+                )
+            }
+
+            AccountManagementScreen(
+                viewModel = accountManagementViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.Settings
+                },
+                onNavigateToAddAccount = {
+                    selectedEditAccountId = null
+                    currentDestination = NavDestination.AddAccount
+                },
+                onNavigateToEditAccount = { accountId ->
+                    selectedEditAccountId = accountId
+                    currentDestination = NavDestination.EditAccount
+                }
+            )
+        }
+
+        NavDestination.AddAccount, NavDestination.EditAccount -> {
+            val editId = if (currentDestination == NavDestination.EditAccount) selectedEditAccountId ?: 0L else 0L
+            val addAccountViewModel: AddAccountViewModel = remember(resolvedContainer, editId) {
+                resolvedContainer?.createAddAccountViewModel(editId) ?: AddAccountViewModel(
+                    accountId = editId,
+                    createAccountUseCase = resolvedContainer!!.createAccountUseCase,
+                    updateAccountUseCase = resolvedContainer.updateAccountUseCase,
+                    getAccountUseCase = resolvedContainer.getAccountUseCase
+                )
+            }
+
+            AddAccountScreen(
+                viewModel = addAccountViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.AccountManagement
+                }
+            )
+        }
+
+        NavDestination.CategoryManagement -> {
+            val categoryManagementViewModel: CategoryManagementViewModel = remember(resolvedContainer) {
+                resolvedContainer?.createCategoryManagementViewModel() ?: CategoryManagementViewModel(
+                    observeActiveCategoriesUseCase = resolvedContainer!!.observeActiveCategoriesUseCase,
+                    archiveCategoryUseCase = resolvedContainer.archiveCategoryUseCase
+                )
+            }
+
+            CategoryManagementScreen(
+                viewModel = categoryManagementViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.Settings
+                },
+                onNavigateToAddCategory = {
+                    selectedEditCategoryId = null
+                    currentDestination = NavDestination.AddCategory
+                },
+                onNavigateToEditCategory = { categoryId ->
+                    selectedEditCategoryId = categoryId
+                    currentDestination = NavDestination.EditCategory
+                }
+            )
+        }
+
+        NavDestination.AddCategory, NavDestination.EditCategory -> {
+            val editId = if (currentDestination == NavDestination.EditCategory) selectedEditCategoryId ?: 0L else 0L
+            val addCategoryViewModel: AddCategoryViewModel = remember(resolvedContainer, editId) {
+                resolvedContainer?.createAddCategoryViewModel(editId) ?: AddCategoryViewModel(
+                    categoryId = editId,
+                    createCategoryUseCase = resolvedContainer!!.createCategoryUseCase,
+                    updateCategoryUseCase = resolvedContainer.updateCategoryUseCase,
+                    getCategoryUseCase = resolvedContainer.getCategoryUseCase
+                )
+            }
+
+            AddCategoryScreen(
+                viewModel = addCategoryViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.CategoryManagement
+                }
+            )
+        }
+
+        NavDestination.AddBudget, NavDestination.EditBudget -> {
+            val editId = if (currentDestination == NavDestination.EditBudget) selectedEditBudgetId ?: 0L else 0L
+            val addEditBudgetViewModel: AddEditBudgetViewModel = remember(resolvedContainer, editId) {
+                resolvedContainer?.createAddEditBudgetViewModel(editId) ?: AddEditBudgetViewModel(
+                    budgetId = editId,
+                    getBudgetUseCase = resolvedContainer!!.getBudgetUseCase,
+                    createBudgetUseCase = resolvedContainer.createBudgetUseCase,
+                    updateBudgetUseCase = resolvedContainer.updateBudgetUseCase,
+                    observeActiveCategoriesUseCase = resolvedContainer.observeActiveCategoriesUseCase,
+                    observeAllAccountsUseCase = resolvedContainer.observeAllAccountsUseCase
+                )
+            }
+
+            AddEditBudgetScreen(
+                viewModel = addEditBudgetViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.Budgets
+                }
+            )
+        }
+
+        NavDestination.RecurringTransactions -> {
+            val recurringViewModel: RecurringTransactionsViewModel = remember(resolvedContainer) {
+                resolvedContainer?.createRecurringTransactionsViewModel() ?: RecurringTransactionsViewModel(
+                    observeRecurringTransactionsUseCase = resolvedContainer!!.observeRecurringTransactionsUseCase,
+                    observeAllAccountsUseCase = resolvedContainer.observeAllAccountsUseCase,
+                    observeAllCategoriesUseCase = resolvedContainer.observeAllCategoriesUseCase,
+                    deactivateRecurringTransactionUseCase = resolvedContainer.deactivateRecurringTransactionUseCase,
+                    processDueRecurringTransactionsUseCase = resolvedContainer.processDueRecurringTransactionsUseCase
+                )
+            }
+
+            RecurringTransactionsScreen(
+                viewModel = recurringViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.Settings
+                },
+                onNavigateToAddRule = {
+                    selectedEditRecurringRuleId = null
+                    currentDestination = NavDestination.AddRecurringTransaction
+                },
+                onNavigateToEditRule = { ruleId ->
+                    selectedEditRecurringRuleId = ruleId
+                    currentDestination = NavDestination.EditRecurringTransaction
+                }
+            )
+        }
+
+        NavDestination.AddRecurringTransaction, NavDestination.EditRecurringTransaction -> {
+            val editId = if (currentDestination == NavDestination.EditRecurringTransaction) selectedEditRecurringRuleId ?: 0L else 0L
+            val addEditRecurringViewModel: AddEditRecurringTransactionViewModel = remember(resolvedContainer, editId) {
+                resolvedContainer?.createAddEditRecurringTransactionViewModel(editId) ?: AddEditRecurringTransactionViewModel(
+                    ruleId = editId,
+                    createRecurringTransactionUseCase = resolvedContainer!!.createRecurringTransactionUseCase,
+                    updateRecurringTransactionUseCase = resolvedContainer.updateRecurringTransactionUseCase,
+                    getRecurringTransactionUseCase = resolvedContainer.getRecurringTransactionUseCase,
+                    observeActiveAccountsUseCase = resolvedContainer.observeActiveAccountsUseCase,
+                    observeActiveCategoriesUseCase = resolvedContainer.observeActiveCategoriesUseCase
+                )
+            }
+
+            AddEditRecurringTransactionScreen(
+                viewModel = addEditRecurringViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.RecurringTransactions
+                }
+            )
+        }
+
+        NavDestination.DataAndStorage -> {
+            val dataStorageViewModel = remember(resolvedContainer) {
+                resolvedContainer?.createDataStorageViewModel() ?: throw IllegalStateException("AppContainer required")
+            }
+            com.example.presentation.settings.DataAndStorageScreen(
+                viewModel = dataStorageViewModel,
+                onNavigateBack = {
+                    currentDestination = NavDestination.Settings
+                }
+            )
+        }
+
+        else -> {
+            BackHandler(enabled = currentDestination != NavDestination.Home) {
+                currentDestination = NavDestination.Home
+            }
+
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("expense_tracker_root_scaffold"),
+                containerColor = MaterialTheme.colorScheme.background,
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Column {
                                 Text(
-                                    text = destination.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    text = if (currentDestination == NavDestination.Home) {
+                                        stringResource(R.string.app_name)
+                                    } else {
+                                        currentDestination.label
+                                    },
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
                                 )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.onBackground,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                unselectedIconColor = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                unselectedTextColor = ExpenseTrackerTheme.extendedColors.textSecondary
-                            ),
-                            modifier = Modifier.testTag(destination.testTag)
+                                Text(
+                                    text = stringResource(R.string.foundation_subtitle).uppercase(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.5.sp,
+                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                )
+                            }
+                        },
+                        actions = {
+                            // Initials Avatar
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = ExpenseTrackerSpacing.md)
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(ExpenseTrackerTheme.extendedColors.surfaceElevated)
+                                    .border(
+                                        width = 1.dp,
+                                        color = ExpenseTrackerTheme.extendedColors.cardBorder,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "ET",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                            titleContentColor = MaterialTheme.colorScheme.onBackground
+                        )
+                    )
+                },
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                        tonalElevation = 0.dp,
+                        modifier = Modifier
+                            .border(
+                                width = 1.dp,
+                                color = ExpenseTrackerTheme.extendedColors.borderSubtle
+                            )
+                            .testTag("bottom_navigation_bar")
+                    ) {
+                        NavDestination.items.forEach { destination ->
+                            val isSelected = currentDestination == destination
+                            NavigationBarItem(
+                                selected = isSelected,
+                                onClick = {
+                                    previousDestination = currentDestination
+                                    currentDestination = destination
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector = destination.icon,
+                                        contentDescription = destination.label,
+                                        modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = destination.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = ExpenseTrackerTheme.extendedColors.primaryBright,
+                                    selectedTextColor = MaterialTheme.colorScheme.onBackground,
+                                    indicatorColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.22f),
+                                    unselectedIconColor = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                    unselectedTextColor = ExpenseTrackerTheme.extendedColors.textSecondary
+                                ),
+                                modifier = Modifier.testTag(destination.testTag)
+                            )
+                        }
+                    }
+                },
+                floatingActionButton = {
+                    FloatingActionButton(
+                        onClick = {
+                            previousDestination = currentDestination
+                            currentDestination = NavDestination.AddTransaction
+                        },
+                        shape = ExpenseTrackerRadius.button,
+                        containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                        contentColor = androidx.compose.ui.graphics.Color.White,
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        ),
+                        modifier = Modifier.testTag("add_transaction_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.action_add_transaction),
+                            modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
                         )
                     }
                 }
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = {
-                        previousDestination = currentDestination
-                        currentDestination = NavDestination.AddTransaction
-                    },
-                    shape = ExpenseTrackerRadius.button,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                    modifier = Modifier.testTag("add_transaction_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add_transaction),
-                        modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
-                    )
-                }
-            }
-        ) { innerPadding ->
-            when (currentDestination) {
-                NavDestination.Home -> {
-                    HomeScreen(
-                        viewModel = resolvedHomeViewModel,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-                NavDestination.Transactions -> {
-                    TransactionsPlaceholderScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-                NavDestination.Statistics -> {
-                    StatisticsPlaceholderScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-                NavDestination.Budgets -> {
-                    BudgetsPlaceholderScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-                NavDestination.Settings -> {
-                    SettingsPlaceholderScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-                NavDestination.AddTransaction -> {
-                    // Handled above
+            ) { innerPadding ->
+                when (currentDestination) {
+                    NavDestination.Home -> {
+                        HomeScreen(
+                            viewModel = resolvedHomeViewModel,
+                            onNavigateToAddTransaction = {
+                                previousDestination = NavDestination.Home
+                                currentDestination = NavDestination.AddTransaction
+                            },
+                            onNavigateToAccounts = {
+                                previousDestination = NavDestination.Home
+                                currentDestination = NavDestination.AccountManagement
+                            },
+                            onNavigateToAddAccount = {
+                                previousDestination = NavDestination.Home
+                                selectedEditAccountId = null
+                                currentDestination = NavDestination.AddAccount
+                            },
+                            onNavigateToTransactions = {
+                                previousDestination = NavDestination.Home
+                                currentDestination = NavDestination.Transactions
+                            },
+                            onNavigateToTransactionDetail = { txId ->
+                                previousDestination = NavDestination.Home
+                                selectedTransactionId = txId
+                                currentDestination = NavDestination.TransactionDetail
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+                    NavDestination.Transactions -> {
+                        val transactionsViewModel: TransactionsViewModel = remember(resolvedContainer) {
+                            resolvedContainer?.createTransactionsViewModel() ?: TransactionsViewModel(
+                                observeTransactionsUseCase = resolvedContainer!!.observeTransactionsUseCase,
+                                observeAllAccountsUseCase = resolvedContainer.observeAllAccountsUseCase,
+                                observeAllCategoriesUseCase = resolvedContainer.observeAllCategoriesUseCase
+                            )
+                        }
+
+                        TransactionsScreen(
+                            viewModel = transactionsViewModel,
+                            onNavigateToDetail = { txId ->
+                                previousDestination = NavDestination.Transactions
+                                selectedTransactionId = txId
+                                currentDestination = NavDestination.TransactionDetail
+                            },
+                            onNavigateToAddTransaction = {
+                                previousDestination = NavDestination.Transactions
+                                currentDestination = NavDestination.AddTransaction
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+                    NavDestination.Statistics -> {
+                        val statisticsViewModel: StatisticsViewModel = remember(resolvedContainer) {
+                            resolvedContainer?.createStatisticsViewModel() ?: StatisticsViewModel(
+                                observeStatisticsUseCase = resolvedContainer!!.observeStatisticsUseCase
+                            )
+                        }
+
+                        StatisticsScreen(
+                            viewModel = statisticsViewModel,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+                    NavDestination.Budgets -> {
+                        val budgetsViewModel: BudgetsViewModel = remember(resolvedContainer) {
+                            resolvedContainer?.createBudgetsViewModel() ?: BudgetsViewModel(
+                                observeActiveBudgetProgressUseCase = resolvedContainer!!.observeActiveBudgetProgressUseCase,
+                                deactivateBudgetUseCase = resolvedContainer.deactivateBudgetUseCase
+                            )
+                        }
+
+                        BudgetsScreen(
+                            viewModel = budgetsViewModel,
+                            onNavigateToAddBudget = {
+                                previousDestination = NavDestination.Budgets
+                                selectedEditBudgetId = null
+                                currentDestination = NavDestination.AddBudget
+                            },
+                            onNavigateToEditBudget = { budgetId ->
+                                previousDestination = NavDestination.Budgets
+                                selectedEditBudgetId = budgetId
+                                currentDestination = NavDestination.EditBudget
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+                    NavDestination.Settings -> {
+                        val settingsViewModel: com.example.presentation.settings.SettingsViewModel = remember(resolvedContainer) {
+                            resolvedContainer?.createSettingsViewModel() ?: com.example.presentation.settings.SettingsViewModel(resolvedContainer!!.settingsRepository)
+                        }
+
+                        SettingsScreen(
+                            viewModel = settingsViewModel,
+                            onNavigateToAccounts = {
+                                previousDestination = NavDestination.Settings
+                                currentDestination = NavDestination.AccountManagement
+                            },
+                            onNavigateToCategories = {
+                                previousDestination = NavDestination.Settings
+                                currentDestination = NavDestination.CategoryManagement
+                            },
+                            onNavigateToRecurring = {
+                                previousDestination = NavDestination.Settings
+                                currentDestination = NavDestination.RecurringTransactions
+                            },
+                            onNavigateToDataAndStorage = {
+                                previousDestination = NavDestination.Settings
+                                currentDestination = NavDestination.DataAndStorage
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+                    else -> {
+                        // Covered by outer when
+                    }
                 }
             }
         }

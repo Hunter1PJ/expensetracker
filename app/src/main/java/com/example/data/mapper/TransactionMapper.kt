@@ -18,6 +18,7 @@ fun TransactionEntity.toDomain(): Transaction {
         transactionTime = transactionTime,
         note = note,
         recurringRuleId = recurringRuleId,
+        recurringOccurrenceDate = recurringOccurrenceDate,
         createdAt = createdAt
     )
 }
@@ -34,6 +35,7 @@ fun Transaction.toEntity(): TransactionEntity {
         transactionTime = transactionTime,
         note = note,
         recurringRuleId = recurringRuleId,
+        recurringOccurrenceDate = recurringOccurrenceDate,
         createdAt = createdAt
     )
 }

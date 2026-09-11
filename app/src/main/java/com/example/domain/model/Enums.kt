@@ -50,3 +50,11 @@ enum class BudgetPeriodType {
     YEARLY,
     CUSTOM
 }
+
+/**
+ * Lifecycle status of a recurring occurrence.
+ */
+enum class RecurringOccurrenceStatus {
+    GENERATED,
+    TRANSACTION_DELETED
+}

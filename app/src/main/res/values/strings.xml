@@ -14,17 +14,60 @@
     <string name="placeholder_transactions_title">Transactions</string>
     <string name="placeholder_transactions_desc">No transactions recorded yet. Ready for transaction repository and local persistence.</string>
     <string name="placeholder_statistics_title">Statistics</string>
+    <string name="title_statistics">Statistics &amp; Analytics</string>
     <string name="placeholder_statistics_desc">Financial breakdown and category charts will appear here.</string>
     <string name="placeholder_budgets_title">Budgets</string>
     <string name="placeholder_budgets_desc">Monthly budget allocations and targets will be managed here.</string>
     <string name="placeholder_settings_title">Settings</string>
     <string name="placeholder_settings_desc">Preferences, backup/export, currency, and theme configurations will be available here.</string>
 
+    <!-- Transactions List & Filtering -->
+    <string name="search_transactions_hint">Search note, category, account…</string>
+    <string name="filter_all">All</string>
+    <string name="filter_all_accounts">All Accounts</string>
+    <string name="filter_all_categories">All Categories</string>
+    <string name="no_transactions_title">No transactions yet</string>
+    <string name="no_transactions_desc">Add your first income or expense.</string>
+    <string name="no_matching_transactions_title">No matching transactions</string>
+    <string name="no_matching_transactions_desc">Try changing your search or filters.</string>
+    <string name="action_clear_filters">Clear Filters</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_search">Search</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_save_changes">Save Changes</string>
+    <string name="status_archived">Archived</string>
+
+    <!-- Transaction Details & Deletion -->
+    <string name="title_transaction_details">Transaction Details</string>
+    <string name="title_edit_transaction">Edit Transaction</string>
+    <string name="delete_transaction_title">Delete transaction?</string>
+    <string name="delete_transaction_message">This will permanently remove this transaction and update your account balance.</string>
+
+    <!-- Home Dashboard -->
+    <string name="home_header_title">Your Finances</string>
+    <string name="home_header_subtitle">Financial Overview</string>
+    <string name="home_total_balance">Total Balance</string>
+    <string name="home_balances">Balances</string>
+    <string name="home_this_month">This Month</string>
+    <string name="home_income">Income</string>
+    <string name="home_expense">Expense</string>
+    <string name="home_net">Net</string>
+    <string name="home_accounts">Accounts</string>
+    <string name="home_recent_transactions">Recent Transactions</string>
+    <string name="home_no_transactions_title">No transactions yet</string>
+    <string name="home_no_transactions_desc">Record your first expense, income, or transfer.</string>
+    <string name="home_empty_title">Start tracking your money</string>
+    <string name="home_empty_desc">Create your first account, then add income and expenses.</string>
+    <string name="home_action_create_account">Create Account</string>
+    <string name="home_action_see_all">See all</string>
+
     <!-- Add Transaction Flow -->
     <string name="title_add_transaction">Add Transaction</string>
     <string name="type_expense">Expense</string>
     <string name="type_income">Income</string>
     <string name="type_transfer">Transfer</string>
+    <string name="type_both">Both</string>
     <string name="amount_label">Amount</string>
     <string name="amount_hint">0.00</string>
     <string name="account_label">Account</string>
@@ -55,4 +98,157 @@
     <string name="error_incompatible_category">Selected category is incompatible with transaction type.</string>
     <string name="error_unknown">An error occurred while saving the transaction.</string>
     <string name="date_picker_dialog_title">Select Date</string>
+
+    <!-- Settings & Management -->
+    <string name="title_settings">Settings</string>
+    <string name="settings_subtitle">Preferences &amp; data management</string>
+    <string name="section_financial_setup">Financial Structure</string>
+    <string name="section_about">About</string>
+    <string name="settings_accounts_desc">Manage cash, bank accounts, and balances</string>
+    <string name="settings_categories_desc">Manage expense and income categories</string>
+    <string name="about_app_desc">Deterministic Money Engine &amp; Room Persistence</string>
+
+    <!-- Account Management -->
+    <string name="title_account_management">Accounts</string>
+    <string name="title_add_account">Add Account</string>
+    <string name="title_edit_account">Edit Account</string>
+    <string name="action_add_account">Add Account</string>
+    <string name="action_save_account">Save Account</string>
+    <string name="action_update_account">Update Account</string>
+    <string name="action_archive">Archive</string>
+    <string name="loading_accounts">Loading accounts…</string>
+    <string name="loading_account_details">Loading account details…</string>
+    <string name="no_accounts_yet_title">No Accounts Yet</string>
+    <string name="no_accounts_yet_desc">Create your first account to start tracking your money.</string>
+    <string name="account_name_label">Account Name</string>
+    <string name="account_name_hint">e.g. Main Bank, Cash Wallet</string>
+    <string name="account_type_label">Account Type</string>
+    <string name="currency_label">Currency</string>
+    <string name="currency_locked_desc">Currency cannot be changed after creation</string>
+    <string name="initial_balance_label">Initial Balance</string>
+    <string name="initial_balance_locked_desc">Initial balance is fixed</string>
+    <string name="icon_label">Icon</string>
+    <string name="color_label">Color</string>
+    <string name="dialog_archive_account_title">Archive %1$s?</string>
+    <string name="dialog_archive_account_message">This account will no longer appear in active account lists, but its transaction history will be preserved.</string>
+    <string name="error_account_name_required">Account name cannot be blank.</string>
+    <string name="error_invalid_initial_balance">Please enter a valid initial balance.</string>
+    <string name="error_account_not_found">Account not found.</string>
+    <string name="error_save_account_failed">Failed to save account.</string>
+    <string name="error_archive_account_failed">Failed to archive account.</string>
+
+    <!-- Category Management -->
+    <string name="title_category_management">Categories</string>
+    <string name="title_add_category">Add Category</string>
+    <string name="title_edit_category">Edit Category</string>
+    <string name="action_add_category">Add Category</string>
+    <string name="action_save_category">Save Category</string>
+    <string name="action_update_category">Update Category</string>
+    <string name="loading_categories">Loading categories…</string>
+    <string name="loading_category_details">Loading category details…</string>
+    <string name="no_categories_yet_title">No Categories Found</string>
+    <string name="no_categories_yet_desc">No categories found for this filter tab.</string>
+    <string name="tab_all">All</string>
+    <string name="tab_expense">Expense</string>
+    <string name="tab_income">Income</string>
+    <string name="tab_both">Both</string>
+    <string name="category_name_label">Category Name</string>
+    <string name="category_name_hint">e.g. Groceries, Freelance</string>
+    <string name="category_type_label">Category Type</string>
+    <string name="badge_system">System</string>
+    <string name="system_category_protected_desc">System category cannot be modified or archived</string>
+    <string name="dialog_archive_category_title">Archive %1$s?</string>
+    <string name="dialog_archive_category_message">This category will no longer appear in active category lists, but previous transactions will remain intact.</string>
+    <string name="error_category_name_required">Category name cannot be blank.</string>
+    <string name="error_category_not_found">Category not found.</string>
+    <string name="error_system_category_cannot_archive">System categories cannot be archived.</string>
+    <string name="error_save_category_failed">Failed to save category.</string>
+    <string name="error_archive_category_failed">Failed to archive category.</string>
+
+    <!-- Budgets -->
+    <string name="title_budgets">Budgets &amp; Limits</string>
+    <string name="title_add_budget">Add Budget</string>
+    <string name="title_edit_budget">Edit Budget</string>
+    <string name="action_add_budget">Add Budget</string>
+    <string name="action_save_budget">Save Budget</string>
+    <string name="action_update_budget">Update Budget</string>
+    <string name="action_deactivate">Deactivate</string>
+    <string name="no_budgets_title">No budgets yet</string>
+    <string name="no_budgets_desc">Set a spending limit to stay on top of your expenses.</string>
+    <string name="budget_scope_label">Scope</string>
+    <string name="budget_scope_overall">Overall Spending</string>
+    <string name="budget_scope_category">Category Spending</string>
+    <string name="budget_limit_label">Budget Limit</string>
+    <string name="budget_period_label">Period</string>
+    <string name="budget_period_monthly">Monthly</string>
+    <string name="budget_period_weekly">Weekly</string>
+    <string name="budget_period_yearly">Yearly</string>
+    <string name="budget_period_custom">Custom</string>
+    <string name="budget_start_date">Start Date</string>
+    <string name="budget_end_date">End Date</string>
+    <string name="budget_spent_label">Spent</string>
+    <string name="budget_remaining_label">Remaining</string>
+    <string name="budget_over_label">Over budget</string>
+    <string name="budget_overall_title">Overall %1$s Budget</string>
+    <string name="dialog_deactivate_budget_title">Deactivate budget?</string>
+    <string name="dialog_deactivate_budget_message">This budget will stop appearing as active, but its existing configuration will be preserved.</string>
+    <string name="error_budget_limit_required">Limit must be greater than zero.</string>
+    <string name="error_budget_currency_required">Please select a currency.</string>
+    <string name="error_budget_date_range_invalid">Start date must be before or equal to end date.</string>
+    <string name="error_budget_category_required">Please select a category for category budget.</string>
+    <string name="error_budget_overlapping">An active budget already exists for this scope, currency, and date range.</string>
+
+    <!-- Recurring Transactions -->
+    <string name="title_recurring_transactions">Recurring Rules</string>
+    <string name="settings_recurring_desc">Manage scheduled expenses, incomes, and transfers</string>
+    <string name="title_add_recurring">Add Recurring Rule</string>
+    <string name="title_edit_recurring">Edit Recurring Rule</string>
+    <string name="action_add_recurring">Add Rule</string>
+    <string name="action_save_recurring">Save Rule</string>
+    <string name="action_update_recurring">Update Rule</string>
+    <string name="action_pause">Pause Rule</string>
+    <string name="action_process_due">Run Due Now</string>
+    <string name="frequency_label">Frequency</string>
+    <string name="frequency_daily">Every day</string>
+    <string name="frequency_weekly">Every week</string>
+    <string name="frequency_biweekly">Every 2 weeks</string>
+    <string name="frequency_monthly">Every month</string>
+    <string name="frequency_yearly">Every year</string>
+    <string name="start_date_label">Start Date</string>
+    <string name="end_date_label">End Date (Optional)</string>
+    <string name="next_occurrence_label">Next Run</string>
+    <string name="status_active">Active</string>
+    <string name="status_paused">Paused</string>
+    <string name="status_ending_soon">Ending Soon</string>
+    <string name="status_needs_attention">Needs Attention</string>
+    <string name="no_recurring_title">No recurring rules yet</string>
+    <string name="no_recurring_desc">Automate your regular rent, salary, subscriptions, or savings transfers.</string>
+    <string name="dialog_deactivate_recurring_title">Pause recurring rule?</string>
+    <string name="dialog_deactivate_recurring_message">This recurring rule will stop generating future transactions until reactivated.</string>
+    <string name="error_recurring_start_after_end">Start date must be on or before end date.</string>
+
+    <!-- Settings Preferences -->
+    <string name="section_preferences">Preferences</string>
+    <string name="title_theme">Theme Mode</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="title_preferred_currency">Preferred Currency</string>
+    <string name="currency_automatic">None / Automatic</string>
+    <string name="title_week_start">Week Starts On</string>
+    <string name="week_start_monday">Monday</string>
+    <string name="week_start_sunday">Sunday</string>
+    <string name="title_date_format">Date Format</string>
+    <string name="date_format_system">System Default</string>
+    <string name="title_time_format">Time Format</string>
+    <string name="time_format_system">System Default</string>
+    <string name="time_format_24">24-Hour</string>
+    <string name="time_format_12">12-Hour</string>
+    <string name="title_show_currency_code">Show Currency Code</string>
+    <string name="desc_show_currency_code">Display ISO currency codes beside symbols</string>
+    <string name="title_confirm_delete">Confirm before delete</string>
+    <string name="desc_confirm_delete">Confirm before deleting individual transactions</string>
+    <string name="title_data_storage">Data &amp; Storage</string>
+    <string name="desc_data_storage">Manage database storage and backup configurations</string>
+    <string name="app_version_label">Version</string>
 </resources>

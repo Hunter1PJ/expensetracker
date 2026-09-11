@@ -55,6 +55,104 @@ enum class NavDestination(
         icon = Icons.Default.Add,
         testTag = "nav_item_add_transaction",
         isBottomBarItem = false
+    ),
+    AccountManagement(
+        route = "account_management",
+        label = "Accounts",
+        icon = Icons.Outlined.AccountBalanceWallet,
+        testTag = "nav_item_account_management",
+        isBottomBarItem = false
+    ),
+    AddAccount(
+        route = "add_account",
+        label = "Add Account",
+        icon = Icons.Default.Add,
+        testTag = "nav_item_add_account",
+        isBottomBarItem = false
+    ),
+    EditAccount(
+        route = "edit_account",
+        label = "Edit Account",
+        icon = Icons.Outlined.AccountBalanceWallet,
+        testTag = "nav_item_edit_account",
+        isBottomBarItem = false
+    ),
+    CategoryManagement(
+        route = "category_management",
+        label = "Categories",
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_category_management",
+        isBottomBarItem = false
+    ),
+    AddCategory(
+        route = "add_category",
+        label = "Add Category",
+        icon = Icons.Default.Add,
+        testTag = "nav_item_add_category",
+        isBottomBarItem = false
+    ),
+    EditCategory(
+        route = "edit_category",
+        label = "Edit Category",
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_edit_category",
+        isBottomBarItem = false
+    ),
+    TransactionDetail(
+        route = "transaction_detail",
+        label = "Transaction Details",
+        icon = Icons.Outlined.ReceiptLong,
+        testTag = "nav_item_transaction_detail",
+        isBottomBarItem = false
+    ),
+    EditTransaction(
+        route = "edit_transaction",
+        label = "Edit Transaction",
+        icon = Icons.Outlined.ReceiptLong,
+        testTag = "nav_item_edit_transaction",
+        isBottomBarItem = false
+    ),
+    AddBudget(
+        route = "add_budget",
+        label = "Add Budget",
+        icon = Icons.Default.Add,
+        testTag = "nav_item_add_budget",
+        isBottomBarItem = false
+    ),
+    EditBudget(
+        route = "edit_budget",
+        label = "Edit Budget",
+        icon = Icons.Outlined.AccountBalanceWallet,
+        testTag = "nav_item_edit_budget",
+        isBottomBarItem = false
+    ),
+    RecurringTransactions(
+        route = "recurring_transactions",
+        label = "Recurring Rules",
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_recurring_transactions",
+        isBottomBarItem = false
+    ),
+    AddRecurringTransaction(
+        route = "add_recurring_transaction",
+        label = "Add Recurring Rule",
+        icon = Icons.Default.Add,
+        testTag = "nav_item_add_recurring_transaction",
+        isBottomBarItem = false
+    ),
+    EditRecurringTransaction(
+        route = "edit_recurring_transaction",
+        label = "Edit Recurring Rule",
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_edit_recurring_transaction",
+        isBottomBarItem = false
+    ),
+    DataAndStorage(
+        route = "data_and_storage",
+        label = "Data & Storage",
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_data_and_storage",
+        isBottomBarItem = false
     );
 
     companion object {

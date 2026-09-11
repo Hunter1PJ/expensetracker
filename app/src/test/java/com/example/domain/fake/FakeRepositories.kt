@@ -92,6 +92,14 @@ class FakeTransactionRepository : TransactionRepository {
     override fun observeAllTransactions(): Flow<List<Transaction>> =
         transactions.map { it.values.toList().sortedByDescending { tx -> tx.transactionTime } }
 
+    override fun observeRecentTransactions(limit: Int): Flow<List<Transaction>> =
+        transactions.map { map ->
+            map.values.sortedByDescending { it.transactionTime }.take(limit)
+        }
+
+    override suspend fun getRecentTransactions(limit: Int): List<Transaction> =
+        transactions.value.values.sortedByDescending { it.transactionTime }.take(limit)
+
     override fun observeTransactionsByAccount(accountId: Long): Flow<List<Transaction>> =
         transactions.map { map ->
             map.values.filter { it.accountId == accountId || it.destinationAccountId == accountId }
@@ -111,12 +119,12 @@ class FakeTransactionRepository : TransactionRepository {
 
     override fun observeTransactionsBetween(startTime: Instant, endTime: Instant): Flow<List<Transaction>> =
         transactions.map { map ->
-            map.values.filter { !it.transactionTime.isBefore(startTime) && !it.transactionTime.isAfter(endTime) }
+            map.values.filter { !it.transactionTime.isBefore(startTime) && it.transactionTime.isBefore(endTime) }
                 .sortedByDescending { it.transactionTime }
         }
 
     override suspend fun getTransactionsBetween(startTime: Instant, endTime: Instant): List<Transaction> =
-        transactions.value.values.filter { !it.transactionTime.isBefore(startTime) && !it.transactionTime.isAfter(endTime) }
+        transactions.value.values.filter { !it.transactionTime.isBefore(startTime) && it.transactionTime.isBefore(endTime) }
             .sortedByDescending { it.transactionTime }
 
     override fun observeTransactionById(id: Long): Flow<Transaction?> =
@@ -140,5 +148,40 @@ class FakeTransactionRepository : TransactionRepository {
 
     override suspend fun deleteTransactionById(id: Long) {
         transactions.value = transactions.value - id
+    }
+}
+
+class FakeBudgetRepository : com.example.domain.repository.BudgetRepository {
+    private val budgets = MutableStateFlow<Map<Long, com.example.domain.model.Budget>>(emptyMap())
+    private var nextId = 1L
+
+    override fun observeActiveBudgets(): Flow<List<com.example.domain.model.Budget>> =
+        budgets.map { map -> map.values.filter { it.isActive } }
+
+    override fun observeAllBudgets(): Flow<List<com.example.domain.model.Budget>> =
+        budgets.map { map -> map.values.toList() }
+
+    override fun observeBudgetsByCategory(categoryId: Long): Flow<List<com.example.domain.model.Budget>> =
+        budgets.map { map -> map.values.filter { it.categoryId == categoryId } }
+
+    override fun observeBudgetById(id: Long): Flow<com.example.domain.model.Budget?> =
+        budgets.map { it[id] }
+
+    override suspend fun getBudgetById(id: Long): com.example.domain.model.Budget? = budgets.value[id]
+
+    override suspend fun insertBudget(budget: com.example.domain.model.Budget): Long {
+        val id = if (budget.id == 0L) nextId++ else budget.id
+        val updated = budget.copy(id = id)
+        budgets.value = budgets.value + (id to updated)
+        return id
+    }
+
+    override suspend fun updateBudget(budget: com.example.domain.model.Budget) {
+        budgets.value = budgets.value + (budget.id to budget)
+    }
+
+    override suspend fun deactivateBudget(id: Long) {
+        val budget = budgets.value[id] ?: return
+        budgets.value = budgets.value + (id to budget.copy(isActive = false))
     }
 }

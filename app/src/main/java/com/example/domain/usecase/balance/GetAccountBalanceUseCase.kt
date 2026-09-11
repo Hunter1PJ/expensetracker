@@ -29,20 +29,20 @@ class GetAccountBalanceUseCase(
             when (tx.type) {
                 TransactionType.INCOME -> {
                     if (tx.accountId == accountId) {
-                        balanceMinorUnits += tx.amount.amountInMinorUnits
+                        balanceMinorUnits = Math.addExact(balanceMinorUnits, tx.amount.amountInMinorUnits)
                     }
                 }
                 TransactionType.EXPENSE -> {
                     if (tx.accountId == accountId) {
-                        balanceMinorUnits -= tx.amount.amountInMinorUnits
+                        balanceMinorUnits = Math.subtractExact(balanceMinorUnits, tx.amount.amountInMinorUnits)
                     }
                 }
                 TransactionType.TRANSFER -> {
                     if (tx.accountId == accountId) {
-                        balanceMinorUnits -= tx.amount.amountInMinorUnits
+                        balanceMinorUnits = Math.subtractExact(balanceMinorUnits, tx.amount.amountInMinorUnits)
                     }
                     if (tx.destinationAccountId == accountId) {
-                        balanceMinorUnits += tx.amount.amountInMinorUnits
+                        balanceMinorUnits = Math.addExact(balanceMinorUnits, tx.amount.amountInMinorUnits)
                     }
                 }
             }
