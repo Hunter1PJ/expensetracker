@@ -10,6 +10,7 @@ import com.suguru.expensetracker.domain.usecase.transaction.DeleteTransactionUse
 import com.suguru.expensetracker.domain.usecase.transaction.GetTransactionUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.presentation.util.DateTimeFormatterHelper
+import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +29,8 @@ class TransactionDetailViewModel(
     private val getCategoryUseCase: GetCategoryUseCase,
     private val deleteTransactionUseCase: DeleteTransactionUseCase,
     private val settingsRepository: com.suguru.expensetracker.domain.repository.SettingsRepository? = null,
-    private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TransactionDetailUiState(isLoading = true))
@@ -121,7 +123,14 @@ class TransactionDetailViewModel(
         _uiState.update { it.copy(isDeleting = true, errorMessage = null) }
         viewModelScope.launch {
             try {
+                val tx = state.transaction
                 deleteTransactionUseCase(transactionId)
+                if (tx != null) {
+                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(tx.accountId)
+                    tx.destinationAccountId?.let { destId ->
+                        widgetRefreshCoordinator?.refreshAccountBalanceWidgets(destId)
+                    }
+                }
                 _uiState.update {
                     it.copy(
                         isDeleting = false,

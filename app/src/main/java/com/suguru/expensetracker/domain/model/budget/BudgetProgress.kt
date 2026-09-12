@@ -25,4 +25,9 @@ sealed class BudgetValidationError : Exception() {
     data object IncompatibleCategoryType : BudgetValidationError()
     data object CategoryArchived : BudgetValidationError()
     data object OverlappingBudgetExists : BudgetValidationError()
+    data class FeatureLimitReached(
+        val feature: com.suguru.expensetracker.domain.model.ProFeature,
+        val currentCount: Int,
+        val freeLimit: Int
+    ) : BudgetValidationError()
 }

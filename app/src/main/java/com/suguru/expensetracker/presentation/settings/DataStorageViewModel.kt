@@ -8,6 +8,7 @@ import com.suguru.expensetracker.domain.repository.SettingsRepository
 import com.suguru.expensetracker.domain.usecase.backup.CreateFullBackupUseCase
 import com.suguru.expensetracker.domain.usecase.backup.RestoreBackupUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.ExportTransactionsToCsvUseCase
+import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +39,8 @@ class DataStorageViewModel(
     private val restoreBackupUseCase: RestoreBackupUseCase,
     private val exportTransactionsToCsvUseCase: ExportTransactionsToCsvUseCase,
     private val backupRepository: BackupRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DataStorageUiState())
@@ -200,6 +202,7 @@ class DataStorageViewModel(
             _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = "Restoring from backup...") }
             val result = restoreBackupUseCase(backup)
             if (result.isSuccess) {
+                widgetRefreshCoordinator?.refreshAll()
                 _uiState.update {
                     it.copy(
                         isLoading = false,

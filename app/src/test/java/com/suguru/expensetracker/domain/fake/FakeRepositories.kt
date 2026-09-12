@@ -29,7 +29,7 @@ class FakeAccountRepository : AccountRepository {
     override suspend fun getAccountById(id: Long): Account? = accounts.value[id]
 
     override suspend fun insertAccount(account: Account): Long {
-        val id = if (account.id == 0L) nextId++ else account.id
+        val id = if (account.id == 0L) nextId++ else { nextId = maxOf(nextId, account.id + 1); account.id }
         val updated = account.copy(id = id)
         accounts.value = accounts.value + (id to updated)
         return id
@@ -66,7 +66,7 @@ class FakeCategoryRepository : CategoryRepository {
     override suspend fun getCategoryById(id: Long): Category? = categories.value[id]
 
     override suspend fun insertCategory(category: Category): Long {
-        val id = if (category.id == 0L) nextId++ else category.id
+        val id = if (category.id == 0L) nextId++ else { nextId = maxOf(nextId, category.id + 1); category.id }
         val updated = category.copy(id = id)
         categories.value = categories.value + (id to updated)
         return id
@@ -171,7 +171,7 @@ class FakeBudgetRepository : com.suguru.expensetracker.domain.repository.BudgetR
     override suspend fun getBudgetById(id: Long): com.suguru.expensetracker.domain.model.Budget? = budgets.value[id]
 
     override suspend fun insertBudget(budget: com.suguru.expensetracker.domain.model.Budget): Long {
-        val id = if (budget.id == 0L) nextId++ else budget.id
+        val id = if (budget.id == 0L) nextId++ else { nextId = maxOf(nextId, budget.id + 1); budget.id }
         val updated = budget.copy(id = id)
         budgets.value = budgets.value + (id to updated)
         return id
@@ -184,6 +184,42 @@ class FakeBudgetRepository : com.suguru.expensetracker.domain.repository.BudgetR
     override suspend fun deactivateBudget(id: Long) {
         val budget = budgets.value[id] ?: return
         budgets.value = budgets.value + (id to budget.copy(isActive = false))
+    }
+}
+
+class FakeRecurringTransactionRepository : com.suguru.expensetracker.domain.repository.RecurringTransactionRepository {
+    private val rules = MutableStateFlow<Map<Long, com.suguru.expensetracker.domain.model.RecurringTransaction>>(emptyMap())
+    private var nextId = 1L
+
+    override fun observeActiveRecurringTransactions(): Flow<List<com.suguru.expensetracker.domain.model.RecurringTransaction>> =
+        rules.map { map -> map.values.filter { it.isActive } }
+
+    override fun observeAllRecurringTransactions(): Flow<List<com.suguru.expensetracker.domain.model.RecurringTransaction>> =
+        rules.map { map -> map.values.toList() }
+
+    override fun observeRecurringTransactionById(id: Long): Flow<com.suguru.expensetracker.domain.model.RecurringTransaction?> =
+        rules.map { it[id] }
+
+    override suspend fun getRecurringTransactionById(id: Long): com.suguru.expensetracker.domain.model.RecurringTransaction? =
+        rules.value[id]
+
+    override suspend fun getRecurringTransactionsDue(beforeOrOnDate: java.time.LocalDate): List<com.suguru.expensetracker.domain.model.RecurringTransaction> =
+        rules.value.values.filter { it.isActive && it.nextOccurrence <= beforeOrOnDate }
+
+    override suspend fun insertRecurringTransaction(recurringTransaction: com.suguru.expensetracker.domain.model.RecurringTransaction): Long {
+        val id = if (recurringTransaction.id == 0L) nextId++ else recurringTransaction.id
+        val updated = recurringTransaction.copy(id = id)
+        rules.value = rules.value + (id to updated)
+        return id
+    }
+
+    override suspend fun updateRecurringTransaction(recurringTransaction: com.suguru.expensetracker.domain.model.RecurringTransaction) {
+        rules.value = rules.value + (recurringTransaction.id to recurringTransaction)
+    }
+
+    override suspend fun deactivateRecurringTransaction(id: Long) {
+        val rule = rules.value[id] ?: return
+        rules.value = rules.value + (id to rule.copy(isActive = false))
     }
 }
 

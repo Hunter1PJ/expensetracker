@@ -41,6 +41,7 @@ data class AddEditBudgetUiState(
     val startDate: LocalDate = LocalDate.now().withDayOfMonth(1),
     val endDate: LocalDate = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth()),
     val validationError: String? = null,
+    val limitReachedState: com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached? = null,
     val isSubmitting: Boolean = false,
     val isSaved: Boolean = false
 )
@@ -221,19 +222,37 @@ class AddEditBudgetViewModel(
                 }
                 _uiState.update { it.copy(isSubmitting = false, isSaved = true) }
             } catch (e: BudgetValidationError) {
-                val message = when (e) {
-                    is BudgetValidationError.InvalidLimit -> "Limit must be greater than zero"
-                    is BudgetValidationError.InvalidCurrency -> "Please select a valid currency"
-                    is BudgetValidationError.InvalidDateRange -> "Start date must be before or equal to end date"
-                    is BudgetValidationError.CategoryNotFound -> "Selected category not found"
-                    is BudgetValidationError.IncompatibleCategoryType -> "Budget category must be Expense or Both"
-                    is BudgetValidationError.CategoryArchived -> "Selected category is archived"
-                    is BudgetValidationError.OverlappingBudgetExists -> "An active budget already exists for this scope, currency, and period"
+                if (e is BudgetValidationError.FeatureLimitReached) {
+                    _uiState.update {
+                        it.copy(
+                            isSubmitting = false,
+                            limitReachedState = com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached(
+                                feature = e.feature,
+                                currentCount = e.currentCount,
+                                freeLimit = e.freeLimit
+                            )
+                        )
+                    }
+                } else {
+                    val message = when (e) {
+                        is BudgetValidationError.InvalidLimit -> "Limit must be greater than zero"
+                        is BudgetValidationError.InvalidCurrency -> "Please select a valid currency"
+                        is BudgetValidationError.InvalidDateRange -> "Start date must be before or equal to end date"
+                        is BudgetValidationError.CategoryNotFound -> "Selected category not found"
+                        is BudgetValidationError.IncompatibleCategoryType -> "Budget category must be Expense or Both"
+                        is BudgetValidationError.CategoryArchived -> "Selected category is archived"
+                        is BudgetValidationError.OverlappingBudgetExists -> "An active budget already exists for this scope, currency, and period"
+                        else -> "Budget validation failed"
+                    }
+                    _uiState.update { it.copy(isSubmitting = false, validationError = message) }
                 }
-                _uiState.update { it.copy(isSubmitting = false, validationError = message) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSubmitting = false, validationError = e.message ?: "Failed to save budget") }
             }
         }
+    }
+
+    fun onDismissLimitSheet() {
+        _uiState.update { it.copy(limitReachedState = null) }
     }
 }

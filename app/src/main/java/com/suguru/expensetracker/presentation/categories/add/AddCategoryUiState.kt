@@ -19,5 +19,6 @@ data class AddCategoryUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isSavedSuccessfully: Boolean = false,
+    val limitReachedState: com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached? = null,
     val error: AddCategoryError? = null
 )

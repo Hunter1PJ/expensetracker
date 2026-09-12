@@ -11,6 +11,7 @@ import com.suguru.expensetracker.domain.usecase.account.CreateAccountUseCase
 import com.suguru.expensetracker.domain.usecase.account.GetAccountUseCase
 import com.suguru.expensetracker.domain.usecase.account.UpdateAccountUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
+import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +28,8 @@ class AddAccountViewModel(
     private val createAccountUseCase: CreateAccountUseCase,
     private val updateAccountUseCase: UpdateAccountUseCase,
     private val getAccountUseCase: GetAccountUseCase,
-    private val settingsRepository: com.suguru.expensetracker.domain.repository.SettingsRepository? = null
+    private val settingsRepository: com.suguru.expensetracker.domain.repository.SettingsRepository? = null,
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -180,6 +182,7 @@ class AddAccountViewModel(
                         colorHex = state.selectedColorHex
                     )
                     updateAccountUseCase(updated)
+                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(updated.id)
                 } else {
                     val newAccount = Account(
                         id = 0L,
@@ -191,12 +194,24 @@ class AddAccountViewModel(
                         isArchived = false
                     )
                     createAccountUseCase(newAccount)
+                    widgetRefreshCoordinator?.refreshAll()
                 }
 
                 _uiState.update {
                     it.copy(
                         isSaving = false,
                         isSavedSuccessfully = true
+                    )
+                }
+            } catch (e: DomainException.FeatureLimitReached) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        limitReachedState = com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached(
+                            feature = e.feature,
+                            currentCount = e.currentCount,
+                            freeLimit = e.freeLimit
+                        )
                     )
                 }
             } catch (e: DomainException.InvalidAccount) {
@@ -219,5 +234,9 @@ class AddAccountViewModel(
 
     fun onDismissError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun onDismissLimitSheet() {
+        _uiState.update { it.copy(limitReachedState = null) }
     }
 }

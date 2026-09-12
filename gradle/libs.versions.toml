@@ -43,6 +43,7 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 workRuntimeKtx = "2.9.1"
 playBillingKtx = "7.1.1"
+glance = "1.1.1"
 
 
 [libraries]
@@ -102,6 +103,7 @@ androidx-credentials-play-services = { group = "androidx.credentials", name = "c
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "playBillingKtx" }
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 
 
 [plugins]

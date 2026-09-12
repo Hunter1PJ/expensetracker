@@ -74,6 +74,16 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import com.suguru.expensetracker.domain.model.ProEntitlement
+
 private enum class ActiveSettingsSheet {
     THEME,
     CURRENCY,
@@ -90,6 +100,7 @@ fun SettingsScreen(
     onNavigateToCategories: () -> Unit,
     onNavigateToRecurring: () -> Unit,
     onNavigateToDataAndStorage: () -> Unit,
+    onNavigateToPro: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -163,6 +174,11 @@ fun SettingsScreen(
 
                 is SettingsUiState.Success -> {
                     val settings = state.settings
+
+                    SettingsProCard(
+                        entitlement = state.entitlement,
+                        onClick = onNavigateToPro
+                    )
 
                     // 1. Management Section
                     Column(
@@ -938,6 +954,131 @@ private fun SettingsOptionCard(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsProCard(
+    entitlement: ProEntitlement,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .widthIn(max = 560.dp)
+            .testTag("settings_pro_card"),
+        shape = ExpenseTrackerRadius.card,
+        colors = CardDefaults.cardColors(
+            containerColor = if (entitlement is ProEntitlement.Pro) {
+                ExpenseTrackerTheme.extendedColors.surfaceElevated
+            } else {
+                ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.08f)
+            }
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (entitlement is ProEntitlement.Pro) {
+                ExpenseTrackerTheme.extendedColors.cardBorder
+            } else {
+                ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.22f)
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ExpenseTrackerSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = ExpenseTrackerTheme.extendedColors.primaryBright,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = "ExpenseTracker Pro",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = when (entitlement) {
+                        is ProEntitlement.Pro -> "Lifetime unlocked"
+                        is ProEntitlement.Pending -> "Purchase pending"
+                        else -> "Unlimited accounts, categories, budgets and recurring rules"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (entitlement is ProEntitlement.Pro) {
+                        ExpenseTrackerTheme.extendedColors.textSecondary
+                    } else {
+                        ExpenseTrackerTheme.extendedColors.primaryBright
+                    }
+                )
+            }
+
+            // Trailing element
+            when (entitlement) {
+                is ProEntitlement.Pro -> {
+                    // Badge with text "PRO"
+                    Surface(
+                        color = ExpenseTrackerTheme.extendedColors.financialPositive.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, ExpenseTrackerTheme.extendedColors.financialPositive.copy(alpha = 0.3f)),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "PRO",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = ExpenseTrackerTheme.extendedColors.financialPositive,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                is ProEntitlement.Pending -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                else -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                    ) {
+                        Text(
+                            text = "Upgrade",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
     }

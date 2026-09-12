@@ -1,6 +1,8 @@
 package com.suguru.expensetracker.presentation.categories.add
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,9 +71,20 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 fun AddCategoryScreen(
     viewModel: AddCategoryViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToPro: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val appContainer = remember(context) {
+        (context.applicationContext as? com.suguru.expensetracker.ExpenseTrackerApplication)?.appContainer
+    }
+    val entitlementState = remember(appContainer) {
+        appContainer?.observeProEntitlementUseCase?.invoke() ?: kotlinx.coroutines.flow.flowOf(com.suguru.expensetracker.domain.model.ProEntitlement.Free)
+    }.collectAsState(initial = com.suguru.expensetracker.domain.model.ProEntitlement.Checking).value
+
+    val isPending = entitlementState is com.suguru.expensetracker.domain.model.ProEntitlement.Pending
 
     BackHandler(onBack = onNavigateBack)
 
@@ -79,6 +92,16 @@ fun AddCategoryScreen(
         if (uiState.isSavedSuccessfully) {
             onNavigateBack()
         }
+    }
+
+    uiState.limitReachedState?.let { limitState ->
+        com.suguru.expensetracker.presentation.components.ContextualPaywallSheet(
+            feature = limitState.feature,
+            limit = limitState.freeLimit,
+            onViewPro = onNavigateToPro,
+            onDismiss = viewModel::onDismissLimitSheet,
+            isPending = isPending
+        )
     }
 
     AddCategoryScreenContent(

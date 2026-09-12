@@ -43,6 +43,7 @@ data class AddEditRecurringUiState(
     val isActive: Boolean = true,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
+    val limitReachedState: com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached? = null,
     val isSuccess: Boolean = false,
     val availableAccounts: List<Account> = emptyList(),
     val availableCategories: List<Category> = emptyList()
@@ -237,12 +238,27 @@ class AddEditRecurringTransactionViewModel(
                     createRecurringTransactionUseCase(ruleToSave)
                 }
                 _uiState.update { it.copy(isSaving = false, isSuccess = true) }
+            } catch (e: DomainException.FeatureLimitReached) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        limitReachedState = com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached(
+                            feature = e.feature,
+                            currentCount = e.currentCount,
+                            freeLimit = e.freeLimit
+                        )
+                    )
+                }
             } catch (e: DomainException) {
                 _uiState.update { it.copy(isSaving = false, errorMessage = e.message) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSaving = false, errorMessage = e.message ?: "Failed to save rule") }
             }
         }
+    }
+
+    fun onDismissLimitSheet() {
+        _uiState.update { it.copy(limitReachedState = null) }
     }
 
     private fun filterCategories(categories: List<Category>, type: TransactionType): List<Category> {

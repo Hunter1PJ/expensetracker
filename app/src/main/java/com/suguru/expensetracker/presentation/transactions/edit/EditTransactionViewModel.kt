@@ -14,6 +14,7 @@ import com.suguru.expensetracker.domain.usecase.transaction.GetTransactionUseCas
 import com.suguru.expensetracker.domain.usecase.transaction.UpdateTransactionUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.presentation.transactions.add.AddTransactionError
+import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +39,8 @@ class EditTransactionViewModel(
     private val observeActiveAccountsUseCase: ObserveActiveAccountsUseCase,
     private val observeCategoriesByTypeUseCase: ObserveCategoriesByTypeUseCase,
     private val getAccountUseCase: GetAccountUseCase,
-    private val getCategoryUseCase: GetCategoryUseCase
+    private val getCategoryUseCase: GetCategoryUseCase,
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditTransactionUiState(transactionId = transactionId, isLoading = true))
@@ -306,6 +308,17 @@ class EditTransactionViewModel(
         viewModelScope.launch {
             try {
                 updateTransactionUseCase(updatedTransaction)
+                widgetRefreshCoordinator?.refreshAccountBalanceWidgets(updatedTransaction.accountId)
+                updatedTransaction.destinationAccountId?.let { destId ->
+                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(destId)
+                }
+                // Also refresh original account just in case it was changed
+                historicalSourceAccount?.let { orig ->
+                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(orig.id)
+                }
+                historicalDestAccount?.let { origDest ->
+                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(origDest.id)
+                }
                 _uiState.update { it.copy(isSaving = false, isSavedSuccessfully = true, error = null) }
                 onSuccess()
             } catch (e: DomainException) {

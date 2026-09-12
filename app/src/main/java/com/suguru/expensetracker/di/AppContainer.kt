@@ -112,13 +112,15 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.data.repository.RoomRecurringOccurrenceRepository(database)
     }
 
+    val monetizationPolicy by lazy { com.suguru.expensetracker.domain.policy.MonetizationPolicy() }
+
     // Account Use Cases
     val observeActiveAccountsUseCase by lazy { ObserveActiveAccountsUseCase(accountRepository) }
     val observeAllAccountsUseCase by lazy { ObserveAllAccountsUseCase(accountRepository) }
     val observeAccountUseCase by lazy { ObserveAccountUseCase(accountRepository) }
     val getAccountUseCase by lazy { GetAccountUseCase(accountRepository) }
-    val createAccountUseCase by lazy { CreateAccountUseCase(accountRepository) }
-    val updateAccountUseCase by lazy { UpdateAccountUseCase(accountRepository) }
+    val createAccountUseCase by lazy { CreateAccountUseCase(accountRepository, entitlementRepository, monetizationPolicy) }
+    val updateAccountUseCase by lazy { UpdateAccountUseCase(accountRepository, entitlementRepository, monetizationPolicy) }
     val archiveAccountUseCase by lazy { ArchiveAccountUseCase(accountRepository) }
 
     // Category Use Cases
@@ -126,8 +128,8 @@ class AppContainer(private val context: Context) {
     val observeAllCategoriesUseCase by lazy { ObserveAllCategoriesUseCase(categoryRepository) }
     val observeCategoriesByTypeUseCase by lazy { ObserveCategoriesByTypeUseCase(categoryRepository) }
     val getCategoryUseCase by lazy { GetCategoryUseCase(categoryRepository) }
-    val createCategoryUseCase by lazy { CreateCategoryUseCase(categoryRepository) }
-    val updateCategoryUseCase by lazy { UpdateCategoryUseCase(categoryRepository) }
+    val createCategoryUseCase by lazy { CreateCategoryUseCase(categoryRepository, entitlementRepository, monetizationPolicy) }
+    val updateCategoryUseCase by lazy { UpdateCategoryUseCase(categoryRepository, entitlementRepository, monetizationPolicy) }
     val archiveCategoryUseCase by lazy { ArchiveCategoryUseCase(categoryRepository) }
 
     // Transaction Use Cases
@@ -153,14 +155,18 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.domain.usecase.recurring.CreateRecurringTransactionUseCase(
             recurringTransactionRepository = recurringTransactionRepository,
             accountRepository = accountRepository,
-            categoryRepository = categoryRepository
+            categoryRepository = categoryRepository,
+            entitlementRepository = entitlementRepository,
+            monetizationPolicy = monetizationPolicy
         )
     }
     val updateRecurringTransactionUseCase by lazy {
         com.suguru.expensetracker.domain.usecase.recurring.UpdateRecurringTransactionUseCase(
             recurringTransactionRepository = recurringTransactionRepository,
             accountRepository = accountRepository,
-            categoryRepository = categoryRepository
+            categoryRepository = categoryRepository,
+            entitlementRepository = entitlementRepository,
+            monetizationPolicy = monetizationPolicy
         )
     }
     val deactivateRecurringTransactionUseCase by lazy {
@@ -203,13 +209,17 @@ class AppContainer(private val context: Context) {
     val createBudgetUseCase by lazy {
         com.suguru.expensetracker.domain.usecase.budget.CreateBudgetUseCase(
             budgetRepository = budgetRepository,
-            categoryRepository = categoryRepository
+            categoryRepository = categoryRepository,
+            entitlementRepository = entitlementRepository,
+            monetizationPolicy = monetizationPolicy
         )
     }
     val updateBudgetUseCase by lazy {
         com.suguru.expensetracker.domain.usecase.budget.UpdateBudgetUseCase(
             budgetRepository = budgetRepository,
-            categoryRepository = categoryRepository
+            categoryRepository = categoryRepository,
+            entitlementRepository = entitlementRepository,
+            monetizationPolicy = monetizationPolicy
         )
     }
     val deactivateBudgetUseCase by lazy {
@@ -228,7 +238,8 @@ class AppContainer(private val context: Context) {
         return com.suguru.expensetracker.presentation.transactions.add.AddTransactionViewModel(
             observeActiveAccountsUseCase = observeActiveAccountsUseCase,
             observeCategoriesByTypeUseCase = observeCategoriesByTypeUseCase,
-            createTransactionUseCase = createTransactionUseCase
+            createTransactionUseCase = createTransactionUseCase,
+            widgetRefreshCoordinator = widgetRefreshCoordinator
         )
     }
 
@@ -244,7 +255,8 @@ class AppContainer(private val context: Context) {
         return com.suguru.expensetracker.presentation.accounts.management.AccountManagementViewModel(
             observeActiveAccountsUseCase = observeActiveAccountsUseCase,
             observeAccountBalanceUseCase = observeAccountBalanceUseCase,
-            archiveAccountUseCase = archiveAccountUseCase
+            archiveAccountUseCase = archiveAccountUseCase,
+            widgetRefreshCoordinator = widgetRefreshCoordinator
         )
     }
 
@@ -254,7 +266,8 @@ class AppContainer(private val context: Context) {
             createAccountUseCase = createAccountUseCase,
             updateAccountUseCase = updateAccountUseCase,
             getAccountUseCase = getAccountUseCase,
-            settingsRepository = settingsRepository
+            settingsRepository = settingsRepository,
+            widgetRefreshCoordinator = widgetRefreshCoordinator
         )
     }
 
@@ -289,7 +302,8 @@ class AppContainer(private val context: Context) {
             getAccountUseCase = getAccountUseCase,
             getCategoryUseCase = getCategoryUseCase,
             deleteTransactionUseCase = deleteTransactionUseCase,
-            settingsRepository = settingsRepository
+            settingsRepository = settingsRepository,
+            widgetRefreshCoordinator = widgetRefreshCoordinator
         )
     }
 
@@ -301,7 +315,8 @@ class AppContainer(private val context: Context) {
             observeActiveAccountsUseCase = observeActiveAccountsUseCase,
             observeCategoriesByTypeUseCase = observeCategoriesByTypeUseCase,
             getAccountUseCase = getAccountUseCase,
-            getCategoryUseCase = getCategoryUseCase
+            getCategoryUseCase = getCategoryUseCase,
+            widgetRefreshCoordinator = widgetRefreshCoordinator
         )
     }
 
@@ -352,7 +367,8 @@ class AppContainer(private val context: Context) {
 
     fun createSettingsViewModel(): com.suguru.expensetracker.presentation.settings.SettingsViewModel {
         return com.suguru.expensetracker.presentation.settings.SettingsViewModel(
-            settingsRepository = settingsRepository
+            settingsRepository = settingsRepository,
+            observeProEntitlementUseCase = observeProEntitlementUseCase
         )
     }
 
@@ -382,7 +398,8 @@ class AppContainer(private val context: Context) {
             restoreBackupUseCase = restoreBackupUseCase,
             exportTransactionsToCsvUseCase = exportTransactionsToCsvUseCase,
             backupRepository = backupRepository,
-            settingsRepository = settingsRepository
+            settingsRepository = settingsRepository,
+            widgetRefreshCoordinator = widgetRefreshCoordinator
         )
     }
 
@@ -393,6 +410,27 @@ class AppContainer(private val context: Context) {
             refreshProEntitlementUseCase = refreshProEntitlementUseCase,
             restorePurchasesUseCase = restorePurchasesUseCase,
             launchProPurchaseUseCase = launchProPurchaseUseCase
+        )
+    }
+
+    // Widget Foundation
+    val widgetConfigurationRepository: com.suguru.expensetracker.widget.configuration.WidgetConfigurationRepository by lazy {
+        com.suguru.expensetracker.widget.configuration.DataStoreWidgetConfigurationRepository(context.applicationContext)
+    }
+
+    val widgetRefreshCoordinator: com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator by lazy {
+        com.suguru.expensetracker.widget.common.GlanceWidgetRefreshCoordinator(context.applicationContext, widgetConfigurationRepository)
+    }
+
+    val widgetEntitlementPolicy: com.suguru.expensetracker.widget.common.WidgetEntitlementPolicy by lazy {
+        com.suguru.expensetracker.widget.common.WidgetEntitlementPolicy()
+    }
+
+    val accountBalanceWidgetDataProvider: com.suguru.expensetracker.widget.balance.AccountBalanceWidgetDataProvider by lazy {
+        com.suguru.expensetracker.widget.balance.AccountBalanceWidgetDataProvider(
+            accountRepository = accountRepository,
+            getAccountBalanceUseCase = getAccountBalanceUseCase,
+            widgetConfigurationRepository = widgetConfigurationRepository
         )
     }
 }

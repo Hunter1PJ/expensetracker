@@ -8,10 +8,12 @@ import com.suguru.expensetracker.domain.model.DateFormatPreference
 import com.suguru.expensetracker.domain.model.ThemeMode
 import com.suguru.expensetracker.domain.model.TimeFormatPreference
 import com.suguru.expensetracker.domain.model.WeekStart
+import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.domain.repository.SettingsRepository
+import com.suguru.expensetracker.domain.usecase.billing.ObserveProEntitlementUseCase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -20,28 +22,32 @@ sealed interface SettingsUiState {
     data class Success(
         val settings: AppSettings,
         val appVersionName: String,
-        val appVersionCode: Int
+        val appVersionCode: Int,
+        val entitlement: ProEntitlement = ProEntitlement.Checking
     ) : SettingsUiState
     data class Error(val message: String) : SettingsUiState
 }
 
 class SettingsViewModel(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val observeProEntitlementUseCase: ObserveProEntitlementUseCase
 ) : ViewModel() {
 
-    val uiState: StateFlow<SettingsUiState> = settingsRepository.settings
-        .map { settings ->
-            SettingsUiState.Success(
-                settings = settings,
-                appVersionName = try { BuildConfig.VERSION_NAME } catch (e: Exception) { "1.0" },
-                appVersionCode = try { BuildConfig.VERSION_CODE } catch (e: Exception) { 1 }
-            )
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = SettingsUiState.Loading
+    val uiState: StateFlow<SettingsUiState> = combine(
+        settingsRepository.settings,
+        observeProEntitlementUseCase()
+    ) { settings, entitlement ->
+        SettingsUiState.Success(
+            settings = settings,
+            appVersionName = try { BuildConfig.VERSION_NAME } catch (e: Exception) { "1.1.0" },
+            appVersionCode = try { BuildConfig.VERSION_CODE } catch (e: Exception) { 2 },
+            entitlement = entitlement
         )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SettingsUiState.Loading
+    )
 
     fun setThemeMode(themeMode: ThemeMode) {
         viewModelScope.launch {

@@ -8,6 +8,7 @@ import com.suguru.expensetracker.domain.usecase.account.ArchiveAccountUseCase
 import com.suguru.expensetracker.domain.usecase.account.ObserveActiveAccountsUseCase
 import com.suguru.expensetracker.domain.usecase.balance.ObserveAccountBalanceUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
+import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +29,8 @@ import kotlinx.coroutines.launch
 class AccountManagementViewModel(
     private val observeActiveAccountsUseCase: ObserveActiveAccountsUseCase,
     private val observeAccountBalanceUseCase: ObserveAccountBalanceUseCase,
-    private val archiveAccountUseCase: ArchiveAccountUseCase
+    private val archiveAccountUseCase: ArchiveAccountUseCase,
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AccountManagementUiState())
@@ -96,6 +98,7 @@ class AccountManagementViewModel(
         viewModelScope.launch {
             try {
                 archiveAccountUseCase(account.id)
+                widgetRefreshCoordinator?.refreshAccountBalanceWidgets(account.id)
                 _uiState.update {
                     it.copy(
                         accountToArchive = null,

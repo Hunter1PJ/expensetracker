@@ -208,6 +208,10 @@ fun ExpenseTrackerApp(
                 viewModel = addAccountViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.AccountManagement
+                },
+                onNavigateToPro = {
+                    previousDestination = currentDestination
+                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -251,6 +255,10 @@ fun ExpenseTrackerApp(
                 viewModel = addCategoryViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.CategoryManagement
+                },
+                onNavigateToPro = {
+                    previousDestination = currentDestination
+                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -272,6 +280,10 @@ fun ExpenseTrackerApp(
                 viewModel = addEditBudgetViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.Budgets
+                },
+                onNavigateToPro = {
+                    previousDestination = currentDestination
+                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -320,6 +332,10 @@ fun ExpenseTrackerApp(
                 viewModel = addEditRecurringViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.RecurringTransactions
+                },
+                onNavigateToPro = {
+                    previousDestination = currentDestination
+                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -332,6 +348,18 @@ fun ExpenseTrackerApp(
                 viewModel = dataStorageViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.Settings
+                }
+            )
+        }
+
+        NavDestination.Pro -> {
+            val proViewModel = remember(resolvedContainer) {
+                resolvedContainer?.createProViewModel() ?: throw IllegalStateException("AppContainer required")
+            }
+            com.suguru.expensetracker.presentation.pro.ProScreen(
+                viewModel = proViewModel,
+                onNavigateBack = {
+                    currentDestination = previousDestination
                 }
             )
         }
@@ -557,7 +585,10 @@ fun ExpenseTrackerApp(
                     }
                     NavDestination.Settings -> {
                         val settingsViewModel: com.suguru.expensetracker.presentation.settings.SettingsViewModel = remember(resolvedContainer) {
-                            resolvedContainer?.createSettingsViewModel() ?: com.suguru.expensetracker.presentation.settings.SettingsViewModel(resolvedContainer!!.settingsRepository)
+                            resolvedContainer?.createSettingsViewModel() ?: com.suguru.expensetracker.presentation.settings.SettingsViewModel(
+                                settingsRepository = resolvedContainer!!.settingsRepository,
+                                observeProEntitlementUseCase = resolvedContainer.observeProEntitlementUseCase
+                            )
                         }
 
                         SettingsScreen(
@@ -577,6 +608,10 @@ fun ExpenseTrackerApp(
                             onNavigateToDataAndStorage = {
                                 previousDestination = NavDestination.Settings
                                 currentDestination = NavDestination.DataAndStorage
+                            },
+                            onNavigateToPro = {
+                                previousDestination = NavDestination.Settings
+                                currentDestination = NavDestination.Pro
                             },
                             modifier = Modifier.padding(innerPadding)
                         )

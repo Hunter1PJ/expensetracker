@@ -10,6 +10,7 @@ import com.suguru.expensetracker.domain.usecase.account.ObserveActiveAccountsUse
 import com.suguru.expensetracker.domain.usecase.category.ObserveCategoriesByTypeUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.CreateTransactionUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
+import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +31,8 @@ import java.time.Instant
 class AddTransactionViewModel(
     private val observeActiveAccountsUseCase: ObserveActiveAccountsUseCase,
     private val observeCategoriesByTypeUseCase: ObserveCategoriesByTypeUseCase,
-    private val createTransactionUseCase: CreateTransactionUseCase
+    private val createTransactionUseCase: CreateTransactionUseCase,
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddTransactionUiState())
@@ -226,6 +228,10 @@ class AddTransactionViewModel(
         viewModelScope.launch {
             try {
                 createTransactionUseCase(transaction)
+                widgetRefreshCoordinator?.refreshAccountBalanceWidgets(transaction.accountId)
+                transaction.destinationAccountId?.let { destId ->
+                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(destId)
+                }
                 _uiState.update { it.copy(isSaving = false, isSavedSuccessfully = true, error = null) }
                 onSuccess()
             } catch (e: DomainException) {

@@ -153,6 +153,13 @@ enum class NavDestination(
         icon = Icons.Outlined.Settings,
         testTag = "nav_item_data_and_storage",
         isBottomBarItem = false
+    ),
+    Pro(
+        route = "pro",
+        label = "ExpenseTracker Pro",
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_pro",
+        isBottomBarItem = false
     );
 
     companion object {

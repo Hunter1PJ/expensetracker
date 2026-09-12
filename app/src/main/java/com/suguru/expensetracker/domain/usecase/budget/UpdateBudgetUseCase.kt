@@ -2,14 +2,19 @@ package com.suguru.expensetracker.domain.usecase.budget
 
 import com.suguru.expensetracker.domain.model.Budget
 import com.suguru.expensetracker.domain.model.CategoryType
+import com.suguru.expensetracker.domain.model.FeatureGateResult
 import com.suguru.expensetracker.domain.model.budget.BudgetValidationError
+import com.suguru.expensetracker.domain.policy.MonetizationPolicy
 import com.suguru.expensetracker.domain.repository.BudgetRepository
 import com.suguru.expensetracker.domain.repository.CategoryRepository
+import com.suguru.expensetracker.domain.repository.EntitlementRepository
 import kotlinx.coroutines.flow.first
 
 class UpdateBudgetUseCase(
     private val budgetRepository: BudgetRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val entitlementRepository: EntitlementRepository? = null,
+    private val monetizationPolicy: MonetizationPolicy = MonetizationPolicy()
 ) {
     suspend operator fun invoke(budget: Budget) {
         if (budget.id <= 0L) {
@@ -23,6 +28,18 @@ class UpdateBudgetUseCase(
         }
         if (budget.startDate.isAfter(budget.endDate)) {
             throw BudgetValidationError.InvalidDateRange
+        }
+
+        val existingBudget = budgetRepository.getBudgetById(budget.id)
+        if (existingBudget != null && !existingBudget.isActive && budget.isActive && entitlementRepository != null) {
+            val entitlement = entitlementRepository.entitlement.value
+            val activeBudgetCount = budgetRepository.observeActiveBudgets().first().size
+            when (val gate = monetizationPolicy.checkBudgetCreation(entitlement, activeBudgetCount)) {
+                is FeatureGateResult.LimitReached -> {
+                    throw BudgetValidationError.FeatureLimitReached(gate.feature, gate.currentCount, gate.freeLimit)
+                }
+                is FeatureGateResult.Allowed -> { /* Allowed */ }
+            }
         }
 
         if (budget.categoryId != null) {

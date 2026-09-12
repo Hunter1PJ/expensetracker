@@ -144,6 +144,17 @@ class AddCategoryViewModel(
                         isSavedSuccessfully = true
                     )
                 }
+            } catch (e: DomainException.FeatureLimitReached) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        limitReachedState = com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached(
+                            feature = e.feature,
+                            currentCount = e.currentCount,
+                            freeLimit = e.freeLimit
+                        )
+                    )
+                }
             } catch (e: DomainException.InvalidCategory) {
                 _uiState.update {
                     it.copy(
@@ -164,5 +175,9 @@ class AddCategoryViewModel(
 
     fun onDismissError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun onDismissLimitSheet() {
+        _uiState.update { it.copy(limitReachedState = null) }
     }
 }
