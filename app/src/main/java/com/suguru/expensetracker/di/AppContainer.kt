@@ -55,6 +55,39 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.data.repository.DataStoreSettingsRepository(context.dataStore)
     }
 
+    val googlePlayBillingManager: com.suguru.expensetracker.data.billing.GooglePlayBillingManager by lazy {
+        com.suguru.expensetracker.data.billing.GooglePlayBillingManager(
+            context = context.applicationContext,
+            onEntitlementUpdated = { entitlement ->
+                (entitlementRepository as? com.suguru.expensetracker.data.repository.BillingEntitlementRepositoryImpl)?.onBillingEntitlementUpdated(entitlement)
+            }
+        )
+    }
+
+    val entitlementRepository: com.suguru.expensetracker.domain.repository.EntitlementRepository by lazy {
+        com.suguru.expensetracker.data.repository.BillingEntitlementRepositoryImpl(
+            context = context.applicationContext,
+            dataStore = context.dataStore,
+            billingManager = googlePlayBillingManager
+        )
+    }
+
+    val observeProEntitlementUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.billing.ObserveProEntitlementUseCase(entitlementRepository)
+    }
+    val observeProProductDetailsUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.billing.ObserveProProductDetailsUseCase(entitlementRepository)
+    }
+    val refreshProEntitlementUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.billing.RefreshProEntitlementUseCase(entitlementRepository)
+    }
+    val restorePurchasesUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.billing.RestorePurchasesUseCase(entitlementRepository)
+    }
+    val launchProPurchaseUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.billing.LaunchProPurchaseUseCase(entitlementRepository)
+    }
+
     val accountRepository: AccountRepository by lazy {
         RoomAccountRepository(database.accountDao())
     }
@@ -350,6 +383,16 @@ class AppContainer(private val context: Context) {
             exportTransactionsToCsvUseCase = exportTransactionsToCsvUseCase,
             backupRepository = backupRepository,
             settingsRepository = settingsRepository
+        )
+    }
+
+    fun createProViewModel(): com.suguru.expensetracker.presentation.pro.ProViewModel {
+        return com.suguru.expensetracker.presentation.pro.ProViewModel(
+            observeProEntitlementUseCase = observeProEntitlementUseCase,
+            observeProProductDetailsUseCase = observeProProductDetailsUseCase,
+            refreshProEntitlementUseCase = refreshProEntitlementUseCase,
+            restorePurchasesUseCase = restorePurchasesUseCase,
+            launchProPurchaseUseCase = launchProPurchaseUseCase
         )
     }
 }

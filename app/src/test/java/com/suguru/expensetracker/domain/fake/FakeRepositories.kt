@@ -9,6 +9,7 @@ import com.suguru.expensetracker.domain.repository.CategoryRepository
 import com.suguru.expensetracker.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 
@@ -183,5 +184,47 @@ class FakeBudgetRepository : com.suguru.expensetracker.domain.repository.BudgetR
     override suspend fun deactivateBudget(id: Long) {
         val budget = budgets.value[id] ?: return
         budgets.value = budgets.value + (id to budget.copy(isActive = false))
+    }
+}
+
+class FakeEntitlementRepository : com.suguru.expensetracker.domain.repository.EntitlementRepository {
+    private val _entitlement = MutableStateFlow<com.suguru.expensetracker.domain.model.ProEntitlement>(com.suguru.expensetracker.domain.model.ProEntitlement.Free)
+    override val entitlement: StateFlow<com.suguru.expensetracker.domain.model.ProEntitlement> = _entitlement
+
+    private val _productDetails = MutableStateFlow<com.suguru.expensetracker.domain.model.ProProductDetails?>(
+        com.suguru.expensetracker.domain.model.ProProductDetails(
+            productId = com.suguru.expensetracker.domain.model.BillingProducts.PRO_LIFETIME,
+            title = "ExpenseTracker Pro — Lifetime",
+            description = "One-time upgrade",
+            formattedPrice = "$9.99"
+        )
+    )
+    override val productDetails: StateFlow<com.suguru.expensetracker.domain.model.ProProductDetails?> = _productDetails
+
+    var restoreResult: com.suguru.expensetracker.domain.model.RestorePurchasesResult =
+        com.suguru.expensetracker.domain.model.RestorePurchasesResult.Restored
+    var launchResult: com.suguru.expensetracker.domain.model.PurchaseLaunchResult =
+        com.suguru.expensetracker.domain.model.PurchaseLaunchResult.Launched
+
+    fun setEntitlement(newEntitlement: com.suguru.expensetracker.domain.model.ProEntitlement) {
+        _entitlement.value = newEntitlement
+    }
+
+    override suspend fun refreshPurchases() {
+        // No-op for fake
+    }
+
+    override suspend fun restorePurchases(): com.suguru.expensetracker.domain.model.RestorePurchasesResult {
+        if (restoreResult is com.suguru.expensetracker.domain.model.RestorePurchasesResult.Restored) {
+            _entitlement.value = com.suguru.expensetracker.domain.model.ProEntitlement.Pro
+        }
+        return restoreResult
+    }
+
+    override suspend fun launchPurchase(activity: android.app.Activity): com.suguru.expensetracker.domain.model.PurchaseLaunchResult {
+        if (launchResult is com.suguru.expensetracker.domain.model.PurchaseLaunchResult.AlreadyOwned) {
+            _entitlement.value = com.suguru.expensetracker.domain.model.ProEntitlement.Pro
+        }
+        return launchResult
     }
 }
