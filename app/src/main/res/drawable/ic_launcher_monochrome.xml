@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Card Base -->
+    <path
+        android:pathData="M34,42 C34,37.58 37.58,34 42,34 L66,34 C70.42,34 74,37.58 74,42 L74,68 C74,72.42 70.42,76 66,76 L42,76 C37.58,76 34,72.42 34,68 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Negative Space Cutout for card slot and trend -->
+    <path
+        android:pathData="M38,47 L70,47 L70,50 L38,50 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#000000"
+        android:strokeWidth="1.5" />
+
+    <!-- Upward Trend Line Cutout -->
+    <path
+        android:pathData="M43,64 L52,54 L58,59 L66,49"
+        android:strokeColor="#000000"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <path
+        android:pathData="M60.5,49 L66,49 L66,54.5"
+        android:strokeColor="#000000"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+</vector>

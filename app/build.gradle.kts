@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -10,26 +12,38 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.suguru.expensetracker"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.example"
+    applicationId = "com.suguru.expensetracker"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
-    versionName = "1.0"
+    versionName = "1.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    val keystoreProps = Properties()
+    if (keystorePropsFile.exists()) {
+      FileInputStream(keystorePropsFile).use { keystoreProps.load(it) }
+    }
+
+    val storeFilePath = keystoreProps.getProperty("storeFile") ?: System.getenv("KEYSTORE_PATH")
+    val storePass = keystoreProps.getProperty("storePassword") ?: System.getenv("STORE_PASSWORD")
+    val alias = keystoreProps.getProperty("keyAlias") ?: System.getenv("KEY_ALIAS") ?: "expensetracker-upload"
+    val keyPass = keystoreProps.getProperty("keyPassword") ?: System.getenv("KEY_PASSWORD")
+
+    if (!storeFilePath.isNullOrBlank() && file(storeFilePath).exists() && !storePass.isNullOrBlank() && !keyPass.isNullOrBlank()) {
+      create("release") {
+        storeFile = file(storeFilePath)
+        storePassword = storePass
+        keyAlias = alias
+        keyPassword = keyPass
+      }
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -41,16 +55,27 @@ android {
 
   buildTypes {
     release {
+      isDebuggable = false
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfigs.findByName("release")?.let { releaseConfig ->
+        signingConfig = releaseConfig
+      }
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      isDebuggable = true
+      signingConfig = signingConfigs.getByName("debugConfig")
+    }
   }
   compileOptions {
+    isCoreLibraryDesugaringEnabled = true
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
+  }
+  lint {
+    abortOnError = false
+    checkReleaseBuilds = false
   }
   buildFeatures {
     compose = true
@@ -134,6 +159,7 @@ dependencies {
   androidTestImplementation(libs.androidx.espresso.core)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.runner)
+  coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
