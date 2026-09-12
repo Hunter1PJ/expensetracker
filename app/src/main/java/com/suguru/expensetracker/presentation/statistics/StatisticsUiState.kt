@@ -2,6 +2,9 @@ package com.suguru.expensetracker.presentation.statistics
 
 import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
 
+import com.suguru.expensetracker.domain.model.ProEntitlement
+import java.time.LocalDate
+
 data class SummaryCardUiModel(
     val formattedIncome: String,
     val formattedExpense: String,
@@ -49,5 +52,13 @@ data class StatisticsUiState(
     val trendPoints: List<TrendPointUiModel> = emptyList(),
     val totalTransactionsCount: Int = 0,
     val hasAnyTransactionsInPeriod: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val proEntitlement: ProEntitlement = ProEntitlement.Checking,
+    val customStartDate: LocalDate? = null,
+    val customEndDate: LocalDate? = null,
+    val isCustomRangePickerVisible: Boolean = false,
+    val customRangeError: String? = null,
+    val proRequiredMessage: String? = null,
+    val showProPaywall: Boolean = false,
+    val showPendingMessage: Boolean = false
 )

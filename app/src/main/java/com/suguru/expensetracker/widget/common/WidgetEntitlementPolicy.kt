@@ -4,7 +4,8 @@ import com.suguru.expensetracker.domain.model.ProEntitlement
 
 enum class WidgetFeature {
     ACCOUNT_BALANCE,
-    QUICK_ADD
+    QUICK_ADD,
+    BUDGET_PROGRESS
 }
 
 sealed interface WidgetGateResult {
@@ -33,6 +34,9 @@ class WidgetEntitlementPolicy {
             }
             WidgetFeature.QUICK_ADD -> {
                 WidgetGateResult.ProRequired(WidgetFeature.QUICK_ADD)
+            }
+            WidgetFeature.BUDGET_PROGRESS -> {
+                WidgetGateResult.ProRequired(WidgetFeature.BUDGET_PROGRESS)
             }
         }
     }

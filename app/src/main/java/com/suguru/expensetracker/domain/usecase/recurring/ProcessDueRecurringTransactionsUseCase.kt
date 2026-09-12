@@ -19,7 +19,8 @@ class ProcessDueRecurringTransactionsUseCase(
     private val recurringTransactionRepository: RecurringTransactionRepository,
     private val recurringOccurrenceRepository: RecurringOccurrenceRepository,
     private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val widgetRefreshCoordinator: () -> com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator? = { null }
 ) {
     suspend operator fun invoke(
         asOfDate: LocalDate = LocalDate.now(),
@@ -92,6 +93,10 @@ class ProcessDueRecurringTransactionsUseCase(
                     isActive = isStillActive
                 )
             }
+        }
+
+        if (totalGeneratedCount > 0) {
+            widgetRefreshCoordinator()?.refreshAll()
         }
 
         return totalGeneratedCount

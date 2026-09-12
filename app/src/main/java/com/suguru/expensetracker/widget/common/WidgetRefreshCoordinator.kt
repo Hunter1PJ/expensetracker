@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 interface WidgetRefreshCoordinator {
     fun refreshAll()
     fun refreshAccountBalanceWidgets(accountId: Long)
+    fun refreshBudgetWidgets(budgetId: Long)
 }
 
 class GlanceWidgetRefreshCoordinator(
@@ -25,6 +26,10 @@ class GlanceWidgetRefreshCoordinator(
         coroutineScope.launch {
             try {
                 AccountBalanceWidget().updateAll(context)
+            } catch (_: Exception) {
+            }
+            try {
+                com.suguru.expensetracker.widget.budget.BudgetProgressWidget().updateAll(context)
             } catch (_: Exception) {
             }
         }
@@ -42,6 +47,26 @@ class GlanceWidgetRefreshCoordinator(
                     val config = configs.find { it.appWidgetId == appWidgetId }
                     if (config?.accountId == accountId) {
                         AccountBalanceWidget().update(context, glanceId)
+                    }
+                }
+            } catch (_: Exception) {
+                refreshAll()
+            }
+        }
+    }
+
+    override fun refreshBudgetWidgets(budgetId: Long) {
+        coroutineScope.launch {
+            try {
+                val manager = GlanceAppWidgetManager(context)
+                val glanceIds = manager.getGlanceIds(com.suguru.expensetracker.widget.budget.BudgetProgressWidget::class.java)
+                val configs = widgetConfigurationRepository.getAllBudgetProgressConfigurations().first()
+                
+                for (glanceId in glanceIds) {
+                    val appWidgetId = manager.getAppWidgetId(glanceId)
+                    val config = configs.find { it.appWidgetId == appWidgetId }
+                    if (config?.budgetId == budgetId) {
+                        com.suguru.expensetracker.widget.budget.BudgetProgressWidget().update(context, glanceId)
                     }
                 }
             } catch (_: Exception) {

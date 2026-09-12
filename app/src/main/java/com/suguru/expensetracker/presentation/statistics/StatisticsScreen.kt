@@ -1,5 +1,15 @@
 package com.suguru.expensetracker.presentation.statistics
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import com.suguru.expensetracker.presentation.components.PrimaryButton
+import com.suguru.expensetracker.presentation.components.SecondaryButton
+import com.suguru.expensetracker.presentation.components.ExpenseTrackerConfirmationDialog
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -160,9 +170,15 @@ fun StatisticsScreen(
                     shape = ExpenseTrackerRadius.cardHero,
                     contentPadding = PaddingValues(ExpenseTrackerSpacing.xxl)
                 ) {
+                    val periodDisplay = if (uiState.selectedPeriod == StatisticsPeriodOption.CUSTOM && uiState.customStartDate != null && uiState.customEndDate != null) {
+                        val formatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+                        "${uiState.customStartDate!!.format(formatter)} - ${uiState.customEndDate!!.format(formatter)}"
+                    } else {
+                        uiState.selectedPeriod.displayName
+                    }
                     EmptyState(
                         title = "No activity for this period",
-                        description = "There are no recorded transactions in ${uiState.selectedPeriod.displayName} for ${uiState.selectedCurrencyCode}.",
+                        description = "There are no recorded transactions in $periodDisplay for ${uiState.selectedCurrencyCode}.",
                         icon = Icons.Outlined.PieChart,
                         testTag = "statistics_empty_state"
                     )
@@ -170,9 +186,15 @@ fun StatisticsScreen(
             } else {
                 // Hero Summary Card
                 uiState.summary?.let { summary ->
+                    val periodDisplay = if (uiState.selectedPeriod == StatisticsPeriodOption.CUSTOM && uiState.customStartDate != null && uiState.customEndDate != null) {
+                        val formatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+                        "${uiState.customStartDate!!.format(formatter)} - ${uiState.customEndDate!!.format(formatter)}"
+                    } else {
+                        uiState.selectedPeriod.displayName
+                    }
                     HeroStatisticsCard(
                         summary = summary,
-                        periodDisplayName = uiState.selectedPeriod.displayName,
+                        periodDisplayName = periodDisplay,
                         transactionCount = uiState.totalTransactionsCount,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -245,6 +267,49 @@ fun StatisticsScreen(
             }
 
             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxl))
+        }
+
+        if (uiState.isCustomRangePickerVisible) {
+            CustomRangePickerDialog(
+                onDismissRequest = { viewModel.dismissCustomRangePicker() },
+                onDatesSelected = { start, end -> viewModel.onCustomDatesSelected(start, end) },
+                initialStartDate = uiState.customStartDate,
+                initialEndDate = uiState.customEndDate,
+                validationError = uiState.customRangeError
+            )
+        }
+
+        if (uiState.showProPaywall) {
+            ExpenseTrackerConfirmationDialog(
+                title = "Unlock Custom Insights",
+                message = "Custom Date Range statistics is a Pro feature. Unlock custom periods, unlimited widgets, and deeper financial analysis.",
+                confirmText = "OK",
+                onConfirm = { viewModel.dismissProPaywall() },
+                onDismissRequest = { viewModel.dismissProPaywall() },
+                testTag = "pro_paywall_dialog"
+            )
+        }
+
+        if (uiState.showPendingMessage) {
+            ExpenseTrackerConfirmationDialog(
+                title = "Pro Purchase Pending",
+                message = "Your Pro purchase is still pending. Google Play will unlock Custom Date Range once the purchase completes.",
+                confirmText = "OK",
+                onConfirm = { viewModel.dismissPendingMessage() },
+                onDismissRequest = { viewModel.dismissPendingMessage() },
+                testTag = "pro_pending_dialog"
+            )
+        }
+
+        if (uiState.proRequiredMessage != null) {
+            ExpenseTrackerConfirmationDialog(
+                title = "Pro Subscription Ended",
+                message = uiState.proRequiredMessage ?: "Custom Date Range requires Pro.",
+                confirmText = "OK",
+                onConfirm = { viewModel.dismissProRequiredMessage() },
+                onDismissRequest = { viewModel.dismissProRequiredMessage() },
+                testTag = "pro_required_dialog"
+            )
         }
     }
 }
@@ -1174,6 +1239,210 @@ private fun AccountAnalyticsCard(
                         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomRangePickerDialog(
+    onDismissRequest: () -> Unit,
+    onDatesSelected: (LocalDate, LocalDate) -> Unit,
+    initialStartDate: LocalDate?,
+    initialEndDate: LocalDate?,
+    validationError: String?,
+    modifier: Modifier = Modifier
+) {
+    var startDate by remember { mutableStateOf(initialStartDate ?: LocalDate.now()) }
+    var endDate by remember { mutableStateOf(initialEndDate ?: LocalDate.now()) }
+
+    BasicAlertDialog(
+        onDismissRequest = onDismissRequest,
+        modifier = modifier.testTag("custom_date_range_picker_dialog")
+    ) {
+        Card(
+            shape = ExpenseTrackerRadius.dialog,
+            colors = CardDefaults.cardColors(
+                containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ),
+            border = BorderStroke(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(ExpenseTrackerSpacing.xl)
+            ) {
+                Text(
+                    text = "Select Custom Range",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
+
+                Text(
+                    text = "START DATE",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = ExpenseTrackerTheme.extendedColors.accentViolet
+                )
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+                DatePickerSelectorRow(
+                    date = startDate,
+                    onDateChanged = { startDate = it },
+                    testTagPrefix = "start"
+                )
+
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
+
+                Text(
+                    text = "END DATE",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = ExpenseTrackerTheme.extendedColors.accentViolet
+                )
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+                DatePickerSelectorRow(
+                    date = endDate,
+                    onDateChanged = { endDate = it },
+                    testTagPrefix = "end"
+                )
+
+                if (validationError != null) {
+                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
+                    Text(
+                        text = validationError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ExpenseTrackerTheme.extendedColors.financialNegative,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.testTag("date_picker_error_text")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xl))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        ExpenseTrackerSpacing.md,
+                        alignment = Alignment.End
+                    )
+                ) {
+                    SecondaryButton(
+                        text = "Cancel",
+                        onClick = onDismissRequest,
+                        modifier = Modifier.testTag("date_picker_cancel_button")
+                    )
+
+                    PrimaryButton(
+                        text = "Apply",
+                        onClick = { onDatesSelected(startDate, endDate) },
+                        modifier = Modifier.testTag("date_picker_apply_button")
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DatePickerSelectorRow(
+    date: LocalDate,
+    onDateChanged: (LocalDate) -> Unit,
+    testTagPrefix: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(ExpenseTrackerRadius.card)
+            .background(ExpenseTrackerTheme.extendedColors.surfaceLow)
+            .border(BorderStroke(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle), ExpenseTrackerRadius.card)
+            .padding(ExpenseTrackerSpacing.sm),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Day selector
+        DateUnitAdjuster(
+            label = "Day",
+            value = date.dayOfMonth,
+            onIncrement = { onDateChanged(date.plusDays(1)) },
+            onDecrement = { onDateChanged(date.minusDays(1)) },
+            testTagPrefix = "${testTagPrefix}_day"
+        )
+
+        // Month selector
+        DateUnitAdjuster(
+            label = date.month.name.lowercase().replaceFirstChar { it.uppercase() },
+            value = date.monthValue,
+            onIncrement = { onDateChanged(date.plusMonths(1)) },
+            onDecrement = { onDateChanged(date.minusMonths(1)) },
+            testTagPrefix = "${testTagPrefix}_month",
+            showValue = false
+        )
+
+        // Year selector
+        DateUnitAdjuster(
+            label = "Year",
+            value = date.year,
+            onIncrement = { onDateChanged(date.plusYears(1)) },
+            onDecrement = { onDateChanged(date.minusYears(1)) },
+            testTagPrefix = "${testTagPrefix}_year"
+        )
+    }
+}
+
+@Composable
+private fun DateUnitAdjuster(
+    label: String,
+    value: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    testTagPrefix: String,
+    showValue: Boolean = true
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = if (showValue) "$value" else label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = ExpenseTrackerTheme.extendedColors.textPrimary
+        )
+        if (showValue) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = ExpenseTrackerTheme.extendedColors.textSecondary
+            )
+        }
+        Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
+                    .clickable { onDecrement() }
+                    .testTag("${testTagPrefix}_dec"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("-", fontWeight = FontWeight.Bold, color = ExpenseTrackerTheme.extendedColors.textPrimary)
+            }
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
+                    .clickable { onIncrement() }
+                    .testTag("${testTagPrefix}_inc"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+", fontWeight = FontWeight.Bold, color = ExpenseTrackerTheme.extendedColors.textPrimary)
             }
         }
     }

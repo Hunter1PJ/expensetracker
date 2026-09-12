@@ -251,4 +251,11 @@
     <string name="title_data_storage">Data &amp; Storage</string>
     <string name="desc_data_storage">Manage database storage and backup configurations</string>
     <string name="app_version_label">Version</string>
+    <!-- Quick Add Widget -->
+    <string name="widget_quick_add_title">ExpenseTracker - Quick Add</string>
+    <string name="widget_quick_add_description">Provides fast launcher actions to add expenses or incomes.</string>
+    <string name="widget_action_add_expense">Add expense</string>
+    <string name="widget_action_add_income">Add income</string>
+    <string name="widget_pro_required_title">Quick Add Widget</string>
+    <string name="widget_pro_required_desc">ExpenseTracker Pro unlocks Quick Add widgets for faster transaction entry.</string>
 </resources>

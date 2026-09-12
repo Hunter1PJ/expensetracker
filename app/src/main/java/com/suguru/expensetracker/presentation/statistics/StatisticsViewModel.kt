@@ -2,8 +2,10 @@ package com.suguru.expensetracker.presentation.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.domain.model.statistics.PeriodStatistics
 import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
+import com.suguru.expensetracker.domain.usecase.billing.ObserveProEntitlementUseCase
 import com.suguru.expensetracker.domain.usecase.statistics.ObserveStatisticsUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,12 +16,15 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StatisticsViewModel(
     private val observeStatisticsUseCase: ObserveStatisticsUseCase,
+    private val observeProEntitlementUseCase: ObserveProEntitlementUseCase,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clockNow: () -> Instant = { Instant.now() }
 ) : ViewModel() {
@@ -27,20 +32,96 @@ class StatisticsViewModel(
     private val _selectedPeriod = MutableStateFlow(StatisticsPeriodOption.THIS_MONTH)
     private val _selectedCurrency = MutableStateFlow<String?>(null)
 
+    private val _customStartDate = MutableStateFlow<LocalDate?>(null)
+    private val _customEndDate = MutableStateFlow<LocalDate?>(null)
+    private val _isCustomRangePickerVisible = MutableStateFlow(false)
+    private val _customRangeError = MutableStateFlow<String?>(null)
+
+    val proEntitlement: StateFlow<ProEntitlement> = observeProEntitlementUseCase()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ProEntitlement.Checking
+        )
+
+    private val _proRequiredMessage = MutableStateFlow<String?>(null)
+    private val _showProPaywall = MutableStateFlow(false)
+    private val _showPendingMessage = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            var lastEntitlement: ProEntitlement? = null
+            proEntitlement.collect { entitlement ->
+                if (lastEntitlement != null && lastEntitlement is ProEntitlement.Pro && entitlement is ProEntitlement.Free) {
+                    if (_selectedPeriod.value == StatisticsPeriodOption.CUSTOM) {
+                        _selectedPeriod.value = StatisticsPeriodOption.THIS_MONTH
+                        _proRequiredMessage.value = "Custom Date Range requires Pro."
+                    }
+                }
+                lastEntitlement = entitlement
+            }
+        }
+    }
+
+    private data class SearchParams(
+        val period: StatisticsPeriodOption,
+        val currency: String?,
+        val customStart: LocalDate?,
+        val customEnd: LocalDate?
+    )
+
+    private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
     val uiState: StateFlow<StatisticsUiState> = combine(
         _selectedPeriod,
-        _selectedCurrency
-    ) { period, currency ->
-        period to currency
-    }.flatMapLatest { (period, currency) ->
+        _selectedCurrency,
+        _customStartDate,
+        _customEndDate
+    ) { period, currency, customStart, customEnd ->
+        SearchParams(period, currency, customStart, customEnd)
+    }.flatMapLatest { params ->
         observeStatisticsUseCase(
-            periodOption = period,
-            selectedCurrencyCode = currency,
+            periodOption = params.period,
+            selectedCurrencyCode = params.currency,
             zoneId = zoneId,
-            now = clockNow()
+            now = clockNow(),
+            customStart = params.customStart,
+            customEnd = params.customEnd
         ).map { periodStats ->
             mapToUiState(periodStats)
         }
+    }.combine(
+        combine(
+            proEntitlement,
+            _customStartDate,
+            _customEndDate,
+            _isCustomRangePickerVisible
+        ) { pro, start, end, visible ->
+            Quad(pro, start, end, visible)
+        }
+    ) { state, quad ->
+        state.copy(
+            proEntitlement = quad.first,
+            customStartDate = quad.second,
+            customEndDate = quad.third,
+            isCustomRangePickerVisible = quad.fourth
+        )
+    }.combine(
+        combine(
+            _customRangeError,
+            _proRequiredMessage,
+            _showProPaywall,
+            _showPendingMessage
+        ) { error, msg, paywall, pending ->
+            Quad(error, msg, paywall, pending)
+        }
+    ) { state, quad ->
+        state.copy(
+            customRangeError = quad.first,
+            proRequiredMessage = quad.second,
+            showProPaywall = quad.third,
+            showPendingMessage = quad.fourth
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -48,11 +129,57 @@ class StatisticsViewModel(
     )
 
     fun onPeriodSelected(period: StatisticsPeriodOption) {
-        _selectedPeriod.value = period
+        if (period == StatisticsPeriodOption.CUSTOM) {
+            val entitlement = proEntitlement.value
+            when (entitlement) {
+                is ProEntitlement.Pro -> {
+                    _isCustomRangePickerVisible.value = true
+                }
+                is ProEntitlement.Pending -> {
+                    _showPendingMessage.value = true
+                }
+                else -> {
+                    _showProPaywall.value = true
+                }
+            }
+        } else {
+            _selectedPeriod.value = period
+            _proRequiredMessage.value = null
+        }
     }
 
     fun onCurrencySelected(currencyCode: String) {
         _selectedCurrency.value = currencyCode
+    }
+
+    fun onCustomDatesSelected(start: LocalDate, end: LocalDate) {
+        if (start.isAfter(end)) {
+            _customRangeError.value = "Start date must be on or before end date."
+            return
+        }
+        _customRangeError.value = null
+        _customStartDate.value = start
+        _customEndDate.value = end
+        _isCustomRangePickerVisible.value = false
+        _selectedPeriod.value = StatisticsPeriodOption.CUSTOM
+        _proRequiredMessage.value = null
+    }
+
+    fun dismissCustomRangePicker() {
+        _isCustomRangePickerVisible.value = false
+        _customRangeError.value = null
+    }
+
+    fun dismissProPaywall() {
+        _showProPaywall.value = false
+    }
+
+    fun dismissPendingMessage() {
+        _showPendingMessage.value = false
+    }
+
+    fun dismissProRequiredMessage() {
+        _proRequiredMessage.value = null
     }
 
     private fun mapToUiState(stats: PeriodStatistics): StatisticsUiState {

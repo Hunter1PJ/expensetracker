@@ -80,7 +80,12 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 fun ExpenseTrackerApp(
     appContainer: AppContainer? = null,
     homeViewModel: HomeViewModel? = null,
-    addTransactionViewModel: AddTransactionViewModel? = null
+    addTransactionViewModel: AddTransactionViewModel? = null,
+    initialDestination: NavDestination? = null,
+    initialAccountId: Long? = null,
+    initialBudgetId: Long? = null,
+    initialTransactionType: com.suguru.expensetracker.domain.model.TransactionType? = null,
+    onResetNavigation: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val resolvedContainer = remember(appContainer, context) {
@@ -91,6 +96,14 @@ fun ExpenseTrackerApp(
         resolvedContainer?.createHomeViewModel() ?: HomeViewModel()
     }
 
+    val resolvedAddTransactionViewModel: AddTransactionViewModel = addTransactionViewModel ?: remember(resolvedContainer) {
+        resolvedContainer?.createAddTransactionViewModel() ?: AddTransactionViewModel(
+            observeActiveAccountsUseCase = resolvedContainer!!.observeActiveAccountsUseCase,
+            observeCategoriesByTypeUseCase = resolvedContainer.observeCategoriesByTypeUseCase,
+            createTransactionUseCase = resolvedContainer.createTransactionUseCase
+        )
+    }
+
     var currentDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
     var previousDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
     var selectedEditAccountId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -99,20 +112,32 @@ fun ExpenseTrackerApp(
     var selectedEditRecurringRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedTransactionId by rememberSaveable { mutableStateOf<Long?>(null) }
 
+    androidx.compose.runtime.LaunchedEffect(initialDestination, initialAccountId, initialBudgetId, initialTransactionType) {
+        if (initialDestination != null) {
+            currentDestination = initialDestination
+            if (initialAccountId != null) {
+                selectedEditAccountId = initialAccountId
+            }
+            if (initialBudgetId != null) {
+                val budget = resolvedContainer?.budgetRepository?.getBudgetById(initialBudgetId)
+                if (budget != null && budget.isActive) {
+                    selectedEditBudgetId = initialBudgetId
+                    currentDestination = NavDestination.EditBudget
+                }
+            }
+            if (initialDestination == NavDestination.AddTransaction && initialTransactionType != null) {
+                resolvedAddTransactionViewModel.onTransactionTypeChanged(initialTransactionType)
+            }
+            onResetNavigation?.invoke()
+        }
+    }
+
     val settingsState by remember(resolvedContainer) {
         resolvedContainer?.settingsRepository?.settings ?: kotlinx.coroutines.flow.flowOf()
     }.collectAsState(initial = null)
 
     when (currentDestination) {
         NavDestination.AddTransaction -> {
-            val resolvedAddTransactionViewModel: AddTransactionViewModel = addTransactionViewModel ?: remember(resolvedContainer) {
-                resolvedContainer?.createAddTransactionViewModel() ?: AddTransactionViewModel(
-                    observeActiveAccountsUseCase = resolvedContainer!!.observeActiveAccountsUseCase,
-                    observeCategoriesByTypeUseCase = resolvedContainer.observeCategoriesByTypeUseCase,
-                    createTransactionUseCase = resolvedContainer.createTransactionUseCase
-                )
-            }
-
             AddTransactionScreen(
                 viewModel = resolvedAddTransactionViewModel,
                 onNavigateBack = {
@@ -551,7 +576,8 @@ fun ExpenseTrackerApp(
                     NavDestination.Statistics -> {
                         val statisticsViewModel: StatisticsViewModel = remember(resolvedContainer) {
                             resolvedContainer?.createStatisticsViewModel() ?: StatisticsViewModel(
-                                observeStatisticsUseCase = resolvedContainer!!.observeStatisticsUseCase
+                                observeStatisticsUseCase = resolvedContainer!!.observeStatisticsUseCase,
+                                observeProEntitlementUseCase = resolvedContainer.observeProEntitlementUseCase
                             )
                         }
 

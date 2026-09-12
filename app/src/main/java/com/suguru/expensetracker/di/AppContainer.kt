@@ -148,7 +148,8 @@ class AppContainer(private val context: Context) {
             recurringTransactionRepository = recurringTransactionRepository,
             recurringOccurrenceRepository = recurringOccurrenceRepository,
             accountRepository = accountRepository,
-            categoryRepository = categoryRepository
+            categoryRepository = categoryRepository,
+            widgetRefreshCoordinator = { widgetRefreshCoordinator }
         )
     }
     val createRecurringTransactionUseCase by lazy {
@@ -322,7 +323,8 @@ class AppContainer(private val context: Context) {
 
     fun createStatisticsViewModel(): com.suguru.expensetracker.presentation.statistics.StatisticsViewModel {
         return com.suguru.expensetracker.presentation.statistics.StatisticsViewModel(
-            observeStatisticsUseCase = observeStatisticsUseCase
+            observeStatisticsUseCase = observeStatisticsUseCase,
+            observeProEntitlementUseCase = observeProEntitlementUseCase
         )
     }
 
@@ -430,6 +432,15 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.widget.balance.AccountBalanceWidgetDataProvider(
             accountRepository = accountRepository,
             getAccountBalanceUseCase = getAccountBalanceUseCase,
+            widgetConfigurationRepository = widgetConfigurationRepository
+        )
+    }
+
+    val budgetProgressWidgetDataProvider: com.suguru.expensetracker.widget.budget.BudgetProgressWidgetDataProvider by lazy {
+        com.suguru.expensetracker.widget.budget.BudgetProgressWidgetDataProvider(
+            budgetRepository = budgetRepository,
+            categoryRepository = categoryRepository,
+            observeActiveBudgetProgressUseCase = observeActiveBudgetProgressUseCase,
             widgetConfigurationRepository = widgetConfigurationRepository
         )
     }

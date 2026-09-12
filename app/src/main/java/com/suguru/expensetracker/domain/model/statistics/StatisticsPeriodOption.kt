@@ -8,9 +8,15 @@ enum class StatisticsPeriodOption(val displayName: String) {
     THIS_MONTH("This Month"),
     LAST_MONTH("Last Month"),
     LAST_3_MONTHS("Last 3 Months"),
-    THIS_YEAR("This Year");
+    THIS_YEAR("This Year"),
+    CUSTOM("Custom");
 
-    fun calculateRange(now: Instant, zoneId: ZoneId): StatisticsRange {
+    fun calculateRange(
+        now: Instant,
+        zoneId: ZoneId,
+        customStart: LocalDate? = null,
+        customEnd: LocalDate? = null
+    ): StatisticsRange {
         val zonedDateTime = now.atZone(zoneId)
         val today = zonedDateTime.toLocalDate()
 
@@ -48,6 +54,16 @@ enum class StatisticsPeriodOption(val displayName: String) {
             THIS_YEAR -> {
                 val startLocal = today.withDayOfYear(1)
                 val endLocal = startLocal.plusYears(1)
+                StatisticsRange(
+                    startInclusive = startLocal.atStartOfDay(zoneId).toInstant(),
+                    endExclusive = endLocal.atStartOfDay(zoneId).toInstant(),
+                    startLocalDate = startLocal,
+                    endLocalDateExclusive = endLocal
+                )
+            }
+            CUSTOM -> {
+                val startLocal = customStart ?: today
+                val endLocal = (customEnd ?: today).plusDays(1)
                 StatisticsRange(
                     startInclusive = startLocal.atStartOfDay(zoneId).toInstant(),
                     endExclusive = endLocal.atStartOfDay(zoneId).toInstant(),
