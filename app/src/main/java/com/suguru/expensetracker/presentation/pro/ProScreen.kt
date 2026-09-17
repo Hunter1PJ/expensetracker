@@ -285,7 +285,8 @@ fun ProScreen(
                         BenefitItem(Icons.Default.AccountBalance, "Unlimited Accounts", "Connect as many cash, bank, or card accounts as you need."),
                         BenefitItem(Icons.Default.Category, "Unlimited Custom Categories", "Structure your budgeting precisely with personalized categories."),
                         BenefitItem(Icons.Default.ShowChart, "Unlimited Budgets", "Plan and monitor multiple budgets across periods and categories."),
-                        BenefitItem(Icons.Default.Autorenew, "Unlimited Recurring Rules", "Automate standing orders, rent, or repeating subscriptions.")
+                        BenefitItem(Icons.Default.Autorenew, "Unlimited Recurring Rules", "Automate standing orders, rent, or repeating subscriptions."),
+                        BenefitItem(Icons.Default.CompareArrows, "Advanced Statistics Compare", "Compare financial performance across periods and see exactly what changed.")
                     )
 
                     benefits.forEach { benefit ->

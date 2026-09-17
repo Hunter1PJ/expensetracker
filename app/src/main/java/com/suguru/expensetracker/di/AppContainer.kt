@@ -197,6 +197,7 @@ class AppContainer(private val context: Context) {
 
     // Statistics Use Cases
     val observeStatisticsUseCase by lazy { com.suguru.expensetracker.domain.usecase.statistics.ObserveStatisticsUseCase(transactionRepository, accountRepository, categoryRepository) }
+    val observeStatisticsComparisonUseCase by lazy { com.suguru.expensetracker.domain.usecase.statistics.ObserveStatisticsComparisonUseCase(observeStatisticsUseCase) }
 
     // Budget Use Cases
     val observeActiveBudgetProgressUseCase by lazy {
@@ -321,10 +322,12 @@ class AppContainer(private val context: Context) {
         )
     }
 
-    fun createStatisticsViewModel(): com.suguru.expensetracker.presentation.statistics.StatisticsViewModel {
+    fun createStatisticsViewModel(savedStateHandle: androidx.lifecycle.SavedStateHandle? = null): com.suguru.expensetracker.presentation.statistics.StatisticsViewModel {
         return com.suguru.expensetracker.presentation.statistics.StatisticsViewModel(
             observeStatisticsUseCase = observeStatisticsUseCase,
-            observeProEntitlementUseCase = observeProEntitlementUseCase
+            observeStatisticsComparisonUseCase = observeStatisticsComparisonUseCase,
+            observeProEntitlementUseCase = observeProEntitlementUseCase,
+            savedStateHandle = savedStateHandle
         )
     }
 

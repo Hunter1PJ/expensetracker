@@ -577,6 +577,7 @@ fun ExpenseTrackerApp(
                         val statisticsViewModel: StatisticsViewModel = remember(resolvedContainer) {
                             resolvedContainer?.createStatisticsViewModel() ?: StatisticsViewModel(
                                 observeStatisticsUseCase = resolvedContainer!!.observeStatisticsUseCase,
+                                observeStatisticsComparisonUseCase = resolvedContainer.observeStatisticsComparisonUseCase,
                                 observeProEntitlementUseCase = resolvedContainer.observeProEntitlementUseCase
                             )
                         }

@@ -26,9 +26,9 @@ import java.time.temporal.ChronoUnit
  * Adheres strictly to multi-currency isolation, transfer neutrality, and exact Long minor-unit arithmetic.
  */
 class ObserveStatisticsUseCase(
-    private val transactionRepository: TransactionRepository,
-    private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository
+    val transactionRepository: TransactionRepository,
+    val accountRepository: AccountRepository,
+    val categoryRepository: CategoryRepository
 ) {
 
     operator fun invoke(
@@ -40,7 +40,20 @@ class ObserveStatisticsUseCase(
         customEnd: LocalDate? = null
     ): Flow<PeriodStatistics> {
         val range = periodOption.calculateRange(now, zoneId, customStart, customEnd)
+        return observeForRange(
+            periodOption = periodOption,
+            range = range,
+            selectedCurrencyCode = selectedCurrencyCode,
+            zoneId = zoneId
+        )
+    }
 
+    fun observeForRange(
+        periodOption: StatisticsPeriodOption,
+        range: StatisticsRange,
+        selectedCurrencyCode: String? = null,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): Flow<PeriodStatistics> {
         return combine(
             transactionRepository.observeTransactionsBetween(range.startInclusive, range.endExclusive),
             accountRepository.observeAllAccounts(),
@@ -80,131 +93,153 @@ class ObserveStatisticsUseCase(
                 }
             }
 
-            // Filter transactions matching the effective currency
-            val currencyTxs = txWithCurrency
-                .filter { it.second == effectiveCurrency }
-                .map { it.first }
-
-            // Calculate Income, Expense, and Net
-            var incomeMinorUnits = 0L
-            var expenseMinorUnits = 0L
-            var totalTxCount = 0
-
-            for (tx in currencyTxs) {
-                when (tx.type) {
-                    TransactionType.INCOME -> {
-                        incomeMinorUnits = Math.addExact(incomeMinorUnits, tx.amount.amountInMinorUnits)
-                        totalTxCount++
-                    }
-                    TransactionType.EXPENSE -> {
-                        expenseMinorUnits = Math.addExact(expenseMinorUnits, tx.amount.amountInMinorUnits)
-                        totalTxCount++
-                    }
-                    TransactionType.TRANSFER -> {
-                        // Transfers do NOT count towards income or expense
-                    }
-                }
-            }
-
-            val netMinorUnits = Math.subtractExact(incomeMinorUnits, expenseMinorUnits)
-
-            val summary = CurrencyAnalyticsSummary(
-                currencyCode = effectiveCurrency,
-                income = Money(incomeMinorUnits, effectiveCurrency),
-                expense = Money(expenseMinorUnits, effectiveCurrency),
-                net = Money(netMinorUnits, effectiveCurrency),
-                transactionCount = totalTxCount
-            )
-
-            // Expense Category Breakdown
-            val expenseTxs = currencyTxs.filter { it.type == TransactionType.EXPENSE }
-            val expenseCategoryGroups = expenseTxs.groupBy { it.categoryId }
-            val expenseCategoriesList = expenseCategoryGroups.map { (catId, txList) ->
-                var catTotal = 0L
-                for (tx in txList) {
-                    catTotal = Math.addExact(catTotal, tx.amount.amountInMinorUnits)
-                }
-                val cat = catId?.let { categoryMap[it] }
-                CategoryAnalytics(
-                    categoryId = catId,
-                    categoryName = cat?.name ?: "Uncategorized",
-                    iconName = cat?.iconName,
-                    colorHex = cat?.colorHex,
-                    amount = Money(catTotal, effectiveCurrency),
-                    transactionCount = txList.size,
-                    isArchived = cat?.isArchived == true
-                )
-            }.sortedByDescending { it.amount.amountInMinorUnits }
-
-            // Income Category Breakdown
-            val incomeTxs = currencyTxs.filter { it.type == TransactionType.INCOME }
-            val incomeCategoryGroups = incomeTxs.groupBy { it.categoryId }
-            val incomeCategoriesList = incomeCategoryGroups.map { (catId, txList) ->
-                var catTotal = 0L
-                for (tx in txList) {
-                    catTotal = Math.addExact(catTotal, tx.amount.amountInMinorUnits)
-                }
-                val cat = catId?.let { categoryMap[it] }
-                CategoryAnalytics(
-                    categoryId = catId,
-                    categoryName = cat?.name ?: "Uncategorized",
-                    iconName = cat?.iconName,
-                    colorHex = cat?.colorHex,
-                    amount = Money(catTotal, effectiveCurrency),
-                    transactionCount = txList.size,
-                    isArchived = cat?.isArchived == true
-                )
-            }.sortedByDescending { it.amount.amountInMinorUnits }
-
-            // Account Breakdown (accounts matching effectiveCurrency)
-            val currencyAccounts = accounts.filter { it.initialBalance.currencyCode == effectiveCurrency }
-            val accountAnalyticsList = currencyAccounts.map { acc ->
-                val accTxs = currencyTxs.filter { it.accountId == acc.id }
-                var accIncome = 0L
-                var accExpense = 0L
-                for (tx in accTxs) {
-                    when (tx.type) {
-                        TransactionType.INCOME -> accIncome = Math.addExact(accIncome, tx.amount.amountInMinorUnits)
-                        TransactionType.EXPENSE -> accExpense = Math.addExact(accExpense, tx.amount.amountInMinorUnits)
-                        TransactionType.TRANSFER -> {}
-                    }
-                }
-                AccountAnalytics(
-                    accountId = acc.id,
-                    accountName = acc.name,
-                    accountType = acc.type,
-                    currencyCode = acc.initialBalance.currencyCode,
-                    income = Money(accIncome, effectiveCurrency),
-                    expense = Money(accExpense, effectiveCurrency),
-                    isArchived = acc.isArchived
-                )
-            }.sortedWith(
-                compareByDescending<AccountAnalytics> { it.expense.amountInMinorUnits }
-                    .thenBy { it.accountName }
-            )
-
-            // Trend Buckets
-            val trendBucketsList = generateTrendBuckets(
+            calculatePeriodStatisticsForCurrency(
+                currency = effectiveCurrency,
                 periodOption = periodOption,
                 range = range,
-                currencyTxs = currencyTxs,
-                effectiveCurrency = effectiveCurrency,
+                transactions = transactions,
+                accounts = accounts,
+                categories = categories,
+                allAvailableCurrencies = availableCurrenciesList,
                 zoneId = zoneId
             )
-
-            PeriodStatistics(
-                periodOption = periodOption,
-                range = range,
-                availableCurrencies = availableCurrenciesList,
-                selectedCurrencyCode = effectiveCurrency,
-                currencySummary = summary,
-                expenseCategories = expenseCategoriesList,
-                incomeCategories = incomeCategoriesList,
-                accountBreakdown = accountAnalyticsList,
-                trendBuckets = trendBucketsList,
-                totalTransactionsInPeriod = currencyTxs.size
-            )
         }
+    }
+
+    fun calculatePeriodStatisticsForCurrency(
+        currency: String,
+        periodOption: StatisticsPeriodOption,
+        range: StatisticsRange,
+        transactions: List<com.suguru.expensetracker.domain.model.Transaction>,
+        accounts: List<com.suguru.expensetracker.domain.model.Account>,
+        categories: List<com.suguru.expensetracker.domain.model.Category>,
+        allAvailableCurrencies: List<String>,
+        zoneId: ZoneId
+    ): PeriodStatistics {
+        val categoryMap = categories.associateBy { it.id }
+
+        // Filter transactions matching the specified currency
+        val currencyTxs = transactions.filter { it.amount.currencyCode == currency }
+
+        // Calculate Income, Expense, and Net
+        var incomeMinorUnits = 0L
+        var expenseMinorUnits = 0L
+        var totalTxCount = 0
+
+        for (tx in currencyTxs) {
+            when (tx.type) {
+                TransactionType.INCOME -> {
+                    incomeMinorUnits = Math.addExact(incomeMinorUnits, tx.amount.amountInMinorUnits)
+                    totalTxCount++
+                }
+                TransactionType.EXPENSE -> {
+                    expenseMinorUnits = Math.addExact(expenseMinorUnits, tx.amount.amountInMinorUnits)
+                    totalTxCount++
+                }
+                TransactionType.TRANSFER -> {
+                    // Transfers do NOT count towards income or expense
+                }
+            }
+        }
+
+        val netMinorUnits = Math.subtractExact(incomeMinorUnits, expenseMinorUnits)
+
+        val summary = CurrencyAnalyticsSummary(
+            currencyCode = currency,
+            income = Money(incomeMinorUnits, currency),
+            expense = Money(expenseMinorUnits, currency),
+            net = Money(netMinorUnits, currency),
+            transactionCount = totalTxCount
+        )
+
+        // Expense Category Breakdown
+        val expenseTxs = currencyTxs.filter { it.type == TransactionType.EXPENSE }
+        val expenseCategoryGroups = expenseTxs.groupBy { it.categoryId }
+        val expenseCategoriesList = expenseCategoryGroups.map { (catId, txList) ->
+            var catTotal = 0L
+            for (tx in txList) {
+                catTotal = Math.addExact(catTotal, tx.amount.amountInMinorUnits)
+            }
+            val cat = catId?.let { categoryMap[it] }
+            CategoryAnalytics(
+                categoryId = catId,
+                categoryName = cat?.name ?: "Uncategorized",
+                iconName = cat?.iconName,
+                colorHex = cat?.colorHex,
+                amount = Money(catTotal, currency),
+                transactionCount = txList.size,
+                isArchived = cat?.isArchived == true
+            )
+        }.sortedByDescending { it.amount.amountInMinorUnits }
+
+        // Income Category Breakdown
+        val incomeTxs = currencyTxs.filter { it.type == TransactionType.INCOME }
+        val incomeCategoryGroups = incomeTxs.groupBy { it.categoryId }
+        val incomeCategoriesList = incomeCategoryGroups.map { (catId, txList) ->
+            var catTotal = 0L
+            for (tx in txList) {
+                catTotal = Math.addExact(catTotal, tx.amount.amountInMinorUnits)
+            }
+            val cat = catId?.let { categoryMap[it] }
+            CategoryAnalytics(
+                categoryId = catId,
+                categoryName = cat?.name ?: "Uncategorized",
+                iconName = cat?.iconName,
+                colorHex = cat?.colorHex,
+                amount = Money(catTotal, currency),
+                transactionCount = txList.size,
+                isArchived = cat?.isArchived == true
+            )
+        }.sortedByDescending { it.amount.amountInMinorUnits }
+
+        // Account Breakdown (accounts matching currency)
+        val currencyAccounts = accounts.filter { it.initialBalance.currencyCode == currency }
+        val accountAnalyticsList = currencyAccounts.map { acc ->
+            val accTxs = currencyTxs.filter { it.accountId == acc.id }
+            var accIncome = 0L
+            var accExpense = 0L
+            for (tx in accTxs) {
+                when (tx.type) {
+                    TransactionType.INCOME -> accIncome = Math.addExact(accIncome, tx.amount.amountInMinorUnits)
+                    TransactionType.EXPENSE -> accExpense = Math.addExact(accExpense, tx.amount.amountInMinorUnits)
+                    TransactionType.TRANSFER -> {}
+                }
+            }
+            AccountAnalytics(
+                accountId = acc.id,
+                accountName = acc.name,
+                accountType = acc.type,
+                currencyCode = acc.initialBalance.currencyCode,
+                income = Money(accIncome, currency),
+                expense = Money(accExpense, currency),
+                isArchived = acc.isArchived
+            )
+        }.sortedWith(
+            compareByDescending<AccountAnalytics> { it.expense.amountInMinorUnits }
+                .thenBy { it.accountName }
+        )
+
+        // Trend Buckets
+        val trendBucketsList = generateTrendBuckets(
+            periodOption = periodOption,
+            range = range,
+            currencyTxs = currencyTxs,
+            effectiveCurrency = currency,
+            zoneId = zoneId
+        )
+
+        return PeriodStatistics(
+            periodOption = periodOption,
+            range = range,
+            availableCurrencies = allAvailableCurrencies,
+            selectedCurrencyCode = currency,
+            currencySummary = summary,
+            expenseCategories = expenseCategoriesList,
+            incomeCategories = incomeCategoriesList,
+            accountBreakdown = accountAnalyticsList,
+            trendBuckets = trendBucketsList,
+            totalTransactionsInPeriod = currencyTxs.size
+        )
     }
 
     private fun generateTrendBuckets(

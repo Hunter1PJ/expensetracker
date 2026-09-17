@@ -152,6 +152,19 @@ fun StatisticsScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
+
+            // Compare Controls Row
+            CompareControlsRow(
+                isComparisonEnabled = uiState.isComparisonEnabled,
+                comparisonMode = uiState.comparisonMode,
+                onToggleComparison = { viewModel.onToggleComparison() },
+                onModeSelected = { viewModel.onComparisonModeSelected(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("compare_controls_row")
+            )
+
             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
 
             if (uiState.isLoading) {
@@ -160,6 +173,105 @@ fun StatisticsScreen(
                         .fillMaxWidth()
                         .height(260.dp)
                 )
+            } else if (uiState.isComparisonEnabled) {
+                // COMPARISON MODE VIEW
+                uiState.comparison?.rangeHeaderSubtitle?.let { subtitle ->
+                    ComparisonRangeHeaderCard(
+                        subtitle = subtitle,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
+                }
+
+                if (uiState.isComparisonLoading) {
+                    StatisticsLoadingState(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(260.dp)
+                    )
+                } else if (uiState.comparisonError != null) {
+                    ExpenseTrackerCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("comparison_error_card"),
+                        shape = ExpenseTrackerRadius.card,
+                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = null,
+                                tint = ExpenseTrackerTheme.extendedColors.financialDanger,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Text(
+                                text = "Couldn't load comparison",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ExpenseTrackerTheme.extendedColors.textPrimary
+                            )
+                            Text(
+                                text = "An error occurred while calculating comparative statistics.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ExpenseTrackerTheme.extendedColors.textSecondary
+                            )
+                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+                            PrimaryButton(
+                                text = "Retry",
+                                onClick = { viewModel.onPeriodSelected(uiState.selectedPeriod) }
+                            )
+                        }
+                    }
+                } else if (uiState.comparison != null) {
+                    val comp = uiState.comparison!!
+                    if (comp.isBothEmpty) {
+                        ExpenseTrackerCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 540.dp)
+                                .testTag("comparison_empty_state"),
+                            shape = ExpenseTrackerRadius.cardHero,
+                            contentPadding = PaddingValues(ExpenseTrackerSpacing.xxl)
+                        ) {
+                            EmptyState(
+                                title = "Nothing to compare yet",
+                                description = "There is no activity recorded in either period for ${uiState.selectedCurrencyCode}.",
+                                icon = Icons.Outlined.PieChart,
+                                testTag = "comparison_empty_state_content"
+                            )
+                        }
+                    } else {
+                        // Comparison Summary Cards (Net, Income, Expense)
+                        ComparisonSummaryCards(
+                            comparison = comp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
+
+                        // Dual Series Trend Chart
+                        if (comp.alignedTrendPoints.isNotEmpty()) {
+                            ComparisonTrendChartCard(
+                                trendPoints = comp.alignedTrendPoints,
+                                mode = comp.mode,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
+                        }
+
+                        // Category Comparison Breakdown
+                        if (comp.categoryBreakdown.isNotEmpty()) {
+                            ComparisonCategoryBreakdownCard(
+                                categories = comp.categoryBreakdown,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
             } else if (!uiState.hasAnyTransactionsInPeriod) {
                 // Empty State for period
                 ExpenseTrackerCard(
@@ -309,6 +421,29 @@ fun StatisticsScreen(
                 onConfirm = { viewModel.dismissProRequiredMessage() },
                 onDismissRequest = { viewModel.dismissProRequiredMessage() },
                 testTag = "pro_required_dialog"
+            )
+        }
+
+        if (uiState.showCompareProPaywall) {
+            ExpenseTrackerConfirmationDialog(
+                title = "Advanced Statistics Compare",
+                message = "Compare your current financial performance with previous periods and see exactly what changed.",
+                confirmText = "View Pro",
+                dismissText = "Not Now",
+                onConfirm = { viewModel.dismissCompareProPaywall() },
+                onDismissRequest = { viewModel.dismissCompareProPaywall() },
+                testTag = "compare_pro_paywall_dialog"
+            )
+        }
+
+        if (uiState.showComparePendingMessage) {
+            ExpenseTrackerConfirmationDialog(
+                title = "Purchase pending",
+                message = "Google Play is still processing your purchase.",
+                confirmText = "OK",
+                onConfirm = { viewModel.dismissComparePendingMessage() },
+                onDismissRequest = { viewModel.dismissComparePendingMessage() },
+                testTag = "compare_pending_dialog"
             )
         }
     }

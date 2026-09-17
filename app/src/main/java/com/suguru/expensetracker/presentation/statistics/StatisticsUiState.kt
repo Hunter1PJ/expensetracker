@@ -1,8 +1,9 @@
 package com.suguru.expensetracker.presentation.statistics
 
-import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
-
 import com.suguru.expensetracker.domain.model.ProEntitlement
+import com.suguru.expensetracker.domain.model.statistics.ComparisonSemantic
+import com.suguru.expensetracker.domain.model.statistics.StatisticsComparisonMode
+import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
 import java.time.LocalDate
 
 data class SummaryCardUiModel(
@@ -40,6 +41,55 @@ data class TrendPointUiModel(
     val formattedExpense: String
 )
 
+data class ComparisonMetricUiModel(
+    val primaryAmount: String,
+    val comparisonAmount: String,
+    val formattedDelta: String,
+    val relativeChangeText: String,
+    val semantic: ComparisonSemantic,
+    val contentDescription: String
+)
+
+data class CategoryComparisonUiModel(
+    val categoryId: Long?,
+    val categoryName: String,
+    val iconName: String?,
+    val colorHex: String?,
+    val formattedPrimaryAmount: String,
+    val formattedComparisonAmount: String,
+    val formattedDelta: String,
+    val relativeChangeText: String,
+    val semantic: ComparisonSemantic,
+    val contentDescription: String
+)
+
+data class AlignedTrendPointUiModel(
+    val label: String,
+    val primaryIncomeMinor: Long,
+    val primaryExpenseMinor: Long,
+    val comparisonIncomeMinor: Long,
+    val comparisonExpenseMinor: Long,
+    val formattedPrimaryIncome: String,
+    val formattedPrimaryExpense: String,
+    val formattedComparisonIncome: String,
+    val formattedComparisonExpense: String
+)
+
+data class ComparisonUiModel(
+    val mode: StatisticsComparisonMode,
+    val primaryDateRangeLabel: String,
+    val comparisonDateRangeLabel: String,
+    val rangeHeaderSubtitle: String,
+    val incomeMetric: ComparisonMetricUiModel,
+    val expenseMetric: ComparisonMetricUiModel,
+    val netMetric: ComparisonMetricUiModel,
+    val categoryBreakdown: List<CategoryComparisonUiModel>,
+    val alignedTrendPoints: List<AlignedTrendPointUiModel>,
+    val isPrimaryEmpty: Boolean,
+    val isComparisonEmpty: Boolean,
+    val isBothEmpty: Boolean
+)
+
 data class StatisticsUiState(
     val isLoading: Boolean = true,
     val selectedPeriod: StatisticsPeriodOption = StatisticsPeriodOption.THIS_MONTH,
@@ -60,5 +110,13 @@ data class StatisticsUiState(
     val customRangeError: String? = null,
     val proRequiredMessage: String? = null,
     val showProPaywall: Boolean = false,
-    val showPendingMessage: Boolean = false
+    val showPendingMessage: Boolean = false,
+    // Advanced Statistics Compare
+    val isComparisonEnabled: Boolean = false,
+    val comparisonMode: StatisticsComparisonMode = StatisticsComparisonMode.PREVIOUS_PERIOD,
+    val isComparisonLoading: Boolean = false,
+    val comparison: ComparisonUiModel? = null,
+    val comparisonError: String? = null,
+    val showCompareProPaywall: Boolean = false,
+    val showComparePendingMessage: Boolean = false
 )
