@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Repeat
@@ -100,6 +101,7 @@ fun SettingsScreen(
     onNavigateToCategories: () -> Unit,
     onNavigateToRecurring: () -> Unit,
     onNavigateToDataAndStorage: () -> Unit,
+    onNavigateToExport: () -> Unit = {},
     onNavigateToPro: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -227,6 +229,15 @@ fun SettingsScreen(
                                 iconTint = ExpenseTrackerTheme.extendedColors.primaryPurple,
                                 onClick = onNavigateToDataAndStorage,
                                 testTag = "settings_item_data_storage"
+                            )
+                            SettingsDivider()
+                            SettingsRow(
+                                title = stringResource(R.string.title_financial_export),
+                                subtitle = stringResource(R.string.desc_financial_export),
+                                icon = Icons.Default.FileDownload,
+                                iconTint = MaterialTheme.colorScheme.primary,
+                                onClick = onNavigateToExport,
+                                testTag = "settings_item_export"
                             )
                         }
                     }

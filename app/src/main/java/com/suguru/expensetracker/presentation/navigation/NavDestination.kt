@@ -154,6 +154,13 @@ enum class NavDestination(
         testTag = "nav_item_data_and_storage",
         isBottomBarItem = false
     ),
+    AdvancedExport(
+        route = "advanced_export",
+        label = "Financial Export",
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_advanced_export",
+        isBottomBarItem = false
+    ),
     Pro(
         route = "pro",
         label = "ExpenseTracker Pro",

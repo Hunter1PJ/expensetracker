@@ -1,5 +1,6 @@
 package com.suguru.expensetracker.domain.usecase.statistics
 
+import com.suguru.expensetracker.domain.analytics.CanonicalFinancialAggregator
 import com.suguru.expensetracker.domain.model.Money
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.model.statistics.AccountAnalytics
@@ -28,7 +29,8 @@ import java.time.temporal.ChronoUnit
 class ObserveStatisticsUseCase(
     val transactionRepository: TransactionRepository,
     val accountRepository: AccountRepository,
-    val categoryRepository: CategoryRepository
+    val categoryRepository: CategoryRepository,
+    val canonicalAggregator: CanonicalFinancialAggregator = CanonicalFinancialAggregator()
 ) {
 
     operator fun invoke(
@@ -116,107 +118,27 @@ class ObserveStatisticsUseCase(
         allAvailableCurrencies: List<String>,
         zoneId: ZoneId
     ): PeriodStatistics {
-        val categoryMap = categories.associateBy { it.id }
-
         // Filter transactions matching the specified currency
         val currencyTxs = transactions.filter { it.amount.currencyCode == currency }
 
-        // Calculate Income, Expense, and Net
-        var incomeMinorUnits = 0L
-        var expenseMinorUnits = 0L
-        var totalTxCount = 0
-
-        for (tx in currencyTxs) {
-            when (tx.type) {
-                TransactionType.INCOME -> {
-                    incomeMinorUnits = Math.addExact(incomeMinorUnits, tx.amount.amountInMinorUnits)
-                    totalTxCount++
-                }
-                TransactionType.EXPENSE -> {
-                    expenseMinorUnits = Math.addExact(expenseMinorUnits, tx.amount.amountInMinorUnits)
-                    totalTxCount++
-                }
-                TransactionType.TRANSFER -> {
-                    // Transfers do NOT count towards income or expense
-                }
-            }
-        }
-
-        val netMinorUnits = Math.subtractExact(incomeMinorUnits, expenseMinorUnits)
-
-        val summary = CurrencyAnalyticsSummary(
-            currencyCode = currency,
-            income = Money(incomeMinorUnits, currency),
-            expense = Money(expenseMinorUnits, currency),
-            net = Money(netMinorUnits, currency),
-            transactionCount = totalTxCount
+        // Canonical calculations delegated to shared CanonicalFinancialAggregator
+        val summary = canonicalAggregator.aggregateCurrencySummary(currency, currencyTxs)
+        val expenseCategoriesList = canonicalAggregator.aggregateCategoryBreakdown(
+            currency = currency,
+            transactions = currencyTxs,
+            categories = categories,
+            type = TransactionType.EXPENSE
         )
-
-        // Expense Category Breakdown
-        val expenseTxs = currencyTxs.filter { it.type == TransactionType.EXPENSE }
-        val expenseCategoryGroups = expenseTxs.groupBy { it.categoryId }
-        val expenseCategoriesList = expenseCategoryGroups.map { (catId, txList) ->
-            var catTotal = 0L
-            for (tx in txList) {
-                catTotal = Math.addExact(catTotal, tx.amount.amountInMinorUnits)
-            }
-            val cat = catId?.let { categoryMap[it] }
-            CategoryAnalytics(
-                categoryId = catId,
-                categoryName = cat?.name ?: "Uncategorized",
-                iconName = cat?.iconName,
-                colorHex = cat?.colorHex,
-                amount = Money(catTotal, currency),
-                transactionCount = txList.size,
-                isArchived = cat?.isArchived == true
-            )
-        }.sortedByDescending { it.amount.amountInMinorUnits }
-
-        // Income Category Breakdown
-        val incomeTxs = currencyTxs.filter { it.type == TransactionType.INCOME }
-        val incomeCategoryGroups = incomeTxs.groupBy { it.categoryId }
-        val incomeCategoriesList = incomeCategoryGroups.map { (catId, txList) ->
-            var catTotal = 0L
-            for (tx in txList) {
-                catTotal = Math.addExact(catTotal, tx.amount.amountInMinorUnits)
-            }
-            val cat = catId?.let { categoryMap[it] }
-            CategoryAnalytics(
-                categoryId = catId,
-                categoryName = cat?.name ?: "Uncategorized",
-                iconName = cat?.iconName,
-                colorHex = cat?.colorHex,
-                amount = Money(catTotal, currency),
-                transactionCount = txList.size,
-                isArchived = cat?.isArchived == true
-            )
-        }.sortedByDescending { it.amount.amountInMinorUnits }
-
-        // Account Breakdown (accounts matching currency)
-        val currencyAccounts = accounts.filter { it.initialBalance.currencyCode == currency }
-        val accountAnalyticsList = currencyAccounts.map { acc ->
-            val accTxs = currencyTxs.filter { it.accountId == acc.id }
-            var accIncome = 0L
-            var accExpense = 0L
-            for (tx in accTxs) {
-                when (tx.type) {
-                    TransactionType.INCOME -> accIncome = Math.addExact(accIncome, tx.amount.amountInMinorUnits)
-                    TransactionType.EXPENSE -> accExpense = Math.addExact(accExpense, tx.amount.amountInMinorUnits)
-                    TransactionType.TRANSFER -> {}
-                }
-            }
-            AccountAnalytics(
-                accountId = acc.id,
-                accountName = acc.name,
-                accountType = acc.type,
-                currencyCode = acc.initialBalance.currencyCode,
-                income = Money(accIncome, currency),
-                expense = Money(accExpense, currency),
-                isArchived = acc.isArchived
-            )
-        }.sortedWith(
-            compareByDescending<AccountAnalytics> { it.expense.amountInMinorUnits }
-                .thenBy { it.accountName }
+        val incomeCategoriesList = canonicalAggregator.aggregateCategoryBreakdown(
+            currency = currency,
+            transactions = currencyTxs,
+            categories = categories,
+            type = TransactionType.INCOME
+        )
+        val accountAnalyticsList = canonicalAggregator.aggregateAccountBreakdown(
+            currency = currency,
+            transactions = currencyTxs,
+            accounts = accounts
         )
 
         // Trend Buckets

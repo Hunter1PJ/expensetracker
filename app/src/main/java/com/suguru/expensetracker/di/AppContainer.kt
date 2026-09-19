@@ -397,6 +397,50 @@ class AppContainer(private val context: Context) {
         )
     }
 
+    val csvExporter: com.suguru.expensetracker.data.export.CsvExporter by lazy {
+        com.suguru.expensetracker.data.export.CsvExporter()
+    }
+
+    val pdfFinancialReportRenderer: com.suguru.expensetracker.data.export.PdfFinancialReportRenderer by lazy {
+        com.suguru.expensetracker.data.export.PdfFinancialReportRenderer()
+    }
+
+    val generateBasicCsvExportUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.export.GenerateBasicCsvExportUseCase(
+            transactionRepository = transactionRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            csvExporter = csvExporter
+        )
+    }
+
+    val prepareFinancialReportDataUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.export.PrepareFinancialReportDataUseCase(
+            transactionRepository = transactionRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository
+        )
+    }
+
+    val generateAdvancedCsvExportUseCase by lazy {
+        com.suguru.expensetracker.domain.usecase.export.GenerateAdvancedCsvExportUseCase(
+            prepareFinancialReportDataUseCase = prepareFinancialReportDataUseCase,
+            csvExporter = csvExporter
+        )
+    }
+
+    fun createExportViewModel(): com.suguru.expensetracker.presentation.export.ExportViewModel {
+        return com.suguru.expensetracker.presentation.export.ExportViewModel(
+            generateBasicCsvExportUseCase = generateBasicCsvExportUseCase,
+            generateAdvancedCsvExportUseCase = generateAdvancedCsvExportUseCase,
+            prepareFinancialReportDataUseCase = prepareFinancialReportDataUseCase,
+            pdfFinancialReportRenderer = pdfFinancialReportRenderer,
+            entitlementRepository = entitlementRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository
+        )
+    }
+
     fun createDataStorageViewModel(): com.suguru.expensetracker.presentation.settings.DataStorageViewModel {
         return com.suguru.expensetracker.presentation.settings.DataStorageViewModel(
             createFullBackupUseCase = createFullBackupUseCase,

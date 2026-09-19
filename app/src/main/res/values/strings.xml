@@ -258,4 +258,8 @@
     <string name="widget_action_add_income">Add income</string>
     <string name="widget_pro_required_title">Quick Add Widget</string>
     <string name="widget_pro_required_desc">ExpenseTracker Pro unlocks Quick Add widgets for faster transaction entry.</string>
+
+    <!-- Advanced Financial Export -->
+    <string name="title_financial_export">Financial Export</string>
+    <string name="desc_financial_export">Export CSV files and generate PDF financial statements</string>
 </resources>

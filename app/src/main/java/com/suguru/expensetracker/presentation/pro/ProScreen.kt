@@ -286,7 +286,8 @@ fun ProScreen(
                         BenefitItem(Icons.Default.Category, "Unlimited Custom Categories", "Structure your budgeting precisely with personalized categories."),
                         BenefitItem(Icons.Default.ShowChart, "Unlimited Budgets", "Plan and monitor multiple budgets across periods and categories."),
                         BenefitItem(Icons.Default.Autorenew, "Unlimited Recurring Rules", "Automate standing orders, rent, or repeating subscriptions."),
-                        BenefitItem(Icons.Default.CompareArrows, "Advanced Statistics Compare", "Compare financial performance across periods and see exactly what changed.")
+                        BenefitItem(Icons.Default.CompareArrows, "Advanced Statistics Compare", "Compare financial performance across periods and see exactly what changed."),
+                        BenefitItem(Icons.Default.PictureAsPdf, "Advanced Financial Export & PDF", "Generate filtered CSV datasets and multi-page printable financial PDF reports.")
                     )
 
                     benefits.forEach { benefit ->

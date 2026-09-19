@@ -377,6 +377,22 @@ fun ExpenseTrackerApp(
             )
         }
 
+        NavDestination.AdvancedExport -> {
+            val exportViewModel = remember(resolvedContainer) {
+                resolvedContainer?.createExportViewModel() ?: throw IllegalStateException("AppContainer required")
+            }
+            com.suguru.expensetracker.presentation.export.AdvancedExportScreen(
+                viewModel = exportViewModel,
+                onNavigateBack = {
+                    currentDestination = previousDestination
+                },
+                onNavigateToPro = {
+                    previousDestination = currentDestination
+                    currentDestination = NavDestination.Pro
+                }
+            )
+        }
+
         NavDestination.Pro -> {
             val proViewModel = remember(resolvedContainer) {
                 resolvedContainer?.createProViewModel() ?: throw IllegalStateException("AppContainer required")
@@ -635,6 +651,10 @@ fun ExpenseTrackerApp(
                             onNavigateToDataAndStorage = {
                                 previousDestination = NavDestination.Settings
                                 currentDestination = NavDestination.DataAndStorage
+                            },
+                            onNavigateToExport = {
+                                previousDestination = NavDestination.Settings
+                                currentDestination = NavDestination.AdvancedExport
                             },
                             onNavigateToPro = {
                                 previousDestination = NavDestination.Settings
