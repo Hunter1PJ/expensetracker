@@ -91,6 +91,7 @@ import java.time.format.DateTimeFormatter
 fun AddTransactionScreen(
     viewModel: AddTransactionViewModel,
     onNavigateBack: () -> Unit,
+    onSaveSuccess: () -> Unit = onNavigateBack,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -99,7 +100,7 @@ fun AddTransactionScreen(
 
     LaunchedEffect(uiState.isSavedSuccessfully) {
         if (uiState.isSavedSuccessfully) {
-            onNavigateBack()
+            onSaveSuccess()
         }
     }
 
@@ -191,6 +192,127 @@ fun AddTransactionScreenContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
             ) {
+            // AI-Assisted Draft Informational Banner
+            AnimatedVisibility(visible = uiState.isAiAssisted) {
+                ExpenseTrackerCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 540.dp)
+                        .testTag("ai_assisted_draft_banner"),
+                    containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.12f),
+                    borderColor = ExpenseTrackerTheme.extendedColors.accentViolet.copy(alpha = 0.4f),
+                    contentPadding = PaddingValues(ExpenseTrackerSpacing.md)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                        ) {
+                            Surface(
+                                shape = ExpenseTrackerRadius.chipPill,
+                                color = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.25f)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.ai_draft_badge),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ExpenseTrackerTheme.extendedColors.accentViolet,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            Text(
+                                text = stringResource(R.string.ai_draft_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        Text(
+                            text = stringResource(R.string.ai_draft_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+
+                        // Missing amount warning
+                        if (uiState.aiAmountWarning != null) {
+                            Text(
+                                text = "• " + stringResource(R.string.ai_missing_amount_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ExpenseTrackerTheme.extendedColors.financialWarning,
+                                modifier = Modifier.testTag("ai_missing_amount_warning")
+                            )
+                        }
+
+                        // Account suggestions / warnings
+                        if (uiState.aiAccountMatchAmbiguous && uiState.aiAccountSuggestion != null) {
+                            Text(
+                                text = "• " + stringResource(R.string.ai_ambiguous_account_warning, uiState.aiAccountSuggestion),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ExpenseTrackerTheme.extendedColors.financialWarning,
+                                modifier = Modifier.testTag("ai_ambiguous_account_warning")
+                            )
+                        } else if (uiState.selectedAccountId == null && uiState.aiAccountSuggestion != null) {
+                            Text(
+                                text = "• " + stringResource(R.string.ai_unmatched_account_hint, uiState.aiAccountSuggestion),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                modifier = Modifier.testTag("ai_unmatched_account_hint")
+                            )
+                        }
+
+                        // Category suggestions / warnings
+                        if (uiState.transactionType != TransactionType.TRANSFER) {
+                            if (uiState.aiCategoryMatchAmbiguous && uiState.aiCategorySuggestion != null) {
+                                Text(
+                                    text = "• " + stringResource(R.string.ai_ambiguous_category_warning, uiState.aiCategorySuggestion),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ExpenseTrackerTheme.extendedColors.financialWarning,
+                                    modifier = Modifier.testTag("ai_ambiguous_category_warning")
+                                )
+                            } else if (uiState.selectedCategoryId == null && uiState.aiCategorySuggestion != null) {
+                                Text(
+                                    text = "• " + stringResource(R.string.ai_unmatched_category_hint, uiState.aiCategorySuggestion),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                    modifier = Modifier.testTag("ai_unmatched_category_hint")
+                                )
+                            }
+                        } else {
+                            // Transfer destination warnings
+                            if (uiState.aiDestinationAccountMatchAmbiguous && uiState.aiDestinationAccountSuggestion != null) {
+                                Text(
+                                    text = "• " + stringResource(R.string.ai_ambiguous_dest_account_warning, uiState.aiDestinationAccountSuggestion),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ExpenseTrackerTheme.extendedColors.financialWarning,
+                                    modifier = Modifier.testTag("ai_ambiguous_dest_account_warning")
+                                )
+                            } else if (uiState.selectedDestinationAccountId == null && uiState.aiDestinationAccountSuggestion != null) {
+                                Text(
+                                    text = "• " + stringResource(R.string.ai_unmatched_dest_account_hint, uiState.aiDestinationAccountSuggestion),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                    modifier = Modifier.testTag("ai_unmatched_dest_account_hint")
+                                )
+                            }
+                        }
+
+                        uiState.aiWarnings.forEach { warning ->
+                            Text(
+                                text = "• $warning",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ExpenseTrackerTheme.extendedColors.financialWarning
+                            )
+                        }
+                    }
+                }
+            }
+
             // Error Banner
             AnimatedVisibility(visible = uiState.error != null) {
                 uiState.error?.let { err ->

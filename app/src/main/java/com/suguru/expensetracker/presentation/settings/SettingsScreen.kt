@@ -83,7 +83,12 @@ import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
-import com.suguru.expensetracker.domain.model.ProEntitlement
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
 
 private enum class ActiveSettingsSheet {
     THEME,
@@ -102,12 +107,13 @@ fun SettingsScreen(
     onNavigateToRecurring: () -> Unit,
     onNavigateToDataAndStorage: () -> Unit,
     onNavigateToExport: () -> Unit = {},
-    onNavigateToPro: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     var activeSheet by remember { mutableStateOf<ActiveSettingsSheet?>(null) }
+    var showApiKeyDialog by remember { mutableStateOf(false) }
+    var apiKeyInput by remember { mutableStateOf("") }
 
     Box(
         modifier = modifier
@@ -177,11 +183,6 @@ fun SettingsScreen(
                 is SettingsUiState.Success -> {
                     val settings = state.settings
 
-                    SettingsProCard(
-                        entitlement = state.entitlement,
-                        onClick = onNavigateToPro
-                    )
-
                     // 1. Management Section
                     Column(
                         modifier = Modifier
@@ -242,7 +243,61 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 2. Appearance Section
+                    // 2. AI Assistant (BYOK) Section
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 560.dp),
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                    ) {
+                        SectionHeader(
+                            title = stringResource(R.string.section_ai_assistant),
+                            testTag = "section_ai_assistant"
+                        )
+
+                        SettingsGroupCard(testTag = "settings_ai_group_card") {
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.title_ai_feature),
+                                subtitle = stringResource(R.string.desc_ai_feature),
+                                icon = Icons.Default.AutoAwesome,
+                                iconTint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                                checked = state.isAiFeatureEnabled,
+                                onCheckedChange = { viewModel.setAiFeatureEnabled(it) },
+                                switchTestTag = "toggle_ai_feature_switch"
+                            )
+
+                            if (state.isAiFeatureEnabled) {
+                                SettingsDivider()
+
+                                val keySubtitle = if (state.isAiConfigured) {
+                                    val statusNote = when (val kvs = state.keyVerificationState) {
+                                        is KeyVerificationState.Idle -> stringResource(R.string.key_status_unverified)
+                                        is KeyVerificationState.Verifying -> stringResource(R.string.key_status_verifying)
+                                        is KeyVerificationState.Valid -> stringResource(R.string.key_status_verified)
+                                        is KeyVerificationState.Invalid -> kvs.message
+                                    }
+                                    "${state.maskedApiKey ?: "••••••••"} • $statusNote"
+                                } else {
+                                    stringResource(R.string.desc_gemini_api_key_not_configured)
+                                }
+
+                                SettingsRow(
+                                    title = stringResource(R.string.title_gemini_api_key),
+                                    subtitle = keySubtitle,
+                                    icon = Icons.Default.Key,
+                                    iconTint = if (state.isAiConfigured) ExpenseTrackerTheme.extendedColors.financialPositive else ExpenseTrackerTheme.extendedColors.accentViolet,
+                                    trailingText = if (state.isAiConfigured) "Manage" else "Set Up",
+                                    onClick = {
+                                        apiKeyInput = ""
+                                        showApiKeyDialog = true
+                                    },
+                                    testTag = "settings_item_gemini_key"
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. Appearance Section
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -722,6 +777,92 @@ fun SettingsScreen(
 
                         null -> Unit
                     }
+
+                    if (showApiKeyDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showApiKeyDialog = false },
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.dialog_api_key_title),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                    Text(
+                                        text = stringResource(R.string.dialog_api_key_desc),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                    )
+
+                                    OutlinedTextField(
+                                        value = apiKeyInput,
+                                        onValueChange = { apiKeyInput = it },
+                                        placeholder = {
+                                            Text(if (state.isAiConfigured) state.maskedApiKey ?: "••••••••" else stringResource(R.string.hint_api_key))
+                                        },
+                                        singleLine = true,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("gemini_api_key_input")
+                                    )
+
+                                    if (state.isAiConfigured) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            TextButton(
+                                                onClick = {
+                                                    viewModel.verifySavedGeminiApiKey()
+                                                },
+                                                modifier = Modifier.testTag("verify_api_key_button")
+                                            ) {
+                                                Text(stringResource(R.string.action_test_key))
+                                            }
+
+                                            TextButton(
+                                                onClick = {
+                                                    viewModel.deleteGeminiApiKey()
+                                                    showApiKeyDialog = false
+                                                },
+                                                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                                    contentColor = ExpenseTrackerTheme.extendedColors.financialDanger
+                                                ),
+                                                modifier = Modifier.testTag("delete_api_key_button")
+                                            ) {
+                                                Text(stringResource(R.string.action_delete_key))
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        if (apiKeyInput.isNotBlank()) {
+                                            viewModel.saveGeminiApiKey(apiKeyInput)
+                                        }
+                                        showApiKeyDialog = false
+                                    },
+                                    enabled = apiKeyInput.isNotBlank(),
+                                    modifier = Modifier.testTag("save_api_key_button")
+                                ) {
+                                    Text(stringResource(R.string.action_save_key))
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = { showApiKeyDialog = false },
+                                    modifier = Modifier.testTag("cancel_api_key_dialog_button")
+                                ) {
+                                    Text(stringResource(R.string.action_cancel))
+                                }
+                            }
+                        )
+                    }
                 }
             }
 
@@ -970,128 +1111,4 @@ private fun SettingsOptionCard(
     }
 }
 
-@Composable
-fun SettingsProCard(
-    entitlement: ProEntitlement,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .widthIn(max = 560.dp)
-            .testTag("settings_pro_card"),
-        shape = ExpenseTrackerRadius.card,
-        colors = CardDefaults.cardColors(
-            containerColor = if (entitlement is ProEntitlement.Pro) {
-                ExpenseTrackerTheme.extendedColors.surfaceElevated
-            } else {
-                ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.08f)
-            }
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (entitlement is ProEntitlement.Pro) {
-                ExpenseTrackerTheme.extendedColors.cardBorder
-            } else {
-                ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.22f)
-            }
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(ExpenseTrackerSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.WorkspacePremium,
-                    contentDescription = null,
-                    tint = ExpenseTrackerTheme.extendedColors.primaryBright,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = "ExpenseTracker Pro",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = when (entitlement) {
-                        is ProEntitlement.Pro -> "Lifetime unlocked"
-                        is ProEntitlement.Pending -> "Purchase pending"
-                        else -> "Unlimited accounts, categories, budgets and recurring rules"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (entitlement is ProEntitlement.Pro) {
-                        ExpenseTrackerTheme.extendedColors.textSecondary
-                    } else {
-                        ExpenseTrackerTheme.extendedColors.primaryBright
-                    }
-                )
-            }
-
-            // Trailing element
-            when (entitlement) {
-                is ProEntitlement.Pro -> {
-                    // Badge with text "PRO"
-                    Surface(
-                        color = ExpenseTrackerTheme.extendedColors.financialPositive.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, ExpenseTrackerTheme.extendedColors.financialPositive.copy(alpha = 0.3f)),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "PRO",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = ExpenseTrackerTheme.extendedColors.financialPositive,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-                is ProEntitlement.Pending -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                else -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                    ) {
-                        Text(
-                            text = "Upgrade",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 

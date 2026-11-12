@@ -71,7 +71,6 @@ class MainActivity : ComponentActivity() {
       val typeStr = intent.getStringExtra("transactionType")
       currentDestinationState.value = when (destStr) {
         "account_management" -> NavDestination.AccountManagement
-        "pro" -> NavDestination.Pro
         "add_transaction" -> NavDestination.AddTransaction
         "budgets" -> NavDestination.Budgets
         else -> null

@@ -2,6 +2,7 @@ package com.suguru.expensetracker.presentation.home
 
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.parser.TransactionCandidate
 
 data class CurrencySummaryUiModel(
     val currencyCode: String,
@@ -47,7 +48,12 @@ data class HomeUiState(
     val accounts: List<AccountSummaryUiModel> = emptyList(),
     val recentTransactions: List<RecentTransactionUiModel> = emptyList(),
     val currentMonthName: String = "This Month",
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isAiFeatureEnabled: Boolean = true,
+    val isAiConfigured: Boolean = false,
+    val isAiExtracting: Boolean = false,
+    val aiExtractionError: String? = null,
+    val extractedCandidates: List<TransactionCandidate> = emptyList()
 ) {
     val hasAccounts: Boolean get() = accounts.isNotEmpty()
     val hasTransactions: Boolean get() = recentTransactions.isNotEmpty()

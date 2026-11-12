@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import com.suguru.expensetracker.domain.util.MoneyParser
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -89,20 +90,26 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     modifier: Modifier = Modifier,
     onNavigateToAddTransaction: () -> Unit = {},
+    onNavigateToAddTransactionWithCandidate: (com.suguru.expensetracker.domain.parser.TransactionCandidate) -> Unit = {},
     onNavigateToAccounts: () -> Unit = {},
     onNavigateToAddAccount: () -> Unit = {},
     onNavigateToTransactions: () -> Unit = {},
-    onNavigateToTransactionDetail: (Long) -> Unit = {}
+    onNavigateToTransactionDetail: (Long) -> Unit = {},
+    onNavigateToSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     HomeScreenContent(
         uiState = uiState,
         onNavigateToAddTransaction = onNavigateToAddTransaction,
+        onNavigateToAddTransactionWithCandidate = onNavigateToAddTransactionWithCandidate,
         onNavigateToAccounts = onNavigateToAccounts,
         onNavigateToAddAccount = onNavigateToAddAccount,
         onNavigateToTransactions = onNavigateToTransactions,
         onNavigateToTransactionDetail = onNavigateToTransactionDetail,
+        onNavigateToSettings = onNavigateToSettings,
+        onExtractTransactions = { input -> viewModel.extractTransactionsFromText(input) },
+        onClearCandidates = { viewModel.clearExtractedCandidates() },
         modifier = modifier
     )
 }
@@ -112,10 +119,14 @@ fun HomeScreenContent(
     uiState: HomeUiState,
     modifier: Modifier = Modifier,
     onNavigateToAddTransaction: () -> Unit = {},
+    onNavigateToAddTransactionWithCandidate: (com.suguru.expensetracker.domain.parser.TransactionCandidate) -> Unit = {},
     onNavigateToAccounts: () -> Unit = {},
     onNavigateToAddAccount: () -> Unit = {},
     onNavigateToTransactions: () -> Unit = {},
-    onNavigateToTransactionDetail: (Long) -> Unit = {}
+    onNavigateToTransactionDetail: (Long) -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onExtractTransactions: (String) -> Unit = {},
+    onClearCandidates: () -> Unit = {}
 ) {
     if (uiState.isLoading) {
         LoadingState(
@@ -228,6 +239,26 @@ fun HomeScreenContent(
                         .fillMaxWidth()
                         .widthIn(max = 540.dp)
                 )
+            }
+
+            // --- 2.5 AI ASSISTANT ENTRY SECTION ---
+            if (uiState.isAiFeatureEnabled) {
+                item {
+                    HomeAiSection(
+                        isConfigured = uiState.isAiConfigured,
+                        isExtracting = uiState.isAiExtracting,
+                        extractionError = uiState.aiExtractionError,
+                        candidates = uiState.extractedCandidates,
+                        onConfigureInSettings = onNavigateToSettings,
+                        onExtract = onExtractTransactions,
+                        onClearCandidates = onClearCandidates,
+                        onNavigateToAddTransaction = onNavigateToAddTransaction,
+                        onEditCandidate = onNavigateToAddTransactionWithCandidate,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 540.dp)
+                    )
+                }
             }
 
             // --- 3. THIS MONTH SECTION ---
@@ -846,6 +877,228 @@ private fun HomeRecentActivitySection(
                                 thickness = 1.dp,
                                 modifier = Modifier.padding(start = 68.dp)
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * AI Assistant Entry Section on Home:
+ * - When unconfigured: shows prompt card directing user to Settings to add their Gemini API key.
+ * - When configured: shows natural language input field with parse trigger and preview/review cards.
+ */
+@Composable
+private fun HomeAiSection(
+    isConfigured: Boolean,
+    isExtracting: Boolean,
+    extractionError: String?,
+    candidates: List<com.suguru.expensetracker.domain.parser.TransactionCandidate>,
+    onConfigureInSettings: () -> Unit,
+    onExtract: (String) -> Unit,
+    onClearCandidates: () -> Unit,
+    onNavigateToAddTransaction: () -> Unit,
+    onEditCandidate: (com.suguru.expensetracker.domain.parser.TransactionCandidate) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var aiInputText by rememberSaveable { mutableStateOf("") }
+
+    ExpenseTrackerCard(
+        modifier = modifier.testTag("home_ai_assistant_card"),
+        shape = ExpenseTrackerRadius.card,
+        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+        borderColor = if (isConfigured) ExpenseTrackerTheme.extendedColors.accentViolet.copy(alpha = 0.4f) else ExpenseTrackerTheme.extendedColors.borderSubtle,
+        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                ) {
+                    IconAvatar(
+                        icon = androidx.compose.material.icons.Icons.Default.AccountBalanceWallet,
+                        contentDescription = "AI Assistant",
+                        tint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                        backgroundColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.16f),
+                        size = 32.dp
+                    )
+                    Text(
+                        text = stringResource(R.string.home_ai_unconfigured_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+
+                Surface(
+                    shape = ExpenseTrackerRadius.chipPill,
+                    color = if (isConfigured) {
+                        ExpenseTrackerTheme.extendedColors.financialPositive.copy(alpha = 0.15f)
+                    } else {
+                        ExpenseTrackerTheme.extendedColors.surfaceHighlight
+                    }
+                ) {
+                    Text(
+                        text = if (isConfigured) "BYOK Ready" else "Key Required",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isConfigured) ExpenseTrackerTheme.extendedColors.financialPositive else ExpenseTrackerTheme.extendedColors.textSecondary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            if (!isConfigured) {
+                // Unconfigured State
+                Text(
+                    text = stringResource(R.string.home_ai_unconfigured_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                )
+
+                SecondaryButton(
+                    text = stringResource(R.string.home_ai_action_configure),
+                    onClick = onConfigureInSettings,
+                    testTag = "home_ai_configure_button",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                // Configured State
+                androidx.compose.material3.OutlinedTextField(
+                    value = aiInputText,
+                    onValueChange = { aiInputText = it },
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.home_ai_input_hint),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("home_ai_prompt_input"),
+                    shape = RoundedCornerShape(ExpenseTrackerRadius.sm),
+                    maxLines = 3,
+                    enabled = !isExtracting
+                )
+
+                if (extractionError != null) {
+                    Text(
+                        text = extractionError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ExpenseTrackerTheme.extendedColors.financialDanger
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                ) {
+                    PrimaryButton(
+                        text = if (isExtracting) "Extracting…" else stringResource(R.string.home_ai_extract_action),
+                        onClick = {
+                            if (aiInputText.isNotBlank()) {
+                                onExtract(aiInputText)
+                            }
+                        },
+                        enabled = !isExtracting && aiInputText.isNotBlank(),
+                        testTag = "home_ai_extract_button",
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (candidates.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                aiInputText = ""
+                                onClearCandidates()
+                            },
+                            modifier = Modifier.testTag("home_ai_clear_button")
+                        ) {
+                            Text("Dismiss")
+                        }
+                    }
+                }
+
+                // Parsed Suggestions Preview (Preview -> Edit -> Confirm -> Save)
+                if (candidates.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_ai_preview_title),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = stringResource(R.string.home_ai_preview_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+
+                        candidates.forEach { candidate ->
+                            val amountStr = candidate.amount?.let {
+                                MoneyParser.format(it, includeSymbol = true, useGrouping = true)
+                            } ?: "Amount not specified"
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("ai_candidate_preview_card"),
+                                shape = ExpenseTrackerRadius.cardInteractive,
+                                colors = CardDefaults.cardColors(
+                                    containerColor = ExpenseTrackerTheme.extendedColors.surfaceHighlight
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(ExpenseTrackerSpacing.md),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = candidate.suggestedTitle,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "${candidate.transactionType.name} • $amountStr",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                        )
+                                        if (candidate.suggestedCategoryName != null) {
+                                            Text(
+                                                text = "Category: ${candidate.suggestedCategoryName}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ExpenseTrackerTheme.extendedColors.accentViolet
+                                            )
+                                        }
+                                    }
+
+                                    SecondaryButton(
+                                        text = stringResource(R.string.home_ai_action_edit_candidate),
+                                        onClick = { onEditCandidate(candidate) },
+                                        testTag = "ai_candidate_confirm_button"
+                                    )
+                                }
+                            }
                         }
                     }
                 }

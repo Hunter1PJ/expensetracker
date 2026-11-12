@@ -4,10 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,22 +21,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.TableChart
-import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
@@ -47,7 +39,6 @@ import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,26 +60,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.suguru.expensetracker.R
-import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
-import com.suguru.expensetracker.presentation.components.ExpenseTrackerBottomSheet
-import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.IconAvatar
 import com.suguru.expensetracker.presentation.components.InteractiveCard
 import com.suguru.expensetracker.presentation.components.PrimaryButton
-import com.suguru.expensetracker.presentation.components.SecondaryButton
 import com.suguru.expensetracker.presentation.components.SectionHeader
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
@@ -105,11 +89,9 @@ import java.time.ZoneId
 fun AdvancedExportScreen(
     viewModel: ExportViewModel,
     onNavigateBack: () -> Unit,
-    onNavigateToPro: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isPro = uiState.proEntitlement is ProEntitlement.Pro
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -265,15 +247,13 @@ fun AdvancedExportScreen(
                 ) {
                     SectionHeader(title = "Choose Export Format")
 
-                    // Format Options
                     FormatOptionCard(
                         title = "Basic CSV Export (All Records)",
-                        subtitle = "Spreadsheet-compatible CSV file containing all transactions without filters. Always Free.",
+                        subtitle = "Spreadsheet-compatible CSV file containing all transactions without filters.",
                         badgeText = "FREE",
                         badgeColor = MaterialTheme.colorScheme.primary,
                         icon = Icons.Default.TableChart,
                         isSelected = uiState.selectedFormat == ExportFormat.BASIC_CSV,
-                        isLocked = false,
                         onClick = { viewModel.selectFormat(ExportFormat.BASIC_CSV) },
                         testTag = "format_basic_csv"
                     )
@@ -281,11 +261,10 @@ fun AdvancedExportScreen(
                     FormatOptionCard(
                         title = "Filtered CSV Export (Custom Selection)",
                         subtitle = "Spreadsheet CSV filtered by custom date ranges, specific accounts, categories, and types.",
-                        badgeText = "PRO",
-                        badgeColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                        badgeText = "FREE",
+                        badgeColor = MaterialTheme.colorScheme.primary,
                         icon = Icons.Default.FilterList,
                         isSelected = uiState.selectedFormat == ExportFormat.ADVANCED_CSV,
-                        isLocked = !isPro,
                         onClick = { viewModel.selectFormat(ExportFormat.ADVANCED_CSV) },
                         testTag = "format_advanced_csv"
                     )
@@ -293,11 +272,10 @@ fun AdvancedExportScreen(
                     FormatOptionCard(
                         title = "PDF Financial Report",
                         subtitle = "Multi-page printable statement with currency totals, category distributions, and ledger.",
-                        badgeText = "PRO",
-                        badgeColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                        badgeText = "FREE",
+                        badgeColor = MaterialTheme.colorScheme.primary,
                         icon = Icons.Default.PictureAsPdf,
                         isSelected = uiState.selectedFormat == ExportFormat.PDF_REPORT,
-                        isLocked = !isPro,
                         onClick = { viewModel.selectFormat(ExportFormat.PDF_REPORT) },
                         testTag = "format_pdf_report"
                     )
@@ -601,51 +579,6 @@ fun AdvancedExportScreen(
         )
     }
 
-    // Pro Paywall Dialog for locked export formats
-    if (uiState.showProPaywallDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissProPaywall() },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.WorkspacePremium,
-                    contentDescription = null,
-                    tint = ExpenseTrackerTheme.extendedColors.primaryPurple
-                )
-            },
-            title = {
-                Text(
-                    text = "ExpenseTracker Pro Feature",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = "Filtered CSV exports and multi-page PDF financial reports require ExpenseTracker Pro.\n\nBasic unfiltered CSV export remains completely free for full data portability.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                )
-            },
-            confirmButton = {
-                PrimaryButton(
-                    text = "View Pro Details",
-                    onClick = {
-                        viewModel.dismissProPaywall()
-                        onNavigateToPro()
-                    },
-                    testTag = "dialog_view_pro_button"
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.dismissProPaywall() },
-                    modifier = Modifier.testTag("dialog_dismiss_pro_button")
-                ) {
-                    Text("Maybe Later")
-                }
-            }
-        )
-    }
-
     // Date Range Picker Dialog
     if (showDatePickerDialog) {
         val dateRangePickerState = rememberDateRangePickerState()
@@ -694,7 +627,6 @@ private fun FormatOptionCard(
     badgeColor: Color,
     icon: ImageVector,
     isSelected: Boolean,
-    isLocked: Boolean,
     onClick: () -> Unit,
     testTag: String
 ) {
@@ -763,15 +695,6 @@ private fun FormatOptionCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary,
                     lineHeight = 16.sp
-                )
-            }
-
-            if (isLocked) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = "Locked",
-                    tint = ExpenseTrackerTheme.extendedColors.textMuted,
-                    modifier = Modifier.size(18.dp)
                 )
             }
         }

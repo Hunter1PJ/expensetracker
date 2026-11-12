@@ -38,7 +38,6 @@ class BudgetProgressWidgetTest {
     private lateinit var dataProvider: BudgetProgressWidgetDataProvider
     private lateinit var fakeWidgetConfigRepository: FakeWidgetConfigurationRepository
     private lateinit var widgetRefreshCoordinator: FakeWidgetRefreshCoordinator
-    private lateinit var widgetEntitlementPolicy: WidgetEntitlementPolicy
 
     @Before
     fun setUp() {
@@ -64,29 +63,6 @@ class BudgetProgressWidgetTest {
             widgetConfigurationRepository = fakeWidgetConfigRepository
         )
         widgetRefreshCoordinator = FakeWidgetRefreshCoordinator()
-        widgetEntitlementPolicy = WidgetEntitlementPolicy()
-    }
-
-    // --- TEST 1: Entitlement Testing - Free Tier is Blocked ---
-    @Test
-    fun testFreeTierBlocksBudgetWidget() {
-        val result = widgetEntitlementPolicy.checkEntitlement(
-            feature = WidgetFeature.BUDGET_PROGRESS,
-            currentProEntitlement = ProEntitlement.Free,
-            currentConfiguredCount = 0
-        )
-        assertTrue(result is WidgetGateResult.ProRequired)
-    }
-
-    // --- TEST 2: Entitlement Testing - Pro Tier is Allowed ---
-    @Test
-    fun testProTierAllowsBudgetWidget() {
-        val result = widgetEntitlementPolicy.checkEntitlement(
-            feature = WidgetFeature.BUDGET_PROGRESS,
-            currentProEntitlement = ProEntitlement.Pro,
-            currentConfiguredCount = 3
-        )
-        assertTrue(result is WidgetGateResult.Allowed)
     }
 
     // --- TEST 3: Configuration Persistence - Configurations are Independent per Widget ID ---

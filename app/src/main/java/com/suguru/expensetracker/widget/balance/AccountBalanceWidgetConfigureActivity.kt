@@ -21,11 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.ExpenseTrackerApplication
 import com.suguru.expensetracker.MainActivity
 import com.suguru.expensetracker.domain.model.Account
-import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
-import com.suguru.expensetracker.widget.common.WidgetFeature
-import com.suguru.expensetracker.widget.common.WidgetGateResult
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
@@ -56,57 +52,21 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
         setContent {
             val scope = rememberCoroutineScope()
             
-            // Gather dependencies from our manual DI container
             val accountRepository = appContainer.accountRepository
             val widgetConfigurationRepository = appContainer.widgetConfigurationRepository
-            val widgetEntitlementPolicy = appContainer.widgetEntitlementPolicy
             val widgetRefreshCoordinator = appContainer.widgetRefreshCoordinator
-            val observeProEntitlementUseCase = appContainer.observeProEntitlementUseCase
 
-            // Core state collection
             val accounts by accountRepository.observeActiveAccounts().collectAsState(initial = emptyList())
-            val entitlement by observeProEntitlementUseCase().collectAsState(initial = ProEntitlement.Checking)
 
             var selectedAccount by remember { mutableStateOf<Account?>(null) }
             var privacyMode by remember { mutableStateOf(false) }
-            var isBlockedByEntitlement by remember { mutableStateOf(false) }
-
-            // Check if adding this widget violates Free tier limit (Free tier only allows 1 widget)
-            LaunchedEffect(entitlement) {
-                if (entitlement !is ProEntitlement.Checking) {
-                    val currentConfigs = widgetConfigurationRepository.getAllConfigurations().first()
-                    // Filter out current widget if it's already configured (reconfiguration is always allowed)
-                    val otherConfigs = currentConfigs.filter { it.appWidgetId != appWidgetId }
-                    val checkResult = widgetEntitlementPolicy.checkEntitlement(
-                        feature = WidgetFeature.ACCOUNT_BALANCE,
-                        currentProEntitlement = entitlement,
-                        currentConfiguredCount = otherConfigs.size
-                    )
-                    isBlockedByEntitlement = checkResult is WidgetGateResult.LimitReached
-                }
-            }
 
             ExpenseTrackerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (isBlockedByEntitlement) {
-                        ProBlockScreen(
-                            onViewPro = {
-                                val intent = Intent(this@AccountBalanceWidgetConfigureActivity, MainActivity::class.java).apply {
-                                    action = "com.suguru.expensetracker.action.NAVIGATE"
-                                    putExtra("destination", "pro")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                }
-                                startActivity(intent)
-                                finish()
-                            },
-                            onCancel = {
-                                finish()
-                            }
-                        )
-                    } else if (accounts.isEmpty()) {
+                    if (accounts.isEmpty()) {
                         EmptyAccountsScreen(
                             onOpenApp = {
                                 val intent = Intent(this@AccountBalanceWidgetConfigureActivity, MainActivity::class.java).apply {
@@ -156,58 +116,6 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                         )
                     }
                 }
-            }
-        }
-    }
-
-    @Composable
-    private fun ProBlockScreen(
-        onViewPro: () -> Unit,
-        onCancel: () -> Unit
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .testTag("pro_block_screen"),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Account Balance Widget",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Free tier includes 1 Account Balance widget.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "ExpenseTracker Pro unlocks unlimited widgets.",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-            Button(
-                onClick = onViewPro,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("view_pro_button")
-            ) {
-                Text("View Pro")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("cancel_button")
-            ) {
-                Text("Cancel")
             }
         }
     }

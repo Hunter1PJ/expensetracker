@@ -156,4 +156,72 @@ class HomeViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun multipleCandidates_canBeReviewedAndConsumedIndependently() = runTest {
+        val fakeAiRepository = object : com.suguru.expensetracker.domain.ai.AiRepository {
+            override val isAiConfigured = kotlinx.coroutines.flow.flowOf(true)
+            override val isAiFeatureEnabled = kotlinx.coroutines.flow.flowOf(true)
+            override suspend fun getMaskedApiKey(): String? = "••••1234"
+            override suspend fun saveApiKey(apiKey: String) = com.suguru.expensetracker.domain.ai.AiResult.Success(Unit)
+            override suspend fun validateApiKey(apiKey: String) = com.suguru.expensetracker.domain.ai.AiResult.Success(true)
+            override suspend fun validateConfiguredKey() = com.suguru.expensetracker.domain.ai.AiResult.Success(true)
+            override suspend fun deleteApiKey() {}
+            override suspend fun setAiFeatureEnabled(enabled: Boolean) {}
+            override suspend fun extractTransactions(input: String, defaultCurrency: String): com.suguru.expensetracker.domain.ai.AiResult<List<com.suguru.expensetracker.domain.parser.TransactionCandidate>> {
+                return com.suguru.expensetracker.domain.ai.AiResult.Success(
+                    listOf(
+                        com.suguru.expensetracker.domain.parser.TransactionCandidate(
+                            rawText = "Coffee 5",
+                            suggestedTitle = "Coffee",
+                            transactionType = TransactionType.EXPENSE,
+                            amount = Money(500L, "USD"),
+                            date = java.time.LocalDate.now(),
+                            confidence = com.suguru.expensetracker.domain.parser.ParseConfidence.HIGH
+                        ),
+                        com.suguru.expensetracker.domain.parser.TransactionCandidate(
+                            rawText = "Lunch 15",
+                            suggestedTitle = "Lunch",
+                            transactionType = TransactionType.EXPENSE,
+                            amount = Money(1500L, "USD"),
+                            date = java.time.LocalDate.now(),
+                            confidence = com.suguru.expensetracker.domain.parser.ParseConfidence.HIGH
+                        )
+                    )
+                )
+            }
+        }
+
+        viewModel = HomeViewModel(
+            observeDashboardSummaryUseCase = observeDashboardSummaryUseCase,
+            observeAccountSummariesUseCase = observeAccountSummariesUseCase,
+            observeRecentTransactionsUseCase = observeRecentTransactionsUseCase,
+            aiRepository = fakeAiRepository
+        )
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.extractTransactionsFromText("Coffee 5 and Lunch 15")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.extractedCandidates.size)
+
+        // Consume the first candidate after user confirms & saves it
+        val firstCandidate = state.extractedCandidates.first()
+        viewModel.consumeCandidate(firstCandidate)
+        advanceUntilIdle()
+
+        val updatedState = viewModel.uiState.value
+        assertEquals(1, updatedState.extractedCandidates.size)
+        assertEquals("Lunch", updatedState.extractedCandidates.first().suggestedTitle)
+
+        // Clear all remaining candidates
+        viewModel.clearExtractedCandidates()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.extractedCandidates.isEmpty())
+
+        collectJob.cancel()
+    }
 }

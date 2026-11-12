@@ -4,14 +4,12 @@ import com.suguru.expensetracker.data.export.CsvExporter
 import com.suguru.expensetracker.data.export.PdfFinancialReportRenderer
 import com.suguru.expensetracker.domain.fake.FakeAccountRepository
 import com.suguru.expensetracker.domain.fake.FakeCategoryRepository
-import com.suguru.expensetracker.domain.fake.FakeEntitlementRepository
 import com.suguru.expensetracker.domain.fake.FakeTransactionRepository
 import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.CategoryType
 import com.suguru.expensetracker.domain.model.Money
-import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.domain.model.Transaction
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.usecase.export.GenerateAdvancedCsvExportUseCase
@@ -41,7 +39,6 @@ class ExportViewModelTest {
     private lateinit var fakeAccountRepo: FakeAccountRepository
     private lateinit var fakeCategoryRepo: FakeCategoryRepository
     private lateinit var fakeTransactionRepo: FakeTransactionRepository
-    private lateinit var fakeEntitlementRepo: FakeEntitlementRepository
 
     private lateinit var csvExporter: CsvExporter
     private lateinit var pdfRenderer: PdfFinancialReportRenderer
@@ -57,7 +54,6 @@ class ExportViewModelTest {
         fakeAccountRepo = FakeAccountRepository()
         fakeCategoryRepo = FakeCategoryRepository()
         fakeTransactionRepo = FakeTransactionRepository()
-        fakeEntitlementRepo = FakeEntitlementRepository()
 
         csvExporter = CsvExporter()
         pdfRenderer = PdfFinancialReportRenderer()
@@ -82,7 +78,6 @@ class ExportViewModelTest {
             generateAdvancedCsvExportUseCase = generateAdvancedCsvExportUseCase,
             prepareFinancialReportDataUseCase = prepareFinancialReportDataUseCase,
             pdfFinancialReportRenderer = pdfRenderer,
-            entitlementRepository = fakeEntitlementRepo,
             accountRepository = fakeAccountRepo,
             categoryRepository = fakeCategoryRepo
         )
@@ -94,41 +89,22 @@ class ExportViewModelTest {
     }
 
     @Test
-    fun `initial state defaults to Basic CSV and Free tier`() = runTest {
+    fun `initial state defaults to Basic CSV`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals(ExportFormat.BASIC_CSV, state.selectedFormat)
-        assertEquals(ProEntitlement.Free, state.proEntitlement)
         assertFalse(state.isWritingFile)
-        assertFalse(state.showProPaywallDialog)
     }
 
     @Test
-    fun `selecting advanced CSV or PDF as Free user triggers paywall dialog`() = runTest {
+    fun `selecting advanced CSV or PDF updates selected format directly`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.selectFormat(ExportFormat.ADVANCED_CSV)
-        assertTrue(viewModel.uiState.value.showProPaywallDialog)
-
-        viewModel.dismissProPaywall()
-        assertFalse(viewModel.uiState.value.showProPaywallDialog)
-
-        viewModel.selectFormat(ExportFormat.PDF_REPORT)
-        assertTrue(viewModel.uiState.value.showProPaywallDialog)
-    }
-
-    @Test
-    fun `selecting advanced CSV or PDF as Pro user updates selected format without paywall`() = runTest {
-        fakeEntitlementRepo.setEntitlement(ProEntitlement.Pro)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.selectFormat(ExportFormat.ADVANCED_CSV)
-        assertFalse(viewModel.uiState.value.showProPaywallDialog)
         assertEquals(ExportFormat.ADVANCED_CSV, viewModel.uiState.value.selectedFormat)
 
         viewModel.selectFormat(ExportFormat.PDF_REPORT)
-        assertFalse(viewModel.uiState.value.showProPaywallDialog)
         assertEquals(ExportFormat.PDF_REPORT, viewModel.uiState.value.selectedFormat)
     }
 
@@ -145,8 +121,7 @@ class ExportViewModelTest {
     }
 
     @Test
-    fun `export requested on PDF report as Pro creates PDF filename`() = runTest {
-        fakeEntitlementRepo.setEntitlement(ProEntitlement.Pro)
+    fun `export requested on PDF report creates PDF filename`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.selectFormat(ExportFormat.PDF_REPORT)

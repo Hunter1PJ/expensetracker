@@ -21,12 +21,8 @@ import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.ExpenseTrackerApplication
 import com.suguru.expensetracker.MainActivity
 import com.suguru.expensetracker.domain.model.budget.BudgetProgress
-import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
-import com.suguru.expensetracker.widget.common.WidgetFeature
-import com.suguru.expensetracker.widget.common.WidgetGateResult
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
@@ -56,35 +52,19 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
         setContent {
             val scope = rememberCoroutineScope()
             
-            val budgetRepository = appContainer.budgetRepository
             val categoryRepository = appContainer.categoryRepository
             val widgetConfigurationRepository = appContainer.widgetConfigurationRepository
-            val widgetEntitlementPolicy = appContainer.widgetEntitlementPolicy
             val widgetRefreshCoordinator = appContainer.widgetRefreshCoordinator
-            val observeProEntitlementUseCase = appContainer.observeProEntitlementUseCase
             val observeActiveBudgetProgressUseCase = appContainer.observeActiveBudgetProgressUseCase
 
             val budgetProgressList by observeActiveBudgetProgressUseCase().collectAsState(initial = emptyList())
             val categories by categoryRepository.observeActiveCategories().collectAsState(initial = emptyList())
-            val entitlement by observeProEntitlementUseCase().collectAsState(initial = ProEntitlement.Checking)
 
             var selectedBudgetProgress by remember { mutableStateOf<BudgetProgress?>(null) }
             var privacyMode by remember { mutableStateOf(false) }
-            var isBlockedByEntitlement by remember { mutableStateOf(false) }
 
             val categoryMap = remember(categories) {
                 categories.associate { it.id to it.name }
-            }
-
-            LaunchedEffect(entitlement) {
-                if (entitlement !is ProEntitlement.Checking) {
-                    val checkResult = widgetEntitlementPolicy.checkEntitlement(
-                        feature = WidgetFeature.BUDGET_PROGRESS,
-                        currentProEntitlement = entitlement,
-                        currentConfiguredCount = 0
-                    )
-                    isBlockedByEntitlement = checkResult !is WidgetGateResult.Allowed
-                }
             }
 
             ExpenseTrackerTheme {
@@ -92,22 +72,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (isBlockedByEntitlement) {
-                        ProBlockScreen(
-                            onViewPro = {
-                                val intent = Intent(this@BudgetProgressWidgetConfigureActivity, MainActivity::class.java).apply {
-                                    action = "com.suguru.expensetracker.action.NAVIGATE"
-                                    putExtra("destination", "pro")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                }
-                                startActivity(intent)
-                                finish()
-                            },
-                            onCancel = {
-                                finish()
-                            }
-                        )
-                    } else if (budgetProgressList.isEmpty()) {
+                    if (budgetProgressList.isEmpty()) {
                         EmptyBudgetsScreen(
                             onOpenApp = {
                                 val intent = Intent(this@BudgetProgressWidgetConfigureActivity, MainActivity::class.java).apply {
@@ -156,58 +121,6 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                         )
                     }
                 }
-            }
-        }
-    }
-
-    @Composable
-    private fun ProBlockScreen(
-        onViewPro: () -> Unit,
-        onCancel: () -> Unit
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .testTag("pro_block_screen"),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Budget Progress Widget",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Budget widgets require ExpenseTracker Pro.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Upgrade to track budgets on your Home Screen.",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-            Button(
-                onClick = onViewPro,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("view_pro_button")
-            ) {
-                Text("View Pro")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("cancel_button")
-            ) {
-                Text("Cancel")
             }
         }
     }

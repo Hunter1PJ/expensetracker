@@ -90,20 +90,9 @@ import java.time.ZoneOffset
 fun AddEditRecurringTransactionScreen(
     viewModel: AddEditRecurringTransactionViewModel,
     onNavigateBack: () -> Unit,
-    onNavigateToPro: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appContainer = remember(context) {
-        (context.applicationContext as? com.suguru.expensetracker.ExpenseTrackerApplication)?.appContainer
-    }
-    val entitlementState = remember(appContainer) {
-        appContainer?.observeProEntitlementUseCase?.invoke() ?: kotlinx.coroutines.flow.flowOf(com.suguru.expensetracker.domain.model.ProEntitlement.Free)
-    }.collectAsState(initial = com.suguru.expensetracker.domain.model.ProEntitlement.Checking).value
-
-    val isPending = entitlementState is com.suguru.expensetracker.domain.model.ProEntitlement.Pending
 
     BackHandler(onBack = onNavigateBack)
 
@@ -111,16 +100,6 @@ fun AddEditRecurringTransactionScreen(
         if (uiState.isSuccess) {
             onNavigateBack()
         }
-    }
-
-    uiState.limitReachedState?.let { limitState ->
-        com.suguru.expensetracker.presentation.components.ContextualPaywallSheet(
-            feature = limitState.feature,
-            limit = limitState.freeLimit,
-            onViewPro = onNavigateToPro,
-            onDismiss = viewModel::onDismissLimitSheet,
-            isPending = isPending
-        )
     }
 
     var showStartDatePicker by remember { mutableStateOf(false) }

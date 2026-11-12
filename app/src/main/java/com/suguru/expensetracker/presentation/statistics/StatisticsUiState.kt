@@ -1,6 +1,5 @@
 package com.suguru.expensetracker.presentation.statistics
 
-import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.domain.model.statistics.ComparisonSemantic
 import com.suguru.expensetracker.domain.model.statistics.StatisticsComparisonMode
 import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
@@ -103,20 +102,14 @@ data class StatisticsUiState(
     val totalTransactionsCount: Int = 0,
     val hasAnyTransactionsInPeriod: Boolean = false,
     val errorMessage: String? = null,
-    val proEntitlement: ProEntitlement = ProEntitlement.Checking,
     val customStartDate: LocalDate? = null,
     val customEndDate: LocalDate? = null,
     val isCustomRangePickerVisible: Boolean = false,
     val customRangeError: String? = null,
-    val proRequiredMessage: String? = null,
-    val showProPaywall: Boolean = false,
-    val showPendingMessage: Boolean = false,
     // Advanced Statistics Compare
     val isComparisonEnabled: Boolean = false,
     val comparisonMode: StatisticsComparisonMode = StatisticsComparisonMode.PREVIOUS_PERIOD,
     val isComparisonLoading: Boolean = false,
     val comparison: ComparisonUiModel? = null,
-    val comparisonError: String? = null,
-    val showCompareProPaywall: Boolean = false,
-    val showComparePendingMessage: Boolean = false
+    val comparisonError: String? = null
 )

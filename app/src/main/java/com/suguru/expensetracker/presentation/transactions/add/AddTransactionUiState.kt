@@ -21,7 +21,16 @@ data class AddTransactionUiState(
     val categories: List<Category> = emptyList(),
     val isSaving: Boolean = false,
     val error: AddTransactionError? = null,
-    val isSavedSuccessfully: Boolean = false
+    val isSavedSuccessfully: Boolean = false,
+    val isAiAssisted: Boolean = false,
+    val aiAmountWarning: String? = null,
+    val aiCategorySuggestion: String? = null,
+    val aiCategoryMatchAmbiguous: Boolean = false,
+    val aiAccountSuggestion: String? = null,
+    val aiAccountMatchAmbiguous: Boolean = false,
+    val aiDestinationAccountSuggestion: String? = null,
+    val aiDestinationAccountMatchAmbiguous: Boolean = false,
+    val aiWarnings: List<String> = emptyList()
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }

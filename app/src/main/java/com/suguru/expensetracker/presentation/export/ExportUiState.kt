@@ -2,10 +2,7 @@ package com.suguru.expensetracker.presentation.export
 
 import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.Category
-import com.suguru.expensetracker.domain.model.ProEntitlement
-import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.model.export.ExportFilter
-import java.time.LocalDate
 
 enum class ExportFormat {
     BASIC_CSV,
@@ -16,7 +13,6 @@ enum class ExportFormat {
 data class ExportUiState(
     val selectedFormat: ExportFormat = ExportFormat.BASIC_CSV,
     val filter: ExportFilter = ExportFilter(),
-    val proEntitlement: ProEntitlement = ProEntitlement.Free,
     val availableAccounts: List<Account> = emptyList(),
     val availableCategories: List<Category> = emptyList(),
     val availableCurrencies: List<String> = emptyList(),
@@ -27,7 +23,6 @@ data class ExportUiState(
     val pendingExportAction: ExportFormat? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null,
-    val showProPaywallDialog: Boolean = false,
     val showFilterSheet: Boolean = false,
     val showPrivacyWarningDialog: Boolean = false
 )

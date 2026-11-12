@@ -390,62 +390,6 @@ fun StatisticsScreen(
                 validationError = uiState.customRangeError
             )
         }
-
-        if (uiState.showProPaywall) {
-            ExpenseTrackerConfirmationDialog(
-                title = "Unlock Custom Insights",
-                message = "Custom Date Range statistics is a Pro feature. Unlock custom periods, unlimited widgets, and deeper financial analysis.",
-                confirmText = "OK",
-                onConfirm = { viewModel.dismissProPaywall() },
-                onDismissRequest = { viewModel.dismissProPaywall() },
-                testTag = "pro_paywall_dialog"
-            )
-        }
-
-        if (uiState.showPendingMessage) {
-            ExpenseTrackerConfirmationDialog(
-                title = "Pro Purchase Pending",
-                message = "Your Pro purchase is still pending. Google Play will unlock Custom Date Range once the purchase completes.",
-                confirmText = "OK",
-                onConfirm = { viewModel.dismissPendingMessage() },
-                onDismissRequest = { viewModel.dismissPendingMessage() },
-                testTag = "pro_pending_dialog"
-            )
-        }
-
-        if (uiState.proRequiredMessage != null) {
-            ExpenseTrackerConfirmationDialog(
-                title = "Pro Subscription Ended",
-                message = uiState.proRequiredMessage ?: "Custom Date Range requires Pro.",
-                confirmText = "OK",
-                onConfirm = { viewModel.dismissProRequiredMessage() },
-                onDismissRequest = { viewModel.dismissProRequiredMessage() },
-                testTag = "pro_required_dialog"
-            )
-        }
-
-        if (uiState.showCompareProPaywall) {
-            ExpenseTrackerConfirmationDialog(
-                title = "Advanced Statistics Compare",
-                message = "Compare your current financial performance with previous periods and see exactly what changed.",
-                confirmText = "View Pro",
-                dismissText = "Not Now",
-                onConfirm = { viewModel.dismissCompareProPaywall() },
-                onDismissRequest = { viewModel.dismissCompareProPaywall() },
-                testTag = "compare_pro_paywall_dialog"
-            )
-        }
-
-        if (uiState.showComparePendingMessage) {
-            ExpenseTrackerConfirmationDialog(
-                title = "Purchase pending",
-                message = "Google Play is still processing your purchase.",
-                confirmText = "OK",
-                onConfirm = { viewModel.dismissComparePendingMessage() },
-                onDismissRequest = { viewModel.dismissComparePendingMessage() },
-                testTag = "compare_pending_dialog"
-            )
-        }
     }
 }
 

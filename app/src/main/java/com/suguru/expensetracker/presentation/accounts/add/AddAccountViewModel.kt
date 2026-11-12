@@ -203,17 +203,6 @@ class AddAccountViewModel(
                         isSavedSuccessfully = true
                     )
                 }
-            } catch (e: DomainException.FeatureLimitReached) {
-                _uiState.update {
-                    it.copy(
-                        isSaving = false,
-                        limitReachedState = com.suguru.expensetracker.domain.model.FeatureGateResult.LimitReached(
-                            feature = e.feature,
-                            currentCount = e.currentCount,
-                            freeLimit = e.freeLimit
-                        )
-                    )
-                }
             } catch (e: DomainException.InvalidAccount) {
                 _uiState.update {
                     it.copy(
@@ -234,9 +223,5 @@ class AddAccountViewModel(
 
     fun onDismissError() {
         _uiState.update { it.copy(error = null) }
-    }
-
-    fun onDismissLimitSheet() {
-        _uiState.update { it.copy(limitReachedState = null) }
     }
 }

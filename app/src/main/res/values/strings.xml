@@ -262,4 +262,40 @@
     <!-- Advanced Financial Export -->
     <string name="title_financial_export">Financial Export</string>
     <string name="desc_financial_export">Export CSV files and generate PDF financial statements</string>
+
+    <!-- AI BYOK Settings & Assistant -->
+    <string name="section_ai_assistant">AI Assistant (BYOK)</string>
+    <string name="title_ai_feature">Enable AI Assistant</string>
+    <string name="desc_ai_feature">Natural language transaction extraction via Gemini</string>
+    <string name="title_gemini_api_key">Gemini API Key</string>
+    <string name="desc_gemini_api_key_configured">Saved securely in Android Keystore</string>
+    <string name="desc_gemini_api_key_not_configured">Configure your personal Google AI key</string>
+    <string name="dialog_api_key_title">Gemini API Key</string>
+    <string name="dialog_api_key_desc">Enter your personal Gemini API key. Stored encrypted on-device.</string>
+    <string name="hint_api_key">Enter AIzaSy… key</string>
+    <string name="action_save_key">Save Key</string>
+    <string name="action_delete_key">Delete Key</string>
+    <string name="action_test_key">Verify Key</string>
+    <string name="key_status_verified">Valid &amp; Ready</string>
+    <string name="key_status_unverified">Saved (Tap to verify)</string>
+    <string name="key_status_verifying">Checking key validity…</string>
+    <string name="key_status_invalid">Invalid API key or unauthorized</string>
+    <string name="home_ai_unconfigured_title">AI Transaction Assistant</string>
+    <string name="home_ai_unconfigured_desc">Add your Gemini API key in Settings to log transactions with natural language.</string>
+    <string name="home_ai_action_configure">Configure in Settings</string>
+    <string name="home_ai_input_hint">e.g., "Paid 45,000 UZS for taxi yesterday"</string>
+    <string name="home_ai_extract_action">Parse Transaction</string>
+    <string name="home_ai_preview_title">Transaction Preview</string>
+    <string name="home_ai_preview_desc">Review suggestions before editing or saving</string>
+    <string name="home_ai_action_edit_candidate">Edit &amp; Confirm</string>
+    <string name="ai_draft_badge">AI-assisted draft</string>
+    <string name="ai_draft_title">Review &amp; Confirm</string>
+    <string name="ai_draft_description">Pre-filled from Gemini suggestions. Please review and verify all fields before saving.</string>
+    <string name="ai_missing_amount_warning">Amount was not detected in the AI draft. Please enter an amount.</string>
+    <string name="ai_ambiguous_account_warning">Suggested account \'%1$s\' is ambiguous. Please select manually.</string>
+    <string name="ai_unmatched_account_hint">Suggested account \'%1$s\' was not found. Please select an account.</string>
+    <string name="ai_ambiguous_category_warning">Suggested category \'%1$s\' is ambiguous. Please select manually.</string>
+    <string name="ai_unmatched_category_hint">Suggested category \'%1$s\' was not found. Please select a category.</string>
+    <string name="ai_ambiguous_dest_account_warning">Suggested destination account \'%1$s\' is ambiguous. Please select manually.</string>
+    <string name="ai_unmatched_dest_account_hint">Suggested destination account \'%1$s\' was not found. Please select an account.</string>
 </resources>

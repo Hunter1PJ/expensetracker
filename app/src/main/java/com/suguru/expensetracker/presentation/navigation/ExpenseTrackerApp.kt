@@ -111,6 +111,7 @@ fun ExpenseTrackerApp(
     var selectedEditBudgetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedEditRecurringRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedTransactionId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var activeAiCandidate by remember { mutableStateOf<com.suguru.expensetracker.domain.parser.TransactionCandidate?>(null) }
 
     androidx.compose.runtime.LaunchedEffect(initialDestination, initialAccountId, initialBudgetId, initialTransactionType) {
         if (initialDestination != null) {
@@ -141,6 +142,16 @@ fun ExpenseTrackerApp(
             AddTransactionScreen(
                 viewModel = resolvedAddTransactionViewModel,
                 onNavigateBack = {
+                    activeAiCandidate = null
+                    resolvedAddTransactionViewModel.clearAiDraftState()
+                    currentDestination = previousDestination
+                },
+                onSaveSuccess = {
+                    activeAiCandidate?.let { candidate ->
+                        resolvedHomeViewModel.consumeCandidate(candidate)
+                        activeAiCandidate = null
+                    }
+                    resolvedAddTransactionViewModel.clearAiDraftState()
                     currentDestination = previousDestination
                 }
             )
@@ -233,10 +244,6 @@ fun ExpenseTrackerApp(
                 viewModel = addAccountViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.AccountManagement
-                },
-                onNavigateToPro = {
-                    previousDestination = currentDestination
-                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -280,10 +287,6 @@ fun ExpenseTrackerApp(
                 viewModel = addCategoryViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.CategoryManagement
-                },
-                onNavigateToPro = {
-                    previousDestination = currentDestination
-                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -305,10 +308,6 @@ fun ExpenseTrackerApp(
                 viewModel = addEditBudgetViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.Budgets
-                },
-                onNavigateToPro = {
-                    previousDestination = currentDestination
-                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -357,10 +356,6 @@ fun ExpenseTrackerApp(
                 viewModel = addEditRecurringViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.RecurringTransactions
-                },
-                onNavigateToPro = {
-                    previousDestination = currentDestination
-                    currentDestination = NavDestination.Pro
                 }
             )
         }
@@ -383,22 +378,6 @@ fun ExpenseTrackerApp(
             }
             com.suguru.expensetracker.presentation.export.AdvancedExportScreen(
                 viewModel = exportViewModel,
-                onNavigateBack = {
-                    currentDestination = previousDestination
-                },
-                onNavigateToPro = {
-                    previousDestination = currentDestination
-                    currentDestination = NavDestination.Pro
-                }
-            )
-        }
-
-        NavDestination.Pro -> {
-            val proViewModel = remember(resolvedContainer) {
-                resolvedContainer?.createProViewModel() ?: throw IllegalStateException("AppContainer required")
-            }
-            com.suguru.expensetracker.presentation.pro.ProScreen(
-                viewModel = proViewModel,
                 onNavigateBack = {
                     currentDestination = previousDestination
                 }
@@ -516,6 +495,8 @@ fun ExpenseTrackerApp(
                     if (currentDestination == NavDestination.Home) {
                         FloatingActionButton(
                             onClick = {
+                                activeAiCandidate = null
+                                resolvedAddTransactionViewModel.clearForm()
                                 previousDestination = currentDestination
                                 currentDestination = NavDestination.AddTransaction
                             },
@@ -542,6 +523,14 @@ fun ExpenseTrackerApp(
                         HomeScreen(
                             viewModel = resolvedHomeViewModel,
                             onNavigateToAddTransaction = {
+                                activeAiCandidate = null
+                                resolvedAddTransactionViewModel.clearForm()
+                                previousDestination = NavDestination.Home
+                                currentDestination = NavDestination.AddTransaction
+                            },
+                            onNavigateToAddTransactionWithCandidate = { candidate ->
+                                activeAiCandidate = candidate
+                                resolvedAddTransactionViewModel.populateFromCandidate(candidate)
                                 previousDestination = NavDestination.Home
                                 currentDestination = NavDestination.AddTransaction
                             },
@@ -563,6 +552,10 @@ fun ExpenseTrackerApp(
                                 selectedTransactionId = txId
                                 currentDestination = NavDestination.TransactionDetail
                             },
+                            onNavigateToSettings = {
+                                previousDestination = NavDestination.Home
+                                currentDestination = NavDestination.Settings
+                            },
                             modifier = Modifier.padding(innerPadding)
                         )
                     }
@@ -583,6 +576,8 @@ fun ExpenseTrackerApp(
                                 currentDestination = NavDestination.TransactionDetail
                             },
                             onNavigateToAddTransaction = {
+                                activeAiCandidate = null
+                                resolvedAddTransactionViewModel.clearForm()
                                 previousDestination = NavDestination.Transactions
                                 currentDestination = NavDestination.AddTransaction
                             },
@@ -593,8 +588,7 @@ fun ExpenseTrackerApp(
                         val statisticsViewModel: StatisticsViewModel = remember(resolvedContainer) {
                             resolvedContainer?.createStatisticsViewModel() ?: StatisticsViewModel(
                                 observeStatisticsUseCase = resolvedContainer!!.observeStatisticsUseCase,
-                                observeStatisticsComparisonUseCase = resolvedContainer.observeStatisticsComparisonUseCase,
-                                observeProEntitlementUseCase = resolvedContainer.observeProEntitlementUseCase
+                                observeStatisticsComparisonUseCase = resolvedContainer.observeStatisticsComparisonUseCase
                             )
                         }
 
@@ -629,8 +623,7 @@ fun ExpenseTrackerApp(
                     NavDestination.Settings -> {
                         val settingsViewModel: com.suguru.expensetracker.presentation.settings.SettingsViewModel = remember(resolvedContainer) {
                             resolvedContainer?.createSettingsViewModel() ?: com.suguru.expensetracker.presentation.settings.SettingsViewModel(
-                                settingsRepository = resolvedContainer!!.settingsRepository,
-                                observeProEntitlementUseCase = resolvedContainer.observeProEntitlementUseCase
+                                settingsRepository = resolvedContainer!!.settingsRepository
                             )
                         }
 
@@ -655,10 +648,6 @@ fun ExpenseTrackerApp(
                             onNavigateToExport = {
                                 previousDestination = NavDestination.Settings
                                 currentDestination = NavDestination.AdvancedExport
-                            },
-                            onNavigateToPro = {
-                                previousDestination = NavDestination.Settings
-                                currentDestination = NavDestination.Pro
                             },
                             modifier = Modifier.padding(innerPadding)
                         )

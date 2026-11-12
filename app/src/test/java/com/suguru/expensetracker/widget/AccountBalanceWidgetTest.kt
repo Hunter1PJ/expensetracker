@@ -33,7 +33,6 @@ class AccountBalanceWidgetTest {
     private lateinit var widgetConfigRepository: FakeWidgetConfigurationRepository
     private lateinit var dataProvider: AccountBalanceWidgetDataProvider
     private lateinit var widgetRefreshCoordinator: FakeWidgetRefreshCoordinator
-    private lateinit var widgetEntitlementPolicy: WidgetEntitlementPolicy
 
     @Before
     fun setUp() {
@@ -47,40 +46,6 @@ class AccountBalanceWidgetTest {
             widgetConfigurationRepository = widgetConfigRepository
         )
         widgetRefreshCoordinator = FakeWidgetRefreshCoordinator()
-        widgetEntitlementPolicy = WidgetEntitlementPolicy()
-    }
-
-    // --- TEST 1: Free + 0 Balance widgets -> configure first allowed ---
-    @Test
-    fun testFreeTierFirstWidgetAllowed() {
-        val result = widgetEntitlementPolicy.checkEntitlement(
-            feature = WidgetFeature.ACCOUNT_BALANCE,
-            currentProEntitlement = ProEntitlement.Free,
-            currentConfiguredCount = 0
-        )
-        assertTrue(result is WidgetGateResult.Allowed)
-    }
-
-    // --- TEST 2: Free + 1 existing Balance widget -> second blocked ---
-    @Test
-    fun testFreeTierSecondWidgetBlocked() {
-        val result = widgetEntitlementPolicy.checkEntitlement(
-            feature = WidgetFeature.ACCOUNT_BALANCE,
-            currentProEntitlement = ProEntitlement.Free,
-            currentConfiguredCount = 1
-        )
-        assertTrue(result is WidgetGateResult.LimitReached)
-    }
-
-    // --- TEST 3: Pro + multiple widgets -> new configuration allowed ---
-    @Test
-    fun testProTierUnlimitedWidgetsAllowed() {
-        val result = widgetEntitlementPolicy.checkEntitlement(
-            feature = WidgetFeature.ACCOUNT_BALANCE,
-            currentProEntitlement = ProEntitlement.Pro,
-            currentConfiguredCount = 5
-        )
-        assertTrue(result is WidgetGateResult.Allowed)
     }
 
     // --- TEST 4: Pro -> Free with existing multiple widgets -> widgets remain functional (Grandfathering) ---

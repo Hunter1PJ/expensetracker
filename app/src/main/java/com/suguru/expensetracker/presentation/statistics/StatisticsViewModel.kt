@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.model.Money
-import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.domain.model.statistics.AlignedTrendPoint
 import com.suguru.expensetracker.domain.model.statistics.CategoryComparisonMetric
 import com.suguru.expensetracker.domain.model.statistics.ComparisonMetric
@@ -14,7 +13,6 @@ import com.suguru.expensetracker.domain.model.statistics.RelativeChange
 import com.suguru.expensetracker.domain.model.statistics.StatisticsComparison
 import com.suguru.expensetracker.domain.model.statistics.StatisticsComparisonMode
 import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
-import com.suguru.expensetracker.domain.usecase.billing.ObserveProEntitlementUseCase
 import com.suguru.expensetracker.domain.usecase.statistics.ObserveStatisticsComparisonUseCase
 import com.suguru.expensetracker.domain.usecase.statistics.ObserveStatisticsUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
@@ -28,7 +26,6 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -39,7 +36,6 @@ import kotlin.math.abs
 class StatisticsViewModel(
     private val observeStatisticsUseCase: ObserveStatisticsUseCase,
     private val observeStatisticsComparisonUseCase: ObserveStatisticsComparisonUseCase = ObserveStatisticsComparisonUseCase(observeStatisticsUseCase),
-    private val observeProEntitlementUseCase: ObserveProEntitlementUseCase,
     private val savedStateHandle: SavedStateHandle? = null,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clockNow: () -> Instant = { Instant.now() }
@@ -68,46 +64,6 @@ class StatisticsViewModel(
     // Advanced Compare state
     private val _isComparisonEnabled = MutableStateFlow(initialComparisonEnabled)
     private val _comparisonMode = MutableStateFlow(initialComparisonMode)
-    private val _showCompareProPaywall = MutableStateFlow(false)
-    private val _showComparePendingMessage = MutableStateFlow(false)
-
-    val proEntitlement: StateFlow<ProEntitlement> = observeProEntitlementUseCase()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = ProEntitlement.Checking
-        )
-
-    private val _proRequiredMessage = MutableStateFlow<String?>(null)
-    private val _showProPaywall = MutableStateFlow(false)
-    private val _showPendingMessage = MutableStateFlow(false)
-
-    init {
-        viewModelScope.launch {
-            var lastEntitlement: ProEntitlement? = null
-            proEntitlement.collect { entitlement ->
-                if (lastEntitlement != null && lastEntitlement is ProEntitlement.Pro && entitlement is ProEntitlement.Free) {
-                    if (_selectedPeriod.value == StatisticsPeriodOption.CUSTOM) {
-                        _selectedPeriod.value = StatisticsPeriodOption.THIS_MONTH
-                        _proRequiredMessage.value = "Custom Date Range requires Pro."
-                    }
-                    if (_isComparisonEnabled.value) {
-                        _isComparisonEnabled.value = false
-                        savedStateHandle?.set(KEY_COMPARISON_ENABLED, false)
-                        _proRequiredMessage.value = "Advanced Compare requires Pro"
-                    }
-                } else if (lastEntitlement != null && lastEntitlement is ProEntitlement.Free && entitlement is ProEntitlement.Pro) {
-                    // Reactive unlock after purchase
-                    if (_showCompareProPaywall.value) {
-                        _showCompareProPaywall.value = false
-                        _isComparisonEnabled.value = true
-                        savedStateHandle?.set(KEY_COMPARISON_ENABLED, true)
-                    }
-                }
-                lastEntitlement = entitlement
-            }
-        }
-    }
 
     private data class SearchParams(
         val period: StatisticsPeriodOption,
@@ -117,8 +73,6 @@ class StatisticsViewModel(
         val comparisonEnabled: Boolean,
         val comparisonMode: StatisticsComparisonMode
     )
-
-    private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
     val uiState: StateFlow<StatisticsUiState> = combine(
         combine(_selectedPeriod, _selectedCurrency, _customStartDate) { period, currency, start ->
@@ -189,47 +143,19 @@ class StatisticsViewModel(
         }
     }.combine(
         combine(
-            proEntitlement,
             _customStartDate,
             _customEndDate,
-            _isCustomRangePickerVisible
-        ) { pro, start, end, visible ->
-            Quad(pro, start, end, visible)
+            _isCustomRangePickerVisible,
+            _customRangeError
+        ) { start, end, visible, error ->
+            Quad(start, end, visible, error)
         }
     ) { state, quad ->
         state.copy(
-            proEntitlement = quad.first,
-            customStartDate = quad.second,
-            customEndDate = quad.third,
-            isCustomRangePickerVisible = quad.fourth
-        )
-    }.combine(
-        combine(
-            _customRangeError,
-            _proRequiredMessage,
-            _showProPaywall,
-            _showPendingMessage
-        ) { error, msg, paywall, pending ->
-            Quad(error, msg, paywall, pending)
-        }
-    ) { state, quad ->
-        state.copy(
-            customRangeError = quad.first,
-            proRequiredMessage = quad.second,
-            showProPaywall = quad.third,
-            showPendingMessage = quad.fourth
-        )
-    }.combine(
-        combine(
-            _showCompareProPaywall,
-            _showComparePendingMessage
-        ) { comparePaywall, comparePending ->
-            comparePaywall to comparePending
-        }
-    ) { state, pair ->
-        state.copy(
-            showCompareProPaywall = pair.first,
-            showComparePendingMessage = pair.second
+            customStartDate = quad.first,
+            customEndDate = quad.second,
+            isCustomRangePickerVisible = quad.third,
+            customRangeError = quad.fourth
         )
     }.stateIn(
         scope = viewModelScope,
@@ -237,23 +163,13 @@ class StatisticsViewModel(
         initialValue = StatisticsUiState(isLoading = true)
     )
 
+    private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
     fun onPeriodSelected(period: StatisticsPeriodOption) {
         if (period == StatisticsPeriodOption.CUSTOM) {
-            val entitlement = proEntitlement.value
-            when (entitlement) {
-                is ProEntitlement.Pro -> {
-                    _isCustomRangePickerVisible.value = true
-                }
-                is ProEntitlement.Pending -> {
-                    _showPendingMessage.value = true
-                }
-                else -> {
-                    _showProPaywall.value = true
-                }
-            }
+            _isCustomRangePickerVisible.value = true
         } else {
             _selectedPeriod.value = period
-            _proRequiredMessage.value = null
         }
     }
 
@@ -262,36 +178,14 @@ class StatisticsViewModel(
     }
 
     fun onToggleComparison() {
-        if (!_isComparisonEnabled.value) {
-            when (proEntitlement.value) {
-                is ProEntitlement.Pro -> {
-                    _isComparisonEnabled.value = true
-                    savedStateHandle?.set(KEY_COMPARISON_ENABLED, true)
-                }
-                is ProEntitlement.Pending -> {
-                    _showComparePendingMessage.value = true
-                }
-                else -> {
-                    _showCompareProPaywall.value = true
-                }
-            }
-        } else {
-            _isComparisonEnabled.value = false
-            savedStateHandle?.set(KEY_COMPARISON_ENABLED, false)
-        }
+        val next = !_isComparisonEnabled.value
+        _isComparisonEnabled.value = next
+        savedStateHandle?.set(KEY_COMPARISON_ENABLED, next)
     }
 
     fun onComparisonModeSelected(mode: StatisticsComparisonMode) {
         _comparisonMode.value = mode
         savedStateHandle?.set(KEY_COMPARISON_MODE, mode.name)
-    }
-
-    fun dismissCompareProPaywall() {
-        _showCompareProPaywall.value = false
-    }
-
-    fun dismissComparePendingMessage() {
-        _showComparePendingMessage.value = false
     }
 
     fun onCustomDatesSelected(start: LocalDate, end: LocalDate) {
@@ -304,24 +198,11 @@ class StatisticsViewModel(
         _customEndDate.value = end
         _isCustomRangePickerVisible.value = false
         _selectedPeriod.value = StatisticsPeriodOption.CUSTOM
-        _proRequiredMessage.value = null
     }
 
     fun dismissCustomRangePicker() {
         _isCustomRangePickerVisible.value = false
         _customRangeError.value = null
-    }
-
-    fun dismissProPaywall() {
-        _showProPaywall.value = false
-    }
-
-    fun dismissPendingMessage() {
-        _showPendingMessage.value = false
-    }
-
-    fun dismissProRequiredMessage() {
-        _proRequiredMessage.value = null
     }
 
     private fun mapToUiState(

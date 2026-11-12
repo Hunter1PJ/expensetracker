@@ -2,10 +2,14 @@ package com.suguru.expensetracker.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.suguru.expensetracker.domain.ai.AiError
+import com.suguru.expensetracker.domain.ai.AiRepository
+import com.suguru.expensetracker.domain.ai.AiResult
 import com.suguru.expensetracker.domain.model.AccountBalanceSummary
 import com.suguru.expensetracker.domain.model.CurrencySummary
 import com.suguru.expensetracker.domain.model.RecentTransactionDetail
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.parser.TransactionCandidate
 import com.suguru.expensetracker.domain.usecase.dashboard.ObserveAccountSummariesUseCase
 import com.suguru.expensetracker.domain.usecase.dashboard.ObserveDashboardSummaryUseCase
 import com.suguru.expensetracker.domain.usecase.dashboard.ObserveRecentTransactionsUseCase
@@ -18,24 +22,64 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class HomeViewModel(
     observeDashboardSummaryUseCase: ObserveDashboardSummaryUseCase? = null,
     observeAccountSummariesUseCase: ObserveAccountSummariesUseCase? = null,
-    observeRecentTransactionsUseCase: ObserveRecentTransactionsUseCase? = null
+    observeRecentTransactionsUseCase: ObserveRecentTransactionsUseCase? = null,
+    private val aiRepository: AiRepository? = null
 ) : ViewModel() {
+
+    private val _isAiExtracting = MutableStateFlow(false)
+    private val _aiExtractionError = MutableStateFlow<String?>(null)
+    private val _extractedCandidates = MutableStateFlow<List<TransactionCandidate>>(emptyList())
+
+    private data class AiUiData(
+        val enabled: Boolean,
+        val configured: Boolean,
+        val isExtracting: Boolean,
+        val error: String?,
+        val candidates: List<TransactionCandidate>
+    )
 
     val uiState: StateFlow<HomeUiState> = if (
         observeDashboardSummaryUseCase != null &&
         observeAccountSummariesUseCase != null &&
         observeRecentTransactionsUseCase != null
     ) {
-        combine(
+        val aiEnabledFlow = aiRepository?.isAiFeatureEnabled ?: kotlinx.coroutines.flow.flowOf(true)
+        val aiConfiguredFlow = aiRepository?.isAiConfigured ?: kotlinx.coroutines.flow.flowOf(false)
+
+        val financialFlow = combine(
             observeDashboardSummaryUseCase(),
             observeAccountSummariesUseCase(),
             observeRecentTransactionsUseCase(limit = 5)
         ) { currencySummaries, accountSummaries, recentTransactions ->
-            mapToUiState(currencySummaries, accountSummaries, recentTransactions)
+            Triple(currencySummaries, accountSummaries, recentTransactions)
+        }
+
+        val aiStatusFlow = combine(
+            aiEnabledFlow,
+            aiConfiguredFlow,
+            _isAiExtracting,
+            _aiExtractionError,
+            _extractedCandidates
+        ) { aiEnabled, aiConfigured, isExtracting, extractionError, candidates ->
+            AiUiData(aiEnabled, aiConfigured, isExtracting, extractionError, candidates)
+        }
+
+        combine(financialFlow, aiStatusFlow) { financialData, aiData ->
+            mapToUiState(
+                currencySummaries = financialData.first,
+                accountSummaries = financialData.second,
+                recentTransactions = financialData.third,
+                isAiEnabled = aiData.enabled,
+                isAiConfigured = aiData.configured,
+                isExtracting = aiData.isExtracting,
+                extractionError = aiData.error,
+                candidates = aiData.candidates
+            )
         }.catch { error ->
             emit(HomeUiState(isLoading = false, errorMessage = error.message ?: "An unexpected error occurred"))
         }.stateIn(
@@ -47,10 +91,58 @@ class HomeViewModel(
         MutableStateFlow(HomeUiState(isLoading = false))
     }
 
+    fun extractTransactionsFromText(input: String, defaultCurrency: String = "UZS") {
+        val aiRepo = aiRepository ?: return
+        if (input.trim().isBlank()) return
+
+        viewModelScope.launch {
+            _isAiExtracting.value = true
+            _aiExtractionError.value = null
+            _extractedCandidates.value = emptyList()
+
+            val result = aiRepo.extractTransactions(input, defaultCurrency)
+            _isAiExtracting.value = false
+
+            when (result) {
+                is AiResult.Success -> {
+                    _extractedCandidates.value = result.data
+                }
+                is AiResult.Failure -> {
+                    val msg = when (result.error) {
+                        is AiError.MissingApiKey -> "Please configure your Gemini API key in Settings."
+                        is AiError.InvalidApiKey -> "Invalid API key. Please check your key in Settings."
+                        is AiError.RateLimitExceeded -> "Gemini API rate limit exceeded. Please wait a moment."
+                        is AiError.NetworkError -> "Network connection failed. Please check internet access."
+                        is AiError.MalformedResponse -> "Failed to parse transaction data from AI response."
+                        is AiError.ServerError -> "Gemini server error (${result.error.statusCode})."
+                        is AiError.ExecutionError -> result.error.message
+                    }
+                    _aiExtractionError.value = msg
+                }
+            }
+        }
+    }
+
+    fun clearExtractedCandidates() {
+        _extractedCandidates.value = emptyList()
+        _aiExtractionError.value = null
+    }
+
+    fun consumeCandidate(candidate: TransactionCandidate) {
+        _extractedCandidates.value = _extractedCandidates.value.filterNot {
+            it === candidate || (it.suggestedTitle == candidate.suggestedTitle && it.rawText == candidate.rawText && it.amount == candidate.amount)
+        }
+    }
+
     private fun mapToUiState(
         currencySummaries: List<CurrencySummary>,
         accountSummaries: List<AccountBalanceSummary>,
-        recentTransactions: List<RecentTransactionDetail>
+        recentTransactions: List<RecentTransactionDetail>,
+        isAiEnabled: Boolean,
+        isAiConfigured: Boolean,
+        isExtracting: Boolean,
+        extractionError: String?,
+        candidates: List<TransactionCandidate>
     ): HomeUiState {
         val currencyUiModels = currencySummaries.map { cs ->
             val isNetPos = cs.monthlyNet.amountInMinorUnits > 0L
@@ -166,7 +258,12 @@ class HomeViewModel(
             accounts = accountUiModels,
             recentTransactions = recentTxUiModels,
             currentMonthName = DateTimeFormatterHelper.formatCurrentMonthLabel(),
-            errorMessage = null
+            errorMessage = null,
+            isAiFeatureEnabled = isAiEnabled,
+            isAiConfigured = isAiConfigured,
+            isAiExtracting = isExtracting,
+            aiExtractionError = extractionError,
+            extractedCandidates = candidates
         )
     }
 }

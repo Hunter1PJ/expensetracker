@@ -15,12 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.suguru.expensetracker.ExpenseTrackerApplication
-import com.suguru.expensetracker.MainActivity
-import com.suguru.expensetracker.domain.model.ProEntitlement
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
-import com.suguru.expensetracker.widget.common.WidgetFeature
-import com.suguru.expensetracker.widget.common.WidgetGateResult
 
 class QuickAddWidgetConfigureActivity : ComponentActivity() {
 
@@ -45,115 +40,25 @@ class QuickAddWidgetConfigureActivity : ComponentActivity() {
             return
         }
 
-        val appContainer = (application as ExpenseTrackerApplication).appContainer
-
         setContent {
-            val observeProEntitlementUseCase = appContainer.observeProEntitlementUseCase
-            val widgetEntitlementPolicy = appContainer.widgetEntitlementPolicy
-
-            val entitlement by observeProEntitlementUseCase().collectAsState(initial = ProEntitlement.Checking)
-            var isBlockedByEntitlement by remember { mutableStateOf(false) }
-
-            LaunchedEffect(entitlement) {
-                if (entitlement !is ProEntitlement.Checking) {
-                    val checkResult = widgetEntitlementPolicy.checkEntitlement(
-                        feature = WidgetFeature.QUICK_ADD,
-                        currentProEntitlement = entitlement,
-                        currentConfiguredCount = 0
-                    )
-                    isBlockedByEntitlement = checkResult is WidgetGateResult.ProRequired
-                }
-            }
-
             ExpenseTrackerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (entitlement is ProEntitlement.Checking) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
+                    ConfigurationScreen(
+                        onConfirm = {
+                            val resultValue = Intent().apply {
+                                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                            }
+                            setResult(RESULT_OK, resultValue)
+                            finish()
+                        },
+                        onCancel = {
+                            finish()
                         }
-                    } else if (isBlockedByEntitlement) {
-                        ProBlockScreen(
-                            onViewPro = {
-                                val intent = Intent(this@QuickAddWidgetConfigureActivity, MainActivity::class.java).apply {
-                                    action = "com.suguru.expensetracker.action.NAVIGATE"
-                                    putExtra("destination", "pro")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                }
-                                startActivity(intent)
-                                // Do NOT finish here so that if the user purchases and presses back, they return to this activity and unlock!
-                            },
-                            onCancel = {
-                                finish()
-                            }
-                        )
-                    } else {
-                        ConfigurationScreen(
-                            onConfirm = {
-                                val resultValue = Intent().apply {
-                                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                                }
-                                setResult(RESULT_OK, resultValue)
-                                finish()
-                            },
-                            onCancel = {
-                                finish()
-                            }
-                        )
-                    }
+                    )
                 }
-            }
-        }
-    }
-
-    @Composable
-    private fun ProBlockScreen(
-        onViewPro: () -> Unit,
-        onCancel: () -> Unit
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .testTag("pro_block_screen"),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Quick Add Widget",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "ExpenseTracker Pro unlocks Quick Add widgets for faster transaction entry.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-            Button(
-                onClick = onViewPro,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("view_pro_button")
-            ) {
-                Text("View Pro")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("cancel_button")
-            ) {
-                Text("Cancel")
             }
         }
     }
