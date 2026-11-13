@@ -25,7 +25,14 @@ enum class ParseWarning {
     UNSUPPORTED_CURRENCY,
     INVALID_AMOUNT,
     MULTIPLE_AMOUNTS_DETECTED,
-    UNPARSED_LINE
+    UNPARSED_LINE,
+    AI_FALLBACK,
+    INVALID_API_KEY
+}
+
+enum class CandidateSource {
+    GEMINI_AI,
+    OFFLINE_PARSER
 }
 
 /**
@@ -45,7 +52,8 @@ data class TransactionCandidate(
     val confidence: ParseConfidence,
     val warnings: List<ParseWarning> = emptyList(),
     val isUnitPriceInterpretation: Boolean = false,
-    val parseError: String? = null
+    val parseError: String? = null,
+    val source: CandidateSource = CandidateSource.OFFLINE_PARSER
 )
 
 /**

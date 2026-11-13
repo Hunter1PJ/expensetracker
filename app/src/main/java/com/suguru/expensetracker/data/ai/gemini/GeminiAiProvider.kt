@@ -3,6 +3,7 @@ package com.suguru.expensetracker.data.ai.gemini
 import com.suguru.expensetracker.data.security.SecureKeyStorage
 import com.suguru.expensetracker.domain.ai.AiConfiguration
 import com.suguru.expensetracker.domain.ai.AiError
+import com.suguru.expensetracker.domain.ai.AiModelDefaults
 import com.suguru.expensetracker.domain.ai.AiProvider
 import com.suguru.expensetracker.domain.ai.AiResult
 import com.suguru.expensetracker.domain.ai.ExtractedFinancialPayload
@@ -31,7 +32,7 @@ class GeminiAiProvider(
         val request = GeminiRequestFactory.createValidationRequest()
         val result = apiClient.generateContent(
             apiKey = trimmed,
-            model = "gemini-2.5-flash",
+            model = AiModelDefaults.GEMINI_MODEL_ID,
             requestBody = request
         )
 

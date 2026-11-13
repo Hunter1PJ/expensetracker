@@ -62,8 +62,8 @@ object GeminiResponseParser {
             }
 
             AiResult.Success(ExtractedFinancialPayload(items = validatedItems))
-        } catch (e: Exception) {
-            AiResult.Failure(AiError.MalformedResponse("JSON validation failure: ${e.message}"))
+        } catch (_: Exception) {
+            AiResult.Failure(AiError.MalformedResponse("Gemini response did not match the expected format."))
         }
     }
 

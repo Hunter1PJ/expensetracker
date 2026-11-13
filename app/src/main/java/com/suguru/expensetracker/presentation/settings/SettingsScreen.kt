@@ -58,7 +58,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.model.AppSettings
 import com.suguru.expensetracker.domain.model.DateFormatPreference
 import com.suguru.expensetracker.domain.model.ThemeMode
@@ -83,6 +85,9 @@ import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.AlertDialog
@@ -98,11 +103,23 @@ private enum class ActiveSettingsSheet {
     TIME_FORMAT
 }
 
+@StringRes
+internal fun settingsErrorMessageResource(error: AiError): Int = when (error) {
+    is AiError.InvalidApiKey -> R.string.ai_settings_error_invalid_key
+    is AiError.MissingApiKey -> R.string.ai_settings_error_missing_key
+    is AiError.RequestTimeout -> R.string.ai_settings_error_timeout
+    is AiError.NetworkError -> R.string.ai_settings_error_network
+    is AiError.RateLimitExceeded -> R.string.ai_settings_error_rate_limit
+    is AiError.ServerError -> R.string.ai_settings_error_server_http
+    is AiError.MalformedResponse -> R.string.ai_settings_error_malformed
+    is AiError.ExecutionError -> R.string.ai_settings_error_secure_storage
+    is AiError.NoTransactionsFound -> R.string.ai_settings_error_generic
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onNavigateToAccounts: () -> Unit,
     onNavigateToCategories: () -> Unit,
     onNavigateToRecurring: () -> Unit,
     onNavigateToDataAndStorage: () -> Unit,
@@ -111,9 +128,24 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var activeSheet by remember { mutableStateOf<ActiveSettingsSheet?>(null) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var apiKeyInput by remember { mutableStateOf("") }
+    val apiKeySavedMessage = stringResource(R.string.ai_settings_key_saved)
+    val apiKeyVerifiedMessage = stringResource(R.string.ai_settings_key_verified)
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                SettingsEvent.ApiKeySaved -> snackbarHostState.showSnackbar(apiKeySavedMessage)
+                SettingsEvent.ApiKeyVerified -> {
+                    showApiKeyDialog = false
+                    snackbarHostState.showSnackbar(apiKeyVerifiedMessage)
+                }
+            }
+        }
+    }
 
     Box(
         modifier = modifier
@@ -197,15 +229,6 @@ fun SettingsScreen(
 
                         SettingsGroupCard {
                             SettingsRow(
-                                title = stringResource(R.string.title_account_management),
-                                subtitle = stringResource(R.string.settings_accounts_desc),
-                                icon = Icons.Default.AccountBalanceWallet,
-                                iconTint = MaterialTheme.colorScheme.primary,
-                                onClick = onNavigateToAccounts,
-                                testTag = "settings_item_accounts"
-                            )
-                            SettingsDivider()
-                            SettingsRow(
                                 title = stringResource(R.string.title_category_management),
                                 subtitle = stringResource(R.string.settings_categories_desc),
                                 icon = Icons.Default.Category,
@@ -274,7 +297,15 @@ fun SettingsScreen(
                                         is KeyVerificationState.Idle -> stringResource(R.string.key_status_unverified)
                                         is KeyVerificationState.Verifying -> stringResource(R.string.key_status_verifying)
                                         is KeyVerificationState.Valid -> stringResource(R.string.key_status_verified)
-                                        is KeyVerificationState.Invalid -> kvs.message
+                                        is KeyVerificationState.Invalid -> {
+                                            val error = kvs.error
+                                            val messageResource = settingsErrorMessageResource(error)
+                                            if (error is AiError.ServerError) {
+                                                stringResource(messageResource, error.statusCode)
+                                            } else {
+                                                stringResource(messageResource)
+                                            }
+                                        }
                                     }
                                     "${state.maskedApiKey ?: "••••••••"} • $statusNote"
                                 } else {
@@ -780,7 +811,12 @@ fun SettingsScreen(
 
                     if (showApiKeyDialog) {
                         AlertDialog(
-                            onDismissRequest = { showApiKeyDialog = false },
+                            onDismissRequest = {
+                                if (state.keyVerificationState is KeyVerificationState.Verifying) {
+                                    viewModel.cancelVerification()
+                                }
+                                showApiKeyDialog = false
+                            },
                             title = {
                                 Text(
                                     text = stringResource(R.string.dialog_api_key_title),
@@ -818,6 +854,7 @@ fun SettingsScreen(
                                                 onClick = {
                                                     viewModel.verifySavedGeminiApiKey()
                                                 },
+                                                enabled = state.keyVerificationState !is KeyVerificationState.Verifying,
                                                 modifier = Modifier.testTag("verify_api_key_button")
                                             ) {
                                                 Text(stringResource(R.string.action_test_key))
@@ -863,11 +900,59 @@ fun SettingsScreen(
                             }
                         )
                     }
+
+                    if (showApiKeyDialog && state.keyVerificationState is KeyVerificationState.Verifying) {
+                        AlertDialog(
+                            onDismissRequest = { viewModel.cancelVerification() },
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.dialog_verify_key_title),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            text = {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .testTag("verify_api_key_progress"),
+                                        strokeWidth = 3.dp
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.dialog_verify_key_description),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = { viewModel.cancelVerification() },
+                                    modifier = Modifier.testTag("cancel_verify_api_key_button")
+                                ) {
+                                    Text(stringResource(R.string.action_cancel))
+                                }
+                            },
+                            modifier = Modifier.testTag("verify_api_key_progress_dialog")
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxl))
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .testTag("settings_snackbar_host")
+        )
     }
 }
 

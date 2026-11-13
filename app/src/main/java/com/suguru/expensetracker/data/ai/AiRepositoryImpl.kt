@@ -16,21 +16,28 @@ import com.suguru.expensetracker.domain.model.Money
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.parser.ParseConfidence
 import com.suguru.expensetracker.domain.parser.ParseWarning
+import com.suguru.expensetracker.domain.parser.DeterministicTransactionParser
+import com.suguru.expensetracker.domain.parser.TransactionInputParser
 import com.suguru.expensetracker.domain.parser.TransactionCandidate
 import com.suguru.expensetracker.domain.util.MoneyParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CancellationException
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.time.LocalDate
 
 class AiRepositoryImpl(
     private val aiProvider: AiProvider,
     private val secureKeyStorage: SecureKeyStorage,
     private val dataStore: DataStore<Preferences>,
-    private val todayProvider: () -> LocalDate = { LocalDate.now() }
+    private val todayProvider: () -> LocalDate = { LocalDate.now() },
+    private val offlineParser: TransactionInputParser = DeterministicTransactionParser(),
+    private val isOnline: () -> Boolean = { true }
 ) : AiRepository {
 
     private object PreferencesKeys {
@@ -68,7 +75,11 @@ class AiRepositoryImpl(
         if (trimmed.isEmpty()) {
             return AiResult.Failure(AiError.MissingApiKey)
         }
-        secureKeyStorage.saveKey(trimmed)
+        try {
+            secureKeyStorage.saveKey(trimmed)
+        } catch (_: Exception) {
+            return AiResult.Failure(AiError.ExecutionError("Secure key storage is unavailable."))
+        }
         _isConfiguredFlow.value = secureKeyStorage.hasKey()
         return AiResult.Success(Unit)
     }
@@ -105,22 +116,87 @@ class AiRepositoryImpl(
             return AiResult.Success(emptyList())
         }
 
-        if (!secureKeyStorage.hasKey() || secureKeyStorage.getKey().isNullOrBlank()) {
-            return AiResult.Failure(AiError.MissingApiKey)
+        val aiEnabled = try {
+            dataStore.data.first()[PreferencesKeys.AI_FEATURE_ENABLED] ?: true
+        } catch (_: IOException) {
+            true
+        }
+
+        if (!aiEnabled || !secureKeyStorage.hasKey() || secureKeyStorage.getKey().isNullOrBlank() || !runCatching(isOnline).getOrDefault(false)) {
+            return parseOffline(trimmedInput, defaultCurrency)
         }
 
         val config = AiConfiguration(defaultCurrency = defaultCurrency)
-        val providerResult = aiProvider.extractFinancialTransactions(trimmedInput, config)
+        val providerResult = try {
+            aiProvider.extractFinancialTransactions(trimmedInput, config)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: SocketTimeoutException) {
+            AiResult.Failure(AiError.RequestTimeout)
+        } catch (_: IOException) {
+            AiResult.Failure(AiError.NetworkError("Network request failed."))
+        } catch (_: Exception) {
+            AiResult.Failure(AiError.ExecutionError("Transaction extraction failed."))
+        }
 
         return when (providerResult) {
             is AiResult.Success -> {
-                val candidates = providerResult.data.items.map { item ->
-                    mapToTransactionCandidate(item, defaultCurrency)
+                if (providerResult.data.items.isEmpty()) {
+                    parseOffline(trimmedInput, defaultCurrency, ParseWarning.AI_FALLBACK)
+                } else {
+                    val candidates = providerResult.data.items.map { item ->
+                        mapToTransactionCandidate(item, defaultCurrency)
+                    }
+                    AiResult.Success(candidates)
                 }
-                AiResult.Success(candidates)
             }
-            is AiResult.Failure -> providerResult
+            is AiResult.Failure -> {
+                val warning = if (providerResult.error is AiError.InvalidApiKey) {
+                    ParseWarning.INVALID_API_KEY
+                } else {
+                    ParseWarning.AI_FALLBACK
+                }
+                when (val offlineResult = parseOffline(trimmedInput, defaultCurrency, warning)) {
+                    is AiResult.Success -> offlineResult
+                    is AiResult.Failure -> if (providerResult.error is AiError.InvalidApiKey) {
+                        providerResult
+                    } else {
+                        offlineResult
+                    }
+                }
+            }
         }
+    }
+
+    private suspend fun parseOffline(
+        input: String,
+        defaultCurrency: String,
+        fallbackWarning: ParseWarning? = null
+    ): AiResult<List<TransactionCandidate>> {
+        val parsed = try {
+            offlineParser.parse(input, defaultCurrency)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return AiResult.Failure(AiError.NoTransactionsFound)
+        }
+        val meaningfulCandidates = parsed.filter { candidate ->
+            candidate.amount != null ||
+                candidate.suggestedCategoryName != null ||
+                candidate.suggestedAccountName != null ||
+                !candidate.warnings.contains(ParseWarning.AMBIGUOUS_TYPE)
+        }
+        if (meaningfulCandidates.isEmpty()) {
+            return AiResult.Failure(AiError.NoTransactionsFound)
+        }
+        val candidates = if (fallbackWarning == null) {
+            meaningfulCandidates
+        } else {
+            meaningfulCandidates.map { candidate ->
+                candidate.copy(warnings = (candidate.warnings + fallbackWarning).distinct())
+            }
+        }
+        return AiResult.Success(candidates)
     }
 
     /**
@@ -213,7 +289,8 @@ class AiRepositoryImpl(
             confidence = confidence,
             warnings = warnings,
             isUnitPriceInterpretation = isUnitPrice,
-            parseError = null
+            parseError = null,
+            source = com.suguru.expensetracker.domain.parser.CandidateSource.GEMINI_AI
         )
     }
 

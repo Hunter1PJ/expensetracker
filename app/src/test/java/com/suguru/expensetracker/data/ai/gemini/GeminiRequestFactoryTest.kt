@@ -1,6 +1,7 @@
 package com.suguru.expensetracker.data.ai.gemini
 
 import com.suguru.expensetracker.domain.ai.AiConfiguration
+import com.suguru.expensetracker.domain.ai.AiModelDefaults
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -11,7 +12,7 @@ class GeminiRequestFactoryTest {
     @Test
     fun createExtractionRequest_buildsStrictSchemaAndSystemInstruction() {
         val config = AiConfiguration(
-            modelIdentifier = "gemini-2.5-flash",
+            modelIdentifier = AiModelDefaults.GEMINI_MODEL_ID,
             temperature = 0.1f,
             defaultCurrency = "UZS"
         )

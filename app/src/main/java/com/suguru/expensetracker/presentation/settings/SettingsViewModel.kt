@@ -16,7 +16,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 sealed interface SettingsUiState {
@@ -37,7 +43,12 @@ sealed interface KeyVerificationState {
     object Idle : KeyVerificationState
     object Verifying : KeyVerificationState
     object Valid : KeyVerificationState
-    data class Invalid(val message: String) : KeyVerificationState
+    data class Invalid(val error: AiError) : KeyVerificationState
+}
+
+sealed interface SettingsEvent {
+    object ApiKeySaved : SettingsEvent
+    object ApiKeyVerified : SettingsEvent
 }
 
 class SettingsViewModel(
@@ -47,6 +58,10 @@ class SettingsViewModel(
 
     private val _keyVerificationState = MutableStateFlow<KeyVerificationState>(KeyVerificationState.Idle)
     private val _maskedKeyFlow = MutableStateFlow<String?>(null)
+    private val _events = Channel<SettingsEvent>(Channel.BUFFERED)
+    private var verificationJob: Job? = null
+
+    val events = _events.receiveAsFlow()
 
     init {
         loadMaskedKey()
@@ -144,38 +159,65 @@ class SettingsViewModel(
     }
 
     fun saveGeminiApiKey(apiKey: String) {
+        if (apiKey.trim().isBlank()) return
+        cancelVerification()
         viewModelScope.launch {
-            if (apiKey.trim().isBlank()) return@launch
-            aiRepository?.saveApiKey(apiKey.trim())
-            _maskedKeyFlow.value = aiRepository?.getMaskedApiKey()
-            _keyVerificationState.value = KeyVerificationState.Idle
+            when (val result = aiRepository?.saveApiKey(apiKey.trim())) {
+                is AiResult.Success -> {
+                    _maskedKeyFlow.value = aiRepository.getMaskedApiKey()
+                    _keyVerificationState.value = KeyVerificationState.Idle
+                    _events.send(SettingsEvent.ApiKeySaved)
+                }
+                is AiResult.Failure -> _keyVerificationState.value = KeyVerificationState.Invalid(result.error)
+                null -> Unit
+            }
         }
     }
 
     fun verifySavedGeminiApiKey() {
         val aiRepo = aiRepository ?: return
-        viewModelScope.launch {
-            _keyVerificationState.value = KeyVerificationState.Verifying
-            val result = aiRepo.validateConfiguredKey()
-            when (result) {
-                is AiResult.Success -> {
-                    _keyVerificationState.value = KeyVerificationState.Valid
-                }
-                is AiResult.Failure -> {
-                    val msg = when (result.error) {
-                        is AiError.InvalidApiKey -> "Invalid API key or unauthorized."
-                        is AiError.RateLimitExceeded -> "Quota exceeded (Rate limit)."
-                        is AiError.NetworkError -> "Network connection failed."
-                        is AiError.MissingApiKey -> "No API key configured."
-                        else -> "Verification failed."
+        if (_keyVerificationState.value is KeyVerificationState.Verifying || verificationJob?.isActive == true) return
+
+        _keyVerificationState.value = KeyVerificationState.Verifying
+        verificationJob = viewModelScope.launch {
+            val currentJob = coroutineContext[Job]
+            try {
+                val result = aiRepo.validateConfiguredKey()
+                currentCoroutineContext().ensureActive()
+                when (result) {
+                    is AiResult.Success -> {
+                        _keyVerificationState.value = KeyVerificationState.Valid
+                        _events.send(SettingsEvent.ApiKeyVerified)
                     }
-                    _keyVerificationState.value = KeyVerificationState.Invalid(msg)
+                    is AiResult.Failure -> _keyVerificationState.value = KeyVerificationState.Invalid(result.error)
+                }
+            } catch (cancelled: CancellationException) {
+                if (verificationJob === currentJob) {
+                    _keyVerificationState.value = KeyVerificationState.Idle
+                }
+                throw cancelled
+            } finally {
+                if (verificationJob === currentJob) {
+                    verificationJob = null
+                    if (_keyVerificationState.value is KeyVerificationState.Verifying) {
+                        _keyVerificationState.value = KeyVerificationState.Idle
+                    }
                 }
             }
         }
     }
 
+    fun cancelVerification() {
+        val job = verificationJob
+        verificationJob = null
+        if (_keyVerificationState.value is KeyVerificationState.Verifying) {
+            _keyVerificationState.value = KeyVerificationState.Idle
+        }
+        job?.cancel()
+    }
+
     fun deleteGeminiApiKey() {
+        cancelVerification()
         viewModelScope.launch {
             aiRepository?.deleteApiKey()
             _maskedKeyFlow.value = null

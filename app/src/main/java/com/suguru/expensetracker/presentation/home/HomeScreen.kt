@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.common.FinanceVisuals
@@ -91,8 +92,6 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToAddTransaction: () -> Unit = {},
     onNavigateToAddTransactionWithCandidate: (com.suguru.expensetracker.domain.parser.TransactionCandidate) -> Unit = {},
-    onNavigateToAccounts: () -> Unit = {},
-    onNavigateToAddAccount: () -> Unit = {},
     onNavigateToTransactions: () -> Unit = {},
     onNavigateToTransactionDetail: (Long) -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
@@ -103,8 +102,6 @@ fun HomeScreen(
         uiState = uiState,
         onNavigateToAddTransaction = onNavigateToAddTransaction,
         onNavigateToAddTransactionWithCandidate = onNavigateToAddTransactionWithCandidate,
-        onNavigateToAccounts = onNavigateToAccounts,
-        onNavigateToAddAccount = onNavigateToAddAccount,
         onNavigateToTransactions = onNavigateToTransactions,
         onNavigateToTransactionDetail = onNavigateToTransactionDetail,
         onNavigateToSettings = onNavigateToSettings,
@@ -120,8 +117,6 @@ fun HomeScreenContent(
     modifier: Modifier = Modifier,
     onNavigateToAddTransaction: () -> Unit = {},
     onNavigateToAddTransactionWithCandidate: (com.suguru.expensetracker.domain.parser.TransactionCandidate) -> Unit = {},
-    onNavigateToAccounts: () -> Unit = {},
-    onNavigateToAddAccount: () -> Unit = {},
     onNavigateToTransactions: () -> Unit = {},
     onNavigateToTransactionDetail: (Long) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -134,45 +129,6 @@ fun HomeScreenContent(
             modifier = modifier.fillMaxSize(),
             testTag = "home_loading_state"
         )
-        return
-    }
-
-    if (!uiState.hasAccounts) {
-        // Empty State: No accounts created yet
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(
-                    horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                    vertical = ExpenseTrackerSpacing.screenVertical
-                )
-                .testTag("home_empty_state"),
-            contentAlignment = Alignment.Center
-        ) {
-            BackgroundGlowDecoration(
-                glowColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
-                alpha = 0.16f
-            )
-
-            Column(
-                modifier = Modifier.widthIn(max = 540.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
-            ) {
-                EmptyState(
-                    title = stringResource(R.string.home_empty_title),
-                    description = stringResource(R.string.home_empty_desc),
-                    icon = Icons.Outlined.AccountBalanceWallet,
-                    testTag = "home_no_accounts_empty_state"
-                )
-                PrimaryButton(
-                    text = stringResource(R.string.home_action_create_account),
-                    onClick = onNavigateToAddAccount,
-                    testTag = "home_create_first_account_button"
-                )
-            }
-        }
         return
     }
 
@@ -242,10 +198,10 @@ fun HomeScreenContent(
             }
 
             // --- 2.5 AI ASSISTANT ENTRY SECTION ---
-            if (uiState.isAiFeatureEnabled) {
-                item {
-                    HomeAiSection(
+            item {
+                HomeAiSection(
                         isConfigured = uiState.isAiConfigured,
+                        isAiEnabled = uiState.isAiFeatureEnabled,
                         isExtracting = uiState.isAiExtracting,
                         extractionError = uiState.aiExtractionError,
                         candidates = uiState.extractedCandidates,
@@ -257,8 +213,7 @@ fun HomeScreenContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 540.dp)
-                    )
-                }
+                )
             }
 
             // --- 3. THIS MONTH SECTION ---
@@ -274,18 +229,7 @@ fun HomeScreenContent(
                 }
             }
 
-            // --- 4. ACCOUNTS SECTION ---
-            item {
-                HomeAccountsSection(
-                    accounts = uiState.accounts,
-                    onManageAccounts = onNavigateToAccounts,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                )
-            }
-
-            // --- 5. RECENT ACTIVITY SECTION ---
+            // --- 4. RECENT ACTIVITY SECTION ---
             item {
                 HomeRecentActivitySection(
                     transactions = uiState.recentTransactions,
@@ -568,180 +512,6 @@ private fun HomeMonthlyOverviewSection(
 }
 
 /**
- * Accounts Section: Header with "See all" action and horizontally scrollable account cards.
- */
-@Composable
-private fun HomeAccountsSection(
-    accounts: List<AccountSummaryUiModel>,
-    onManageAccounts: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.testTag("accounts_section"),
-        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = stringResource(R.string.home_accounts),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-
-            TextButton(
-                onClick = onManageAccounts,
-                modifier = Modifier.testTag("manage_accounts_button")
-            ) {
-                Text(
-                    text = stringResource(R.string.home_action_see_all),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
-            contentPadding = PaddingValues(horizontal = 2.dp)
-        ) {
-            items(
-                items = accounts,
-                key = { it.id }
-            ) { account ->
-                AccountHorizontalCard(
-                    account = account,
-                    onClick = onManageAccounts
-                )
-            }
-        }
-    }
-}
-
-/**
- * Account Horizontal Card: Uses real account data with subtle radial glow tint from the account's color.
- */
-@Composable
-private fun AccountHorizontalCard(
-    account: AccountSummaryUiModel,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val accentColor = FinanceVisuals.parseColorHex(account.colorHex)
-    val icon = FinanceVisuals.getAccountIcon(account.iconName)
-
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .width(210.dp)
-            .testTag("home_account_card_${account.id}"),
-        shape = ExpenseTrackerRadius.cardInteractive,
-        colors = CardDefaults.cardColors(
-            containerColor = ExpenseTrackerTheme.extendedColors.surface
-        ),
-        border = BorderStroke(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 2.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .drawBehind {
-                    // Subtle corner tint from account color
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                accentColor.copy(alpha = 0.14f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width * 0.85f, 0f),
-                            radius = size.width * 0.7f
-                        ),
-                        center = Offset(size.width * 0.85f, 0f),
-                        radius = size.width * 0.7f
-                    )
-                }
-                .padding(ExpenseTrackerSpacing.lg)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-            ) {
-                // Top row: IconAvatar + Account Name
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                ) {
-                    IconAvatar(
-                        icon = icon,
-                        contentDescription = account.name,
-                        tint = accentColor,
-                        backgroundColor = accentColor.copy(alpha = 0.16f),
-                        borderColor = accentColor.copy(alpha = 0.35f),
-                        size = 34.dp,
-                        shapeType = AvatarShape.ROUNDED_SQUARE
-                    )
-
-                    Text(
-                        text = account.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // Balance
-                Text(
-                    text = account.balanceFormatted,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Bottom row: Type label + Currency badge
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = account.typeName.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.8.sp,
-                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                    )
-
-                    Surface(
-                        shape = ExpenseTrackerRadius.chipPill,
-                        color = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
-                        border = BorderStroke(0.5.dp, ExpenseTrackerTheme.extendedColors.borderSubtle)
-                    ) {
-                        Text(
-                            text = account.currencyCode,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = ExpenseTrackerTheme.extendedColors.accentViolet,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
  * Recent Activity Section: Header with "See all", List of FinancialListRow items or empty state.
  */
 @Composable
@@ -893,8 +663,9 @@ private fun HomeRecentActivitySection(
 @Composable
 private fun HomeAiSection(
     isConfigured: Boolean,
+    isAiEnabled: Boolean,
     isExtracting: Boolean,
-    extractionError: String?,
+    extractionError: AiError?,
     candidates: List<com.suguru.expensetracker.domain.parser.TransactionCandidate>,
     onConfigureInSettings: () -> Unit,
     onExtract: (String) -> Unit,
@@ -909,7 +680,7 @@ private fun HomeAiSection(
         modifier = modifier.testTag("home_ai_assistant_card"),
         shape = ExpenseTrackerRadius.card,
         containerColor = ExpenseTrackerTheme.extendedColors.surface,
-        borderColor = if (isConfigured) ExpenseTrackerTheme.extendedColors.accentViolet.copy(alpha = 0.4f) else ExpenseTrackerTheme.extendedColors.borderSubtle,
+        borderColor = if (isConfigured && isAiEnabled) ExpenseTrackerTheme.extendedColors.accentViolet.copy(alpha = 0.4f) else ExpenseTrackerTheme.extendedColors.borderSubtle,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
     ) {
         Column(
@@ -950,17 +721,16 @@ private fun HomeAiSection(
                     }
                 ) {
                     Text(
-                        text = if (isConfigured) "BYOK Ready" else "Key Required",
+                        text = if (isConfigured && isAiEnabled) "Gemini AI" else stringResource(R.string.candidate_source_offline),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isConfigured) ExpenseTrackerTheme.extendedColors.financialPositive else ExpenseTrackerTheme.extendedColors.textSecondary,
+                        color = if (isConfigured && isAiEnabled) ExpenseTrackerTheme.extendedColors.financialPositive else ExpenseTrackerTheme.extendedColors.textSecondary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
             }
 
-            if (!isConfigured) {
-                // Unconfigured State
+            if (!isConfigured || !isAiEnabled) {
                 Text(
                     text = stringResource(R.string.home_ai_unconfigured_desc),
                     style = MaterialTheme.typography.bodySmall,
@@ -973,9 +743,9 @@ private fun HomeAiSection(
                     testTag = "home_ai_configure_button",
                     modifier = Modifier.fillMaxWidth()
                 )
-            } else {
-                // Configured State
-                androidx.compose.material3.OutlinedTextField(
+            }
+
+            androidx.compose.material3.OutlinedTextField(
                     value = aiInputText,
                     onValueChange = { aiInputText = it },
                     placeholder = {
@@ -992,18 +762,30 @@ private fun HomeAiSection(
                     enabled = !isExtracting
                 )
 
-                if (extractionError != null) {
+            if (extractionError != null) {
                     Text(
-                        text = extractionError,
+                        text = stringResource(
+                            when (extractionError) {
+                                is AiError.MissingApiKey -> R.string.ai_error_missing_key
+                                is AiError.InvalidApiKey -> R.string.ai_error_invalid_key
+                                is AiError.RequestTimeout -> R.string.ai_error_timeout
+                                is AiError.NoTransactionsFound -> R.string.ai_error_no_transactions
+                                is AiError.NetworkError -> R.string.ai_error_network
+                                is AiError.RateLimitExceeded -> R.string.ai_error_rate_limit
+                                is AiError.ServerError -> R.string.ai_error_server
+                                is AiError.MalformedResponse -> R.string.ai_error_malformed
+                                is AiError.ExecutionError -> R.string.ai_error_generic
+                            }
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.financialDanger
                     )
-                }
+            }
 
-                Row(
+            Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                ) {
+            ) {
                     PrimaryButton(
                         text = if (isExtracting) "Extracting…" else stringResource(R.string.home_ai_extract_action),
                         onClick = {
@@ -1027,10 +809,10 @@ private fun HomeAiSection(
                             Text("Dismiss")
                         }
                     }
-                }
+            }
 
                 // Parsed Suggestions Preview (Preview -> Edit -> Confirm -> Save)
-                if (candidates.isNotEmpty()) {
+            if (candidates.isNotEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
@@ -1079,10 +861,34 @@ private fun HomeAiSection(
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
+                                            text = stringResource(
+                                                if (candidate.source == com.suguru.expensetracker.domain.parser.CandidateSource.GEMINI_AI) {
+                                                    R.string.candidate_source_gemini
+                                                } else {
+                                                    R.string.candidate_source_offline
+                                                }
+                                            ),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                        )
+                                        Text(
                                             text = "${candidate.transactionType.name} • $amountStr",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                                         )
+                                        if (candidate.warnings.contains(com.suguru.expensetracker.domain.parser.ParseWarning.INVALID_API_KEY)) {
+                                            Text(
+                                                text = stringResource(R.string.candidate_warning_invalid_key),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ExpenseTrackerTheme.extendedColors.financialWarning
+                                            )
+                                        } else if (candidate.warnings.contains(com.suguru.expensetracker.domain.parser.ParseWarning.AI_FALLBACK)) {
+                                            Text(
+                                                text = stringResource(R.string.candidate_warning_ai_fallback),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ExpenseTrackerTheme.extendedColors.financialWarning
+                                            )
+                                        }
                                         if (candidate.suggestedCategoryName != null) {
                                             Text(
                                                 text = "Category: ${candidate.suggestedCategoryName}",
@@ -1105,7 +911,6 @@ private fun HomeAiSection(
             }
         }
     }
-}
 
 @Preview(showBackground = true)
 @Composable

@@ -16,7 +16,8 @@ import java.time.Instant
 @Entity(
     tableName = "accounts",
     indices = [
-        Index(value = ["is_archived"])
+        Index(value = ["is_archived"]),
+        Index(value = ["internal_key"], unique = true)
     ]
 )
 data class AccountEntity(
@@ -35,5 +36,7 @@ data class AccountEntity(
     @ColumnInfo(name = "is_archived")
     val isArchived: Boolean,
     @ColumnInfo(name = "created_at")
-    val createdAt: Instant
+    val createdAt: Instant,
+    @ColumnInfo(name = "internal_key")
+    val internalKey: String? = null
 )

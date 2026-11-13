@@ -272,60 +272,6 @@ fun AddEditRecurringTransactionScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
                             SectionHeader(title = "Account & Categorization")
 
-                            // Account selector
-                            var accountExpanded by remember { mutableStateOf(false) }
-                            ExposedDropdownMenuBox(
-                                expanded = accountExpanded,
-                                onExpandedChange = { accountExpanded = !accountExpanded },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                val selectedAccount = uiState.availableAccounts.find { it.id == uiState.selectedAccountId }
-                                OutlinedTextField(
-                                    value = selectedAccount?.name ?: "",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = {
-                                        Text(
-                                            stringResource(
-                                                if (uiState.type == TransactionType.TRANSFER) R.string.from_account_label else R.string.account_label
-                                            )
-                                        )
-                                    },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountExpanded) },
-                                    shape = ExpenseTrackerRadius.button,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                        unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle
-                                    ),
-                                    modifier = Modifier
-                                        .menuAnchor()
-                                        .fillMaxWidth()
-                                        .testTag("account_selector")
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = accountExpanded,
-                                    onDismissRequest = { accountExpanded = false },
-                                    modifier = Modifier.background(ExpenseTrackerTheme.extendedColors.surfaceElevated)
-                                ) {
-                                    uiState.availableAccounts.forEach { account ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    "${account.name} (${account.initialBalance.currencyCode})",
-                                                    color = MaterialTheme.colorScheme.onBackground
-                                                )
-                                            },
-                                            onClick = {
-                                                viewModel.onAccountSelected(account.id)
-                                                accountExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
                             // Destination Account selector for Transfer
                             if (uiState.type == TransactionType.TRANSFER) {
                                 var destExpanded by remember { mutableStateOf(false) }

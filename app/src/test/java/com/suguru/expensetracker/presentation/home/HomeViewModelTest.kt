@@ -207,6 +207,10 @@ class HomeViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(2, state.extractedCandidates.size)
+        assertEquals(
+            com.suguru.expensetracker.domain.parser.CandidateSource.OFFLINE_PARSER,
+            state.extractedCandidates.first().source
+        )
 
         // Consume the first candidate after user confirms & saves it
         val firstCandidate = state.extractedCandidates.first()

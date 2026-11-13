@@ -2,9 +2,11 @@ package com.suguru.expensetracker.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.suguru.expensetracker.domain.model.BackupRestoreOutcome
 import com.suguru.expensetracker.domain.model.ExpenseTrackerBackup
 import com.suguru.expensetracker.domain.repository.BackupRepository
 import com.suguru.expensetracker.domain.repository.SettingsRepository
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
 import com.suguru.expensetracker.domain.usecase.backup.CreateFullBackupUseCase
 import com.suguru.expensetracker.domain.usecase.backup.RestoreBackupUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.ExportTransactionsToCsvUseCase
@@ -40,7 +42,8 @@ class DataStorageViewModel(
     private val exportTransactionsToCsvUseCase: ExportTransactionsToCsvUseCase,
     private val backupRepository: BackupRepository,
     private val settingsRepository: SettingsRepository,
-    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null,
+    private val onPendingSettingsRecovery: suspend () -> InternalDefaultAccountProvisioningResult? = { null }
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DataStorageUiState())
@@ -201,24 +204,39 @@ class DataStorageViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = "Restoring from backup...") }
             val result = restoreBackupUseCase(backup)
-            if (result.isSuccess) {
-                widgetRefreshCoordinator?.refreshAll()
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        message = null,
-                        pendingRestoreBackup = null,
-                        successMessage = "Database restored successfully! All data has been updated."
-                    )
+            when {
+                result.isFailure -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            message = null,
+                            pendingRestoreBackup = null,
+                            error = "Restore failed: ${result.exceptionOrNull()?.localizedMessage ?: "Unknown database error"}"
+                        )
+                    }
                 }
-            } else {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        message = null,
-                        pendingRestoreBackup = null,
-                        error = "Restore failed: ${result.exceptionOrNull()?.localizedMessage ?: "Unknown database error"}"
-                    )
+                result.getOrNull() == BackupRestoreOutcome.SettingsRecoveryPending -> {
+                    widgetRefreshCoordinator?.refreshAll()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            message = null,
+                            pendingRestoreBackup = null,
+                            successMessage = "Database imported successfully. Settings recovery is running; app navigation remains blocked until it finishes."
+                        )
+                    }
+                    onPendingSettingsRecovery()
+                }
+                else -> {
+                    widgetRefreshCoordinator?.refreshAll()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            message = null,
+                            pendingRestoreBackup = null,
+                            successMessage = "Database restored successfully! All data has been updated."
+                        )
+                    }
                 }
             }
         }

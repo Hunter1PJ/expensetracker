@@ -15,6 +15,8 @@ sealed interface AiResult<out T> {
 sealed interface AiError {
     object MissingApiKey : AiError
     object InvalidApiKey : AiError
+    object RequestTimeout : AiError
+    object NoTransactionsFound : AiError
     data class NetworkError(val message: String) : AiError
     data class RateLimitExceeded(val retryAfterSeconds: Long? = null) : AiError
     data class ServerError(val statusCode: Int, val message: String) : AiError
@@ -22,11 +24,15 @@ sealed interface AiError {
     data class ExecutionError(val message: String) : AiError
 }
 
+object AiModelDefaults {
+    const val GEMINI_MODEL_ID = "gemini-3.5-flash-lite"
+}
+
 /**
  * Standard configuration options for AI extraction.
  */
 data class AiConfiguration(
-    val modelIdentifier: String = "gemini-2.5-flash",
+    val modelIdentifier: String = AiModelDefaults.GEMINI_MODEL_ID,
     val temperature: Float = 0.1f,
     val topP: Float = 0.95f,
     val maxOutputTokens: Int = 2048,

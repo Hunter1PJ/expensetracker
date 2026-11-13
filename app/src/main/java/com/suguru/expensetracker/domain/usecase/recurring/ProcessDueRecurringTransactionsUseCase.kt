@@ -1,5 +1,8 @@
 package com.suguru.expensetracker.domain.usecase.recurring
 
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
+import com.suguru.expensetracker.domain.error.DomainException
 import com.suguru.expensetracker.domain.model.RecurringTransaction
 import com.suguru.expensetracker.domain.model.Transaction
 import com.suguru.expensetracker.domain.model.TransactionType
@@ -20,12 +23,14 @@ class ProcessDueRecurringTransactionsUseCase(
     private val recurringOccurrenceRepository: RecurringOccurrenceRepository,
     private val accountRepository: AccountRepository,
     private val categoryRepository: CategoryRepository,
-    private val widgetRefreshCoordinator: () -> com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator? = { null }
+    private val widgetRefreshCoordinator: () -> com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator? = { null },
+    private val internalDefaultAccountProvisioner: InternalDefaultAccountProvisioner? = null
 ) {
     suspend operator fun invoke(
         asOfDate: LocalDate = LocalDate.now(),
         zoneId: ZoneId = ZoneId.systemDefault()
     ): Int {
+        ensureInternalDefaultAccountIsReady()
         val dueRules = recurringTransactionRepository.getRecurringTransactionsDue(asOfDate)
         var totalGeneratedCount = 0
 
@@ -100,6 +105,17 @@ class ProcessDueRecurringTransactionsUseCase(
         }
 
         return totalGeneratedCount
+    }
+
+    private suspend fun ensureInternalDefaultAccountIsReady() {
+        val result = internalDefaultAccountProvisioner?.ensureProvisioned() ?: return
+        when (result) {
+            is InternalDefaultAccountProvisioningResult.Ready -> Unit
+            is InternalDefaultAccountProvisioningResult.RequiresCurrencySelection -> {
+                throw DomainException.InvalidAccount("Internal default account requires a preferred currency selection before recurring transaction generation can continue.")
+            }
+            is InternalDefaultAccountProvisioningResult.Failure -> throw result.error
+        }
     }
 
     private suspend fun isRuleValidForExecution(rule: RecurringTransaction): Boolean {

@@ -1,8 +1,14 @@
 package com.suguru.expensetracker.data.repository
 
 import androidx.room.withTransaction
+import com.suguru.expensetracker.data.account.INTERNAL_DEFAULT_ACCOUNT_KEY
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabase
+import com.suguru.expensetracker.data.local.entity.PendingSettingsRecoveryEntity
 import com.suguru.expensetracker.domain.model.AccountType
+import com.suguru.expensetracker.domain.model.BackupRestoreOutcome
+import com.suguru.expensetracker.domain.model.BackupSettings
 import com.suguru.expensetracker.domain.model.BudgetPeriodType
 import com.suguru.expensetracker.domain.model.CategoryType
 import com.suguru.expensetracker.domain.model.ExpenseTrackerBackup
@@ -17,23 +23,29 @@ import com.suguru.expensetracker.domain.repository.SettingsRepository
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 
 class RoomBackupRepository(
     private val db: ExpenseTrackerDatabase,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val internalDefaultAccountProvisioner: InternalDefaultAccountProvisioner? = null,
+    private val onProvisioningResult: (InternalDefaultAccountProvisioningResult) -> Unit = {},
+    private val onSettingsRecoveryPending: () -> Unit = {}
 ) : BackupRepository {
 
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
     private val adapter = moshi.adapter(ExpenseTrackerBackup::class.java)
+    private val backupSettingsAdapter = moshi.adapter(BackupSettings::class.java)
+    private val recoveryMutex = Mutex()
 
-    override fun serializeBackup(backup: ExpenseTrackerBackup): String {
-        return adapter.toJson(backup)
-    }
+    override fun serializeBackup(backup: ExpenseTrackerBackup): String = adapter.toJson(backup)
 
     override fun deserializeBackup(json: String): Result<ExpenseTrackerBackup> {
         return try {
@@ -48,8 +60,72 @@ class RoomBackupRepository(
         }
     }
 
+    suspend fun hasPendingSettingsRecovery(): Boolean = db.pendingSettingsRecoveryDao().getPending() != null
+
+    suspend fun retryPendingSettingsRecovery(): Result<Unit> {
+        return try {
+            recoveryMutex.withLock {
+                restorePendingSettingsLocked()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun ensureProvisionedWithRecovery(): InternalDefaultAccountProvisioningResult? {
+        return try {
+            recoveryMutex.withLock {
+                val hadPendingSettings = db.pendingSettingsRecoveryDao().getPending() != null
+                if (hadPendingSettings) {
+                    onSettingsRecoveryPending()
+                    val recovery = restorePendingSettingsLocked()
+                    if (recovery.isFailure) {
+                        return@withLock InternalDefaultAccountProvisioningResult.Failure(
+                            recovery.exceptionOrNull() ?: IllegalStateException("Settings recovery failed.")
+                        )
+                    }
+                }
+
+                val provisioningResult = internalDefaultAccountProvisioner?.ensureProvisioned()
+                if (provisioningResult is InternalDefaultAccountProvisioningResult.Failure) {
+                    return@withLock provisioningResult
+                }
+
+                if (hadPendingSettings) {
+                    db.pendingSettingsRecoveryDao().clear()
+                }
+                provisioningResult?.let(onProvisioningResult)
+                provisioningResult
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            InternalDefaultAccountProvisioningResult.Failure(e)
+        }
+    }
+
+    private suspend fun restorePendingSettingsLocked(): Result<Unit> {
+        val pending = db.pendingSettingsRecoveryDao().getPending() ?: return Result.success(Unit)
+        val settings = try {
+            backupSettingsAdapter.fromJson(pending.settingsJson)?.toDomain()
+                ?: return Result.failure(IllegalStateException("Pending settings recovery payload is missing."))
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        return try {
+            settingsRepository.restoreSettings(settings)
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun createSnapshot(): ExpenseTrackerBackup {
-        // Read everything atomically from the DB
         val backupDao = db.backupDao()
         val accounts = backupDao.getAllAccounts()
         val categories = backupDao.getAllCategories()
@@ -57,15 +133,13 @@ class RoomBackupRepository(
         val budgets = backupDao.getAllBudgets()
         val recurringTransactions = backupDao.getAllRecurringTransactions()
         val recurringOccurrences = backupDao.getAllRecurringOccurrences()
-
-        // Read settings
         val settings = settingsRepository.settings.first()
 
         val backup = ExpenseTrackerBackup(
-            formatVersion = 1,
+            formatVersion = 2,
             appVersion = "1.0.0",
             createdAt = Instant.now().toString(),
-            databaseSchemaVersion = 2,
+            databaseSchemaVersion = 3,
             accounts = accounts.map { it.toBackup() },
             categories = categories.map { it.toBackup() },
             transactions = transactions.map { it.toBackup() },
@@ -76,90 +150,94 @@ class RoomBackupRepository(
             checksum = null
         )
 
-        // Generate checksum
-        val checksum = computeChecksum(backup)
-        return backup.copy(checksum = checksum)
+        return backup.copy(checksum = computeChecksum(backup))
     }
 
-    override suspend fun restoreSnapshot(backup: ExpenseTrackerBackup): Result<Unit> {
+    override suspend fun restoreSnapshot(backup: ExpenseTrackerBackup): Result<BackupRestoreOutcome> {
         val validationResult = validateBackup(backup)
         if (validationResult.isFailure) {
-            return validationResult
+            return validationResult.map { BackupRestoreOutcome.Complete }
         }
 
         return try {
-            db.withTransaction {
-                val backupDao = db.backupDao()
+            recoveryMutex.withLock {
+                db.withTransaction {
+                    val backupDao = db.backupDao()
 
-                // 1. Delete all tables in FK-safe child-to-parent order
-                db.compileStatement("DELETE FROM budgets").execute()
-                db.compileStatement("DELETE FROM recurring_occurrences").execute()
-                db.compileStatement("DELETE FROM transactions").execute()
-                db.compileStatement("DELETE FROM recurring_transactions").execute()
-                db.compileStatement("DELETE FROM categories").execute()
-                db.compileStatement("DELETE FROM accounts").execute()
+                    db.compileStatement("DELETE FROM budgets").execute()
+                    db.compileStatement("DELETE FROM recurring_occurrences").execute()
+                    db.compileStatement("DELETE FROM transactions").execute()
+                    db.compileStatement("DELETE FROM recurring_transactions").execute()
+                    db.compileStatement("DELETE FROM categories").execute()
+                    db.compileStatement("DELETE FROM accounts").execute()
+                    db.compileStatement(
+                        "DELETE FROM sqlite_sequence WHERE name IN ('budgets', 'recurring_occurrences', 'transactions', 'recurring_transactions', 'categories', 'accounts')"
+                    ).execute()
 
-                // Reset sqlite_sequence for each table to avoid collision
-                db.compileStatement(
-                    "DELETE FROM sqlite_sequence WHERE name IN ('budgets', 'recurring_occurrences', 'transactions', 'recurring_transactions', 'categories', 'accounts')"
-                ).execute()
+                    if (backup.accounts.isNotEmpty()) {
+                        backupDao.insertAccounts(backup.accounts.map { it.toEntity() })
+                        val maxAccountId = backup.accounts.maxOf { it.id }
+                        db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('accounts', $maxAccountId)").execute()
+                    }
 
-                // 2. Insert entities in parent-to-child order
-                if (backup.accounts.isNotEmpty()) {
-                    backupDao.insertAccounts(backup.accounts.map { it.toEntity() })
-                    val maxAccountId = backup.accounts.maxOf { it.id }
-                    db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('accounts', $maxAccountId)").execute()
+                    if (backup.categories.isNotEmpty()) {
+                        backupDao.insertCategories(backup.categories.map { it.toEntity() })
+                        val maxCategoryId = backup.categories.maxOf { it.id }
+                        db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('categories', $maxCategoryId)").execute()
+                    }
+
+                    if (backup.recurringTransactions.isNotEmpty()) {
+                        backupDao.insertRecurringTransactions(backup.recurringTransactions.map { it.toEntity() })
+                        val maxRecurringId = backup.recurringTransactions.maxOf { it.id }
+                        db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('recurring_transactions', $maxRecurringId)").execute()
+                    }
+
+                    if (backup.transactions.isNotEmpty()) {
+                        backupDao.insertTransactions(backup.transactions.map { it.toEntity() })
+                        val maxTransactionId = backup.transactions.maxOf { it.id }
+                        db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('transactions', $maxTransactionId)").execute()
+                    }
+
+                    if (backup.recurringOccurrences.isNotEmpty()) {
+                        backupDao.insertRecurringOccurrences(backup.recurringOccurrences.map { it.toEntity() })
+                        val maxOccurrenceId = backup.recurringOccurrences.maxOf { it.id }
+                        db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('recurring_occurrences', $maxOccurrenceId)").execute()
+                    }
+
+                    if (backup.budgets.isNotEmpty()) {
+                        backupDao.insertBudgets(backup.budgets.map { it.toEntity() })
+                        val maxBudgetId = backup.budgets.maxOf { it.id }
+                        db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('budgets', $maxBudgetId)").execute()
+                    }
+
+                    backup.settings?.let { backupSettings ->
+                        val payload = backupSettingsAdapter.toJson(backupSettings)
+                        db.pendingSettingsRecoveryDao().insert(PendingSettingsRecoveryEntity(settingsJson = payload))
+                    } ?: db.pendingSettingsRecoveryDao().clear()
                 }
 
-                if (backup.categories.isNotEmpty()) {
-                    backupDao.insertCategories(backup.categories.map { it.toEntity() })
-                    val maxCategoryId = backup.categories.maxOf { it.id }
-                    db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('categories', $maxCategoryId)").execute()
-                }
+                val backupSettings = backup.settings?.toDomain() ?: return@withLock Result.success(BackupRestoreOutcome.Complete)
+                onSettingsRecoveryPending()
 
-                if (backup.recurringTransactions.isNotEmpty()) {
-                    backupDao.insertRecurringTransactions(backup.recurringTransactions.map { it.toEntity() })
-                    val maxRecurringId = backup.recurringTransactions.maxOf { it.id }
-                    db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('recurring_transactions', $maxRecurringId)").execute()
-                }
-
-                if (backup.transactions.isNotEmpty()) {
-                    backupDao.insertTransactions(backup.transactions.map { it.toEntity() })
-                    val maxTransactionId = backup.transactions.maxOf { it.id }
-                    db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('transactions', $maxTransactionId)").execute()
-                }
-
-                if (backup.recurringOccurrences.isNotEmpty()) {
-                    backupDao.insertRecurringOccurrences(backup.recurringOccurrences.map { it.toEntity() })
-                    val maxOccurrenceId = backup.recurringOccurrences.maxOf { it.id }
-                    db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('recurring_occurrences', $maxOccurrenceId)").execute()
-                }
-
-                if (backup.budgets.isNotEmpty()) {
-                    backupDao.insertBudgets(backup.budgets.map { it.toEntity() })
-                    val maxBudgetId = backup.budgets.maxOf { it.id }
-                    db.compileStatement("INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('budgets', $maxBudgetId)").execute()
-                }
-            }
-
-            // Restore settings after database transaction succeeds
-            backup.settings?.let { backupSettings ->
-                try {
-                    val appSettings = backupSettings.toDomain()
-                    settingsRepository.setThemeMode(appSettings.themeMode)
-                    settingsRepository.setPreferredCurrency(appSettings.preferredCurrencyCode)
-                    settingsRepository.setWeekStart(appSettings.weekStart)
-                    settingsRepository.setDateFormat(appSettings.dateFormat)
-                    settingsRepository.setTimeFormat(appSettings.timeFormat)
-                    settingsRepository.setShowCurrencyCode(appSettings.showCurrencyCode)
-                    settingsRepository.setConfirmBeforeDelete(appSettings.confirmBeforeDelete)
+                return@withLock try {
+                    settingsRepository.restoreSettings(backupSettings)
+                    val provisioningResult = internalDefaultAccountProvisioner?.ensureProvisioned()
+                    when (provisioningResult) {
+                        is InternalDefaultAccountProvisioningResult.Failure -> Result.success(BackupRestoreOutcome.SettingsRecoveryPending)
+                        else -> {
+                            db.pendingSettingsRecoveryDao().clear()
+                            provisioningResult?.let(onProvisioningResult)
+                            Result.success(BackupRestoreOutcome.Complete)
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    // Report settings failure separately or let it pass since financial DB was successful
-                    // As per prompt: "financial database success remains valid, while settings failure is reported separately."
+                    Result.success(BackupRestoreOutcome.SettingsRecoveryPending)
                 }
             }
-
-            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -177,24 +255,33 @@ class RoomBackupRepository(
     }
 
     private fun validateBackup(backup: ExpenseTrackerBackup): Result<Unit> {
-        if (backup.formatVersion > 1) {
-            return Result.failure(IllegalArgumentException("This backup was created by a newer version of ExpenseTracker (Format v${backup.formatVersion}). Please update the app before restoring it."))
+        if (backup.formatVersion !in 1..2) {
+            return Result.failure(IllegalArgumentException("Unsupported backup format version ${backup.formatVersion}. This app supports format versions 1 and 2."))
         }
-        if (backup.databaseSchemaVersion > 2) {
-            return Result.failure(IllegalArgumentException("This backup has an incompatible schema version (${backup.databaseSchemaVersion}). Please update the app before restoring it."))
+        if (backup.databaseSchemaVersion > 3) {
+            return Result.failure(IllegalArgumentException("This backup has an incompatible database schema version (${backup.databaseSchemaVersion}). Please update the app before restoring it."))
         }
 
-        // 1. Check for blank or invalid currency codes
-        val invalidCurrencies = (backup.accounts.map { it.initialBalanceCurrencyCode } +
+        val duplicateInternalKeys = backup.accounts
+            .mapNotNull { it.internalKey }
+            .groupingBy { it }
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+        if (duplicateInternalKeys.isNotEmpty()) {
+            return Result.failure(IllegalArgumentException("Backup contains duplicate internal account markers: ${duplicateInternalKeys.joinToString()}."))
+        }
+
+        val invalidCurrencies = (
+            backup.accounts.map { it.initialBalanceCurrencyCode } +
                 backup.transactions.map { it.currencyCode } +
                 backup.budgets.map { it.currencyCode } +
-                backup.recurringTransactions.map { it.currencyCode })
-            .filter { it.trim().length != 3 }
+                backup.recurringTransactions.map { it.currencyCode }
+        ).filter { it.trim().length != 3 }
         if (invalidCurrencies.isNotEmpty()) {
             return Result.failure(IllegalArgumentException("Backup contains invalid currency codes: ${invalidCurrencies.distinct()}"))
         }
 
-        // 2. Check primary keys are valid (ID > 0)
         if (backup.accounts.any { it.id <= 0 }) return Result.failure(IllegalArgumentException("Backup contains invalid account IDs."))
         if (backup.categories.any { it.id <= 0 }) return Result.failure(IllegalArgumentException("Backup contains invalid category IDs."))
         if (backup.transactions.any { it.id <= 0 }) return Result.failure(IllegalArgumentException("Backup contains invalid transaction IDs."))
@@ -202,7 +289,6 @@ class RoomBackupRepository(
         if (backup.recurringTransactions.any { it.id <= 0 }) return Result.failure(IllegalArgumentException("Backup contains invalid recurring transaction IDs."))
         if (backup.recurringOccurrences.any { it.id <= 0 }) return Result.failure(IllegalArgumentException("Backup contains invalid recurring occurrence IDs."))
 
-        // 3. Check for duplicates in primary keys
         if (backup.accounts.map { it.id }.distinct().size != backup.accounts.size) return Result.failure(IllegalArgumentException("Backup contains duplicate account IDs."))
         if (backup.categories.map { it.id }.distinct().size != backup.categories.size) return Result.failure(IllegalArgumentException("Backup contains duplicate category IDs."))
         if (backup.transactions.map { it.id }.distinct().size != backup.transactions.size) return Result.failure(IllegalArgumentException("Backup contains duplicate transaction IDs."))
@@ -210,61 +296,36 @@ class RoomBackupRepository(
         if (backup.recurringTransactions.map { it.id }.distinct().size != backup.recurringTransactions.size) return Result.failure(IllegalArgumentException("Backup contains duplicate recurring transaction IDs."))
         if (backup.recurringOccurrences.map { it.id }.distinct().size != backup.recurringOccurrences.size) return Result.failure(IllegalArgumentException("Backup contains duplicate recurring occurrence IDs."))
 
-        // 4. Check for duplicate recurring occurrences (same ruleId and occurrenceDate)
         val occurrenceKeys = backup.recurringOccurrences.map { it.ruleId to it.occurrenceDate }
         if (occurrenceKeys.distinct().size != occurrenceKeys.size) {
             return Result.failure(IllegalArgumentException("Backup contains duplicate recurring occurrence identities (ruleId + date)."))
         }
 
-        // 5. Check foreign keys
         val accountIds = backup.accounts.map { it.id }.toSet()
         val categoryIds = backup.categories.map { it.id }.toSet()
         val ruleIds = backup.recurringTransactions.map { it.id }.toSet()
 
-        // Accounts fk in transactions
         for (tx in backup.transactions) {
-            if (tx.accountId !in accountIds) {
-                return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent account ID ${tx.accountId}."))
-            }
-            if (tx.destinationAccountId != null && tx.destinationAccountId !in accountIds) {
-                return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent destination account ID ${tx.destinationAccountId}."))
-            }
-            if (tx.categoryId != null && tx.categoryId !in categoryIds) {
-                return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent category ID ${tx.categoryId}."))
-            }
-            if (tx.recurringRuleId != null && tx.recurringRuleId !in ruleIds) {
-                return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent recurring rule ID ${tx.recurringRuleId}."))
-            }
+            if (tx.accountId !in accountIds) return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent account ID ${tx.accountId}."))
+            if (tx.destinationAccountId != null && tx.destinationAccountId !in accountIds) return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent destination account ID ${tx.destinationAccountId}."))
+            if (tx.categoryId != null && tx.categoryId !in categoryIds) return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent category ID ${tx.categoryId}."))
+            if (tx.recurringRuleId != null && tx.recurringRuleId !in ruleIds) return Result.failure(IllegalArgumentException("Transaction #${tx.id} references non-existent recurring rule ID ${tx.recurringRuleId}."))
         }
 
-        // Category fk in budgets
         for (b in backup.budgets) {
-            if (b.categoryId != null && b.categoryId !in categoryIds) {
-                return Result.failure(IllegalArgumentException("Budget #${b.id} references non-existent category ID ${b.categoryId}."))
-            }
+            if (b.categoryId != null && b.categoryId !in categoryIds) return Result.failure(IllegalArgumentException("Budget #${b.id} references non-existent category ID ${b.categoryId}."))
         }
 
-        // Account & category fks in recurring transactions
         for (rt in backup.recurringTransactions) {
-            if (rt.accountId !in accountIds) {
-                return Result.failure(IllegalArgumentException("Recurring transaction #${rt.id} references non-existent account ID ${rt.accountId}."))
-            }
-            if (rt.destinationAccountId != null && rt.destinationAccountId !in accountIds) {
-                return Result.failure(IllegalArgumentException("Recurring transaction #${rt.id} references non-existent destination account ID ${rt.destinationAccountId}."))
-            }
-            if (rt.categoryId != null && rt.categoryId !in categoryIds) {
-                return Result.failure(IllegalArgumentException("Recurring transaction #${rt.id} references non-existent category ID ${rt.categoryId}."))
-            }
+            if (rt.accountId !in accountIds) return Result.failure(IllegalArgumentException("Recurring transaction #${rt.id} references non-existent account ID ${rt.accountId}."))
+            if (rt.destinationAccountId != null && rt.destinationAccountId !in accountIds) return Result.failure(IllegalArgumentException("Recurring transaction #${rt.id} references non-existent destination account ID ${rt.destinationAccountId}."))
+            if (rt.categoryId != null && rt.categoryId !in categoryIds) return Result.failure(IllegalArgumentException("Recurring transaction #${rt.id} references non-existent category ID ${rt.categoryId}."))
         }
 
-        // Recurring rule fk in recurring occurrences
         for (ro in backup.recurringOccurrences) {
-            if (ro.ruleId !in ruleIds) {
-                return Result.failure(IllegalArgumentException("Recurring occurrence #${ro.id} references non-existent rule ID ${ro.ruleId}."))
-            }
+            if (ro.ruleId !in ruleIds) return Result.failure(IllegalArgumentException("Recurring occurrence #${ro.id} references non-existent rule ID ${ro.ruleId}."))
         }
 
-        // 6. Validate enums
         try {
             backup.accounts.forEach { AccountType.valueOf(it.type) }
             backup.categories.forEach { CategoryType.valueOf(it.type) }
@@ -276,7 +337,6 @@ class RoomBackupRepository(
             return Result.failure(IllegalArgumentException("Backup contains invalid or unrecognized enum values: ${e.message}"))
         }
 
-        // 7. Validate dates & times
         try {
             backup.accounts.forEach { Instant.parse(it.createdAt) }
             backup.transactions.forEach {
@@ -301,7 +361,6 @@ class RoomBackupRepository(
             return Result.failure(IllegalArgumentException("Backup contains malformed date/time strings: ${e.message}"))
         }
 
-        // 8. Verify checksum if present
         if (backup.checksum != null) {
             val computed = computeChecksum(backup)
             if (computed != backup.checksum) {

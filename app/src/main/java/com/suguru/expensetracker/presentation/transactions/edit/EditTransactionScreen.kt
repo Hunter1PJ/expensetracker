@@ -367,42 +367,7 @@ fun EditTransactionScreenContent(
                         }
                     }
 
-                    // 3. Source Account Selector
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                    ) {
-                        SectionHeader(
-                            title = if (uiState.transactionType == TransactionType.TRANSFER) {
-                                stringResource(R.string.from_account_label)
-                            } else {
-                                stringResource(R.string.account_label)
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                        FlowRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("account_selector"),
-                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                        ) {
-                            uiState.accounts.forEach { account ->
-                                val isSelected = uiState.selectedAccountId == account.id
-                                AccountChip(
-                                    account = account,
-                                    isSelected = isSelected,
-                                    onClick = { onAccountSelected(account.id) },
-                                    testTag = "account_item_${account.id}"
-                                )
-                            }
-                        }
-                    }
-
-                    // 4. Destination Account Selector (If Transfer)
+                    // 3. Destination Account Selector (If Transfer)
                     if (uiState.transactionType == TransactionType.TRANSFER) {
                         Column(
                             modifier = Modifier

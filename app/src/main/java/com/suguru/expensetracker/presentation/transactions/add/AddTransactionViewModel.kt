@@ -52,6 +52,11 @@ class AddTransactionViewModel(
         observeCategories()
     }
 
+    private fun defaultAccountId(accounts: List<com.suguru.expensetracker.domain.model.Account>, currentSelection: Long?): Long? {
+        if (currentSelection != null && accounts.any { it.id == currentSelection }) return currentSelection
+        return accounts.firstOrNull { it.internalKey == "default" }?.id ?: accounts.firstOrNull()?.id
+    }
+
     private fun observeAccounts() {
         viewModelScope.launch {
             observeActiveAccountsUseCase().collect { accounts ->
@@ -60,7 +65,7 @@ class AddTransactionViewModel(
                         val accountMatch = matchAccount(state.aiAccountSuggestion, accounts)
                         val updatedAccountId = when (accountMatch) {
                             is MatchResult.Single -> accountMatch.item.id
-                            else -> if (accounts.any { it.id == state.selectedAccountId }) state.selectedAccountId else null
+                            else -> defaultAccountId(accounts, state.selectedAccountId)
                         }
                         val isAccountAmbiguous = accountMatch is MatchResult.Ambiguous
 
@@ -83,12 +88,7 @@ class AddTransactionViewModel(
                             aiDestinationAccountMatchAmbiguous = isDestAmbiguous
                         )
                     } else {
-                        val isCurrentSelectionValid = accounts.any { it.id == state.selectedAccountId }
-                        val updatedAccountId = if (isCurrentSelectionValid) {
-                            state.selectedAccountId
-                        } else {
-                            accounts.firstOrNull()?.id
-                        }
+                        val updatedAccountId = defaultAccountId(accounts, state.selectedAccountId)
 
                         // Also check destination account validity if transfer
                         val isDestValid = accounts.any { it.id == state.selectedDestinationAccountId }
@@ -236,6 +236,10 @@ class AddTransactionViewModel(
                 aiCategorySuggestion = suggestedCategory,
                 aiCategoryMatchAmbiguous = catAmbiguous,
                 aiWarnings = warnings,
+                aiSourceWarnings = candidate.warnings.filter {
+                    it == ParseWarning.AI_FALLBACK || it == ParseWarning.INVALID_API_KEY
+                },
+                candidateSource = candidate.source,
                 error = null,
                 isSavedSuccessfully = false
             )
@@ -253,7 +257,9 @@ class AddTransactionViewModel(
                 aiDestinationAccountMatchAmbiguous = false,
                 aiCategorySuggestion = null,
                 aiCategoryMatchAmbiguous = false,
-                aiWarnings = emptyList()
+                aiWarnings = emptyList(),
+                aiSourceWarnings = emptyList(),
+                candidateSource = null
             )
         }
     }
@@ -263,13 +269,14 @@ class AddTransactionViewModel(
             AddTransactionUiState(
                 accounts = state.accounts,
                 categories = state.categories,
-                selectedAccountId = state.accounts.firstOrNull()?.id,
+                selectedAccountId = defaultAccountId(state.accounts, null),
                 selectedCategoryId = state.categories.firstOrNull()?.id,
                 transactionType = TransactionType.EXPENSE,
                 amount = "",
                 note = "",
                 transactionTime = Instant.now(),
-                isAiAssisted = false
+                isAiAssisted = false,
+                candidateSource = null
             )
         }
     }

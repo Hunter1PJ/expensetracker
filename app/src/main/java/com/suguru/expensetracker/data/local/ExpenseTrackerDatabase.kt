@@ -10,12 +10,14 @@ import com.suguru.expensetracker.data.local.dao.AccountDao
 import com.suguru.expensetracker.data.local.dao.BackupDao
 import com.suguru.expensetracker.data.local.dao.BudgetDao
 import com.suguru.expensetracker.data.local.dao.CategoryDao
+import com.suguru.expensetracker.data.local.dao.PendingSettingsRecoveryDao
 import com.suguru.expensetracker.data.local.dao.RecurringOccurrenceDao
 import com.suguru.expensetracker.data.local.dao.RecurringTransactionDao
 import com.suguru.expensetracker.data.local.dao.TransactionDao
 import com.suguru.expensetracker.data.local.entity.AccountEntity
 import com.suguru.expensetracker.data.local.entity.BudgetEntity
 import com.suguru.expensetracker.data.local.entity.CategoryEntity
+import com.suguru.expensetracker.data.local.entity.PendingSettingsRecoveryEntity
 import com.suguru.expensetracker.data.local.entity.RecurringOccurrenceEntity
 import com.suguru.expensetracker.data.local.entity.RecurringTransactionEntity
 import com.suguru.expensetracker.data.local.entity.TransactionEntity
@@ -27,10 +29,11 @@ import com.suguru.expensetracker.data.local.entity.TransactionEntity
         TransactionEntity::class,
         BudgetEntity::class,
         RecurringTransactionEntity::class,
-        RecurringOccurrenceEntity::class
+        RecurringOccurrenceEntity::class,
+        PendingSettingsRecoveryEntity::class
     ],
-    version = 2,
-    exportSchema = false
+    version = 4,
+    exportSchema = true
 )
 @TypeConverters(ExpenseTrackerConverters::class)
 abstract class ExpenseTrackerDatabase : RoomDatabase() {
@@ -41,6 +44,7 @@ abstract class ExpenseTrackerDatabase : RoomDatabase() {
     abstract fun recurringTransactionDao(): RecurringTransactionDao
     abstract fun recurringOccurrenceDao(): RecurringOccurrenceDao
     abstract fun backupDao(): BackupDao
+    abstract fun pendingSettingsRecoveryDao(): PendingSettingsRecoveryDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -60,6 +64,19 @@ abstract class ExpenseTrackerDatabase : RoomDatabase() {
                 """.trimIndent())
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_recurring_occurrences_rule_id_occurrence_date` ON `recurring_occurrences` (`rule_id`, `occurrence_date`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_occurrences_generated_transaction_id` ON `recurring_occurrences` (`generated_transaction_id`)")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `accounts` ADD COLUMN `internal_key` TEXT")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_accounts_internal_key` ON `accounts` (`internal_key`)")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `pending_settings_restore` (`id` INTEGER NOT NULL, `settings_json` TEXT NOT NULL, PRIMARY KEY(`id`))")
             }
         }
     }

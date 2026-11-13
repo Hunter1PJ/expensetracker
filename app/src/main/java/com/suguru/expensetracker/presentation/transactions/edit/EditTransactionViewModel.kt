@@ -108,6 +108,11 @@ class EditTransactionViewModel(
         }
     }
 
+    private fun defaultAccountId(accounts: List<com.suguru.expensetracker.domain.model.Account>, currentSelection: Long?): Long? {
+        if (currentSelection != null && accounts.any { it.id == currentSelection }) return currentSelection
+        return accounts.firstOrNull { it.internalKey == "default" }?.id ?: accounts.firstOrNull()?.id
+    }
+
     private fun observeAccounts() {
         viewModelScope.launch {
             observeActiveAccountsUseCase().collect { activeAccounts ->
@@ -123,13 +128,7 @@ class EditTransactionViewModel(
                         allAccounts.add(histDest)
                     }
 
-                    val isCurrentSelectionValid = allAccounts.any { it.id == state.selectedAccountId }
-                    val updatedAccountId = if (isCurrentSelectionValid) {
-                        state.selectedAccountId
-                    } else {
-                        allAccounts.firstOrNull()?.id
-                    }
-
+                    val updatedAccountId = defaultAccountId(allAccounts, state.selectedAccountId)
                     val isDestValid = allAccounts.any { it.id == state.selectedDestinationAccountId }
                     val updatedDestId = if (isDestValid) state.selectedDestinationAccountId else null
 

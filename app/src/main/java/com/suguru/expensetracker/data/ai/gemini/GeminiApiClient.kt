@@ -5,14 +5,18 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.suguru.expensetracker.domain.ai.AiConfiguration
 import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.ai.AiResult
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 
 /**
  * Direct HTTPS client for Gemini generateContent endpoint supporting user-supplied API keys (BYOK).
@@ -40,16 +44,16 @@ class GeminiApiClient(
         apiKey: String,
         model: String,
         requestBody: GeminiGenerateContentRequest
-    ): AiResult<String> = withContext(Dispatchers.IO) {
+    ): AiResult<String> {
         val trimmedKey = apiKey.trim()
         if (trimmedKey.isBlank()) {
-            return@withContext AiResult.Failure(AiError.MissingApiKey)
+            return AiResult.Failure(AiError.MissingApiKey)
         }
 
         val jsonPayload = try {
             requestAdapter.toJson(requestBody)
-        } catch (e: Exception) {
-            return@withContext AiResult.Failure(AiError.ExecutionError("Request serialization error: ${e.message}"))
+        } catch (_: Exception) {
+            return AiResult.Failure(AiError.ExecutionError("Could not prepare the Gemini request."))
         }
 
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
@@ -60,48 +64,61 @@ class GeminiApiClient(
             .post(jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
 
-        try {
-            client.newCall(request).execute().use { response ->
-                val responseBody = response.body?.string() ?: ""
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    val result = when (e) {
+                        is SocketTimeoutException -> AiResult.Failure(AiError.RequestTimeout)
+                        else -> AiResult.Failure(AiError.NetworkError("Network request failed."))
+                    }
+                    if (continuation.isActive) continuation.resume(result)
+                }
 
-                when (response.code) {
-                    200 -> {
-                        val parsed = responseAdapter.fromJson(responseBody)
-                        val text = parsed?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                        if (text != null) {
-                            AiResult.Success(text)
+                override fun onResponse(call: Call, response: Response) {
+                    val result = try {
+                        response.use { parseResponse(it) }
+                    } catch (e: IOException) {
+                        if (e is SocketTimeoutException) {
+                            AiResult.Failure(AiError.RequestTimeout)
                         } else {
-                            AiResult.Failure(AiError.MalformedResponse("Empty candidate or response structure"))
+                            AiResult.Failure(AiError.NetworkError("Network request failed."))
                         }
+                    } catch (_: Exception) {
+                        AiResult.Failure(AiError.ExecutionError("Gemini request failed."))
                     }
-                    400 -> {
-                        // Could be bad request or invalid key format
-                        if (responseBody.contains("API_KEY_INVALID", ignoreCase = true) ||
-                            responseBody.contains("key not valid", ignoreCase = true)) {
-                            AiResult.Failure(AiError.InvalidApiKey)
-                        } else {
-                            AiResult.Failure(AiError.ServerError(400, "Bad request to Gemini API"))
-                        }
-                    }
-                    401, 403 -> {
-                        AiResult.Failure(AiError.InvalidApiKey)
-                    }
-                    429 -> {
-                        val retryHeader = response.header("Retry-After")?.toLongOrNull()
-                        AiResult.Failure(AiError.RateLimitExceeded(retryHeader))
-                    }
-                    in 500..599 -> {
-                        AiResult.Failure(AiError.ServerError(response.code, "Gemini service temporarily unavailable"))
-                    }
-                    else -> {
-                        AiResult.Failure(AiError.ServerError(response.code, "HTTP ${response.code} error received"))
-                    }
+                    if (continuation.isActive) continuation.resume(result)
+                }
+            })
+        }
+    }
+
+    private fun parseResponse(response: Response): AiResult<String> {
+        val responseBody = response.body?.string() ?: ""
+        return when (response.code) {
+            200 -> {
+                val parsed = try {
+                    responseAdapter.fromJson(responseBody)
+                } catch (_: Exception) {
+                    null
+                }
+                val text = parsed?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                if (text != null) AiResult.Success(text)
+                else AiResult.Failure(AiError.MalformedResponse("Invalid or empty Gemini response"))
+            }
+            400 -> {
+                if (responseBody.contains("API_KEY_INVALID", ignoreCase = true) ||
+                    responseBody.contains("key not valid", ignoreCase = true)) {
+                    AiResult.Failure(AiError.InvalidApiKey)
+                } else {
+                    AiResult.Failure(AiError.ServerError(400, "Bad request to Gemini API"))
                 }
             }
-        } catch (e: IOException) {
-            AiResult.Failure(AiError.NetworkError(e.message ?: "Network connection failed"))
-        } catch (e: Exception) {
-            AiResult.Failure(AiError.ExecutionError(e.message ?: "Unexpected error during execution"))
+            401, 403 -> AiResult.Failure(AiError.InvalidApiKey)
+            429 -> AiResult.Failure(AiError.RateLimitExceeded(response.header("Retry-After")?.toLongOrNull()))
+            in 500..599 -> AiResult.Failure(AiError.ServerError(response.code, "Gemini service temporarily unavailable"))
+            else -> AiResult.Failure(AiError.ServerError(response.code, "HTTP ${response.code} error received"))
         }
     }
 }

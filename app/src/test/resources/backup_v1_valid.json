@@ -1,0 +1,34 @@
+{
+  "formatVersion": 1,
+  "appVersion": "1.0.0",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "databaseSchemaVersion": 2,
+  "accounts": [
+    {
+      "id": 1,
+      "name": "Checking",
+      "type": "BANK",
+      "initialBalanceAmountInMinorUnits": 12500,
+      "initialBalanceCurrencyCode": "ABC",
+      "iconName": "wallet",
+      "colorHex": "#112233",
+      "isArchived": false,
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "categories": [],
+  "transactions": [],
+  "budgets": [],
+  "recurringTransactions": [],
+  "recurringOccurrences": [],
+  "settings": {
+    "themeMode": "SYSTEM",
+    "preferredCurrencyCode": "USD",
+    "weekStart": "MONDAY",
+    "dateFormat": "SYSTEM_DEFAULT",
+    "timeFormat": "SYSTEM_DEFAULT",
+    "showCurrencyCode": true,
+    "confirmBeforeDelete": true
+  },
+  "checksum": "6123899671ff51b83724e049c16ad8561038b0167172213f057c554a2262f7ea"
+}

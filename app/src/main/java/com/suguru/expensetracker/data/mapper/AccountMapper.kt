@@ -16,7 +16,8 @@ fun AccountEntity.toDomain(): Account {
         iconName = iconName,
         colorHex = colorHex,
         isArchived = isArchived,
-        createdAt = createdAt
+        createdAt = createdAt,
+        internalKey = internalKey
     )
 }
 
@@ -30,6 +31,7 @@ fun Account.toEntity(): AccountEntity {
         iconName = iconName,
         colorHex = colorHex,
         isArchived = isArchived,
-        createdAt = createdAt
+        createdAt = createdAt,
+        internalKey = internalKey
     )
 }

@@ -56,27 +56,6 @@ enum class NavDestination(
         testTag = "nav_item_add_transaction",
         isBottomBarItem = false
     ),
-    AccountManagement(
-        route = "account_management",
-        label = "Accounts",
-        icon = Icons.Outlined.AccountBalanceWallet,
-        testTag = "nav_item_account_management",
-        isBottomBarItem = false
-    ),
-    AddAccount(
-        route = "add_account",
-        label = "Add Account",
-        icon = Icons.Default.Add,
-        testTag = "nav_item_add_account",
-        isBottomBarItem = false
-    ),
-    EditAccount(
-        route = "edit_account",
-        label = "Edit Account",
-        icon = Icons.Outlined.AccountBalanceWallet,
-        testTag = "nav_item_edit_account",
-        isBottomBarItem = false
-    ),
     CategoryManagement(
         route = "category_management",
         label = "Categories",

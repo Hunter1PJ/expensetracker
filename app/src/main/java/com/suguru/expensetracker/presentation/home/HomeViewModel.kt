@@ -32,14 +32,14 @@ class HomeViewModel(
 ) : ViewModel() {
 
     private val _isAiExtracting = MutableStateFlow(false)
-    private val _aiExtractionError = MutableStateFlow<String?>(null)
+    private val _aiExtractionError = MutableStateFlow<AiError?>(null)
     private val _extractedCandidates = MutableStateFlow<List<TransactionCandidate>>(emptyList())
 
     private data class AiUiData(
         val enabled: Boolean,
         val configured: Boolean,
         val isExtracting: Boolean,
-        val error: String?,
+        val error: AiError?,
         val candidates: List<TransactionCandidate>
     )
 
@@ -108,16 +108,7 @@ class HomeViewModel(
                     _extractedCandidates.value = result.data
                 }
                 is AiResult.Failure -> {
-                    val msg = when (result.error) {
-                        is AiError.MissingApiKey -> "Please configure your Gemini API key in Settings."
-                        is AiError.InvalidApiKey -> "Invalid API key. Please check your key in Settings."
-                        is AiError.RateLimitExceeded -> "Gemini API rate limit exceeded. Please wait a moment."
-                        is AiError.NetworkError -> "Network connection failed. Please check internet access."
-                        is AiError.MalformedResponse -> "Failed to parse transaction data from AI response."
-                        is AiError.ServerError -> "Gemini server error (${result.error.statusCode})."
-                        is AiError.ExecutionError -> result.error.message
-                    }
-                    _aiExtractionError.value = msg
+                    _aiExtractionError.value = result.error
                 }
             }
         }
@@ -141,7 +132,7 @@ class HomeViewModel(
         isAiEnabled: Boolean,
         isAiConfigured: Boolean,
         isExtracting: Boolean,
-        extractionError: String?,
+        extractionError: AiError?,
         candidates: List<TransactionCandidate>
     ): HomeUiState {
         val currencyUiModels = currencySummaries.map { cs ->

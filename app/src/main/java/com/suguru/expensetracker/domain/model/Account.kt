@@ -13,5 +13,6 @@ data class Account(
     val iconName: String = "account_balance",
     val colorHex: String = "#10B981",
     val isArchived: Boolean = false,
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
+    val internalKey: String? = null
 )

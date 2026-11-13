@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 interface SettingsRepository {
     val settings: Flow<AppSettings>
 
+    suspend fun restoreSettings(value: AppSettings)
     suspend fun setThemeMode(value: ThemeMode)
     suspend fun setPreferredCurrency(value: String?)
     suspend fun setWeekStart(value: WeekStart)

@@ -216,7 +216,16 @@ fun AddTransactionScreenContent(
                                 color = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.25f)
                             ) {
                                 Text(
-                                    text = stringResource(R.string.ai_draft_badge),
+                                    text = stringResource(
+                                        R.string.ai_draft_from_source,
+                                        stringResource(
+                                            if (uiState.candidateSource == com.suguru.expensetracker.domain.parser.CandidateSource.GEMINI_AI) {
+                                                R.string.candidate_source_gemini
+                                            } else {
+                                                R.string.candidate_source_offline
+                                            }
+                                        )
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = ExpenseTrackerTheme.extendedColors.accentViolet,
@@ -305,6 +314,19 @@ fun AddTransactionScreenContent(
                         uiState.aiWarnings.forEach { warning ->
                             Text(
                                 text = "• $warning",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ExpenseTrackerTheme.extendedColors.financialWarning
+                            )
+                        }
+                        uiState.aiSourceWarnings.forEach { warning ->
+                            Text(
+                                text = "• " + stringResource(
+                                    if (warning == com.suguru.expensetracker.domain.parser.ParseWarning.INVALID_API_KEY) {
+                                        R.string.candidate_warning_invalid_key
+                                    } else {
+                                        R.string.candidate_warning_ai_fallback
+                                    }
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.financialWarning
                             )
@@ -477,42 +499,7 @@ fun AddTransactionScreenContent(
                     testTag = "no_accounts_empty_state"
                 )
             } else {
-                // 3. Source Account Selector
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                ) {
-                    SectionHeader(
-                        title = if (uiState.transactionType == TransactionType.TRANSFER) {
-                            stringResource(R.string.from_account_label)
-                        } else {
-                            stringResource(R.string.account_label)
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("account_selector"),
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                    ) {
-                        uiState.accounts.forEach { account ->
-                            val isSelected = uiState.selectedAccountId == account.id
-                            AccountChip(
-                                account = account,
-                                isSelected = isSelected,
-                                onClick = { onAccountSelected(account.id) },
-                                testTag = "account_item_${account.id}"
-                            )
-                        }
-                    }
-                }
-
-                // 4. Destination Account Selector (If Transfer)
+                // 3. Destination Account Selector (If Transfer)
                 if (uiState.transactionType == TransactionType.TRANSFER) {
                     Column(
                         modifier = Modifier

@@ -3,6 +3,8 @@ package com.suguru.expensetracker.presentation.transactions.add
 import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.parser.CandidateSource
+import com.suguru.expensetracker.domain.parser.ParseWarning
 import com.suguru.expensetracker.domain.util.MoneyParser
 import java.time.Instant
 
@@ -23,6 +25,7 @@ data class AddTransactionUiState(
     val error: AddTransactionError? = null,
     val isSavedSuccessfully: Boolean = false,
     val isAiAssisted: Boolean = false,
+    val candidateSource: CandidateSource? = null,
     val aiAmountWarning: String? = null,
     val aiCategorySuggestion: String? = null,
     val aiCategoryMatchAmbiguous: Boolean = false,
@@ -30,7 +33,8 @@ data class AddTransactionUiState(
     val aiAccountMatchAmbiguous: Boolean = false,
     val aiDestinationAccountSuggestion: String? = null,
     val aiDestinationAccountMatchAmbiguous: Boolean = false,
-    val aiWarnings: List<String> = emptyList()
+    val aiWarnings: List<String> = emptyList(),
+    val aiSourceWarnings: List<ParseWarning> = emptyList()
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }

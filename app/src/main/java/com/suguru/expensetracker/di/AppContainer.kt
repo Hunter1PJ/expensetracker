@@ -1,11 +1,18 @@
 package com.suguru.expensetracker.di
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
+import com.suguru.expensetracker.presentation.startup.StartupProvisioningState
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabase
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabaseProvider
+import com.suguru.expensetracker.domain.parser.DeterministicTransactionParser
 import com.suguru.expensetracker.data.repository.RoomAccountRepository
 import com.suguru.expensetracker.data.repository.RoomBudgetRepository
 import com.suguru.expensetracker.data.repository.RoomCategoryRepository
+import com.suguru.expensetracker.data.repository.DefaultCategorySeeder
 import com.suguru.expensetracker.data.repository.RoomRecurringTransactionRepository
 import com.suguru.expensetracker.data.repository.RoomTransactionRepository
 import com.suguru.expensetracker.domain.repository.AccountRepository
@@ -40,6 +47,13 @@ import com.suguru.expensetracker.domain.usecase.transaction.ObserveTransactionsB
 import com.suguru.expensetracker.domain.usecase.transaction.ObserveTransactionsByCategoryUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.ObserveTransactionsUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.UpdateTransactionUseCase
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private val Context.dataStore by androidx.datastore.preferences.preferencesDataStore(name = "expense_tracker_settings")
 
@@ -48,6 +62,12 @@ private val Context.dataStore by androidx.datastore.preferences.preferencesDataS
  * Repositories are exposed via their clean domain interfaces.
  */
 class AppContainer(private val context: Context) {
+
+    private val _provisioningState = kotlinx.coroutines.flow.MutableStateFlow<StartupProvisioningState>(StartupProvisioningState.Loading)
+    val provisioningState: kotlinx.coroutines.flow.StateFlow<StartupProvisioningState> = _provisioningState
+    private val provisioningMutex = Mutex()
+    private val categoryInitializationMutex = Mutex()
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val database: ExpenseTrackerDatabase = ExpenseTrackerDatabaseProvider.getDatabase(context)
 
@@ -72,8 +92,50 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.data.ai.AiRepositoryImpl(
             aiProvider = geminiAiProvider,
             secureKeyStorage = secureKeyStorage,
-            dataStore = context.dataStore
+            dataStore = context.dataStore,
+            offlineParser = DeterministicTransactionParser(),
+            isOnline = ::hasValidatedInternetConnection
         )
+    }
+
+    private fun hasValidatedInternetConnection(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    val internalDefaultAccountProvisioner: InternalDefaultAccountProvisioner by lazy {
+        InternalDefaultAccountProvisioner(database, settingsRepository)
+    }
+
+    suspend fun ensureInternalDefaultAccountProvisioning(): InternalDefaultAccountProvisioningResult {
+        return provisioningMutex.withLock {
+            val roomBackupRepository = backupRepository as? com.suguru.expensetracker.data.repository.RoomBackupRepository
+            val result = roomBackupRepository?.ensureProvisionedWithRecovery()
+                ?: internalDefaultAccountProvisioner.ensureProvisioned()
+            try {
+                ensureDefaultCategories()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                _provisioningState.value = StartupProvisioningState.RecoverableError(
+                    error.localizedMessage ?: "Unable to initialize default categories."
+                )
+                return@withLock InternalDefaultAccountProvisioningResult.Failure(error)
+            }
+            if (result is InternalDefaultAccountProvisioningResult.Failure &&
+                _provisioningState.value == StartupProvisioningState.SettingsRecoveryPending
+            ) {
+                _provisioningState.value = StartupProvisioningState.RecoverableError(
+                    result.error.localizedMessage ?: "Settings recovery is still pending."
+                )
+            } else {
+                _provisioningState.value = StartupProvisioningState.fromResult(result)
+            }
+            result
+        }
     }
 
     val accountRepository: AccountRepository by lazy {
@@ -82,6 +144,16 @@ class AppContainer(private val context: Context) {
 
     val categoryRepository: CategoryRepository by lazy {
         RoomCategoryRepository(database.categoryDao())
+    }
+
+    val defaultCategorySeeder: DefaultCategorySeeder by lazy {
+        DefaultCategorySeeder(database, database.categoryDao())
+    }
+
+    private suspend fun ensureDefaultCategories() {
+        categoryInitializationMutex.withLock {
+            defaultCategorySeeder.ensureSeeded()
+        }
     }
 
     val transactionRepository: TransactionRepository by lazy {
@@ -124,8 +196,12 @@ class AppContainer(private val context: Context) {
     val observeTransactionsByCategoryUseCase by lazy { ObserveTransactionsByCategoryUseCase(transactionRepository) }
     val observeTransactionsBetweenUseCase by lazy { ObserveTransactionsBetweenUseCase(transactionRepository) }
     val getTransactionUseCase by lazy { GetTransactionUseCase(transactionRepository) }
-    val createTransactionUseCase by lazy { CreateTransactionUseCase(transactionRepository, accountRepository, categoryRepository) }
-    val updateTransactionUseCase by lazy { UpdateTransactionUseCase(transactionRepository, accountRepository, categoryRepository) }
+    val createTransactionUseCase by lazy {
+        CreateTransactionUseCase(transactionRepository, accountRepository, categoryRepository, internalDefaultAccountProvisioner)
+    }
+    val updateTransactionUseCase by lazy {
+        UpdateTransactionUseCase(transactionRepository, accountRepository, categoryRepository, internalDefaultAccountProvisioner)
+    }
     val deleteTransactionUseCase by lazy { DeleteTransactionUseCase(transactionRepository, recurringOccurrenceRepository) }
 
     // Recurring Transaction Use Cases
@@ -135,21 +211,24 @@ class AppContainer(private val context: Context) {
             recurringOccurrenceRepository = recurringOccurrenceRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
-            widgetRefreshCoordinator = { widgetRefreshCoordinator }
+            widgetRefreshCoordinator = { widgetRefreshCoordinator },
+            internalDefaultAccountProvisioner = internalDefaultAccountProvisioner
         )
     }
     val createRecurringTransactionUseCase by lazy {
         com.suguru.expensetracker.domain.usecase.recurring.CreateRecurringTransactionUseCase(
             recurringTransactionRepository = recurringTransactionRepository,
             accountRepository = accountRepository,
-            categoryRepository = categoryRepository
+            categoryRepository = categoryRepository,
+            internalDefaultAccountProvisioner = internalDefaultAccountProvisioner
         )
     }
     val updateRecurringTransactionUseCase by lazy {
         com.suguru.expensetracker.domain.usecase.recurring.UpdateRecurringTransactionUseCase(
             recurringTransactionRepository = recurringTransactionRepository,
             accountRepository = accountRepository,
-            categoryRepository = categoryRepository
+            categoryRepository = categoryRepository,
+            internalDefaultAccountProvisioner = internalDefaultAccountProvisioner
         )
     }
     val deactivateRecurringTransactionUseCase by lazy {
@@ -356,7 +435,28 @@ class AppContainer(private val context: Context) {
     }
 
     val backupRepository: com.suguru.expensetracker.domain.repository.BackupRepository by lazy {
-        com.suguru.expensetracker.data.repository.RoomBackupRepository(database, settingsRepository)
+        com.suguru.expensetracker.data.repository.RoomBackupRepository(
+            database,
+            settingsRepository,
+            internalDefaultAccountProvisioner,
+            onProvisioningResult = { result ->
+                _provisioningState.value = StartupProvisioningState.Loading
+                startupScope.launch {
+                    try {
+                        ensureDefaultCategories()
+                        _provisioningState.value = StartupProvisioningState.fromResult(result)
+                    } catch (error: Exception) {
+                        if (error is CancellationException) throw error
+                        _provisioningState.value = StartupProvisioningState.RecoverableError(
+                            error.localizedMessage ?: "Unable to initialize default categories."
+                        )
+                    }
+                }
+            },
+            onSettingsRecoveryPending = {
+                _provisioningState.value = StartupProvisioningState.SettingsRecoveryPending
+            }
+        )
     }
 
     val createFullBackupUseCase by lazy {
@@ -425,7 +525,8 @@ class AppContainer(private val context: Context) {
             exportTransactionsToCsvUseCase = exportTransactionsToCsvUseCase,
             backupRepository = backupRepository,
             settingsRepository = settingsRepository,
-            widgetRefreshCoordinator = widgetRefreshCoordinator
+            widgetRefreshCoordinator = widgetRefreshCoordinator,
+            onPendingSettingsRecovery = { ensureInternalDefaultAccountProvisioning() }
         )
     }
 

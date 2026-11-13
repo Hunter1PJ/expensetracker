@@ -25,6 +25,10 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  sourceSets {
+    getByName("androidTest").assets.directories.add("$projectDir/schemas")
+  }
+
   signingConfigs {
     val keystorePropsFile = rootProject.file("keystore.properties")
     val keystoreProps = Properties()
@@ -98,6 +102,10 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
@@ -160,6 +168,7 @@ dependencies {
   androidTestImplementation(libs.androidx.espresso.core)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.runner)
+  androidTestImplementation(libs.androidx.room.testing)
   coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)

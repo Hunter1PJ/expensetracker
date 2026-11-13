@@ -18,7 +18,8 @@ data class BackupAccount(
     val iconName: String,
     val colorHex: String,
     val isArchived: Boolean,
-    val createdAt: String
+    val createdAt: String,
+    val internalKey: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -98,6 +99,11 @@ data class BackupSettings(
     val confirmBeforeDelete: Boolean
 )
 
+sealed interface BackupRestoreOutcome {
+    data object Complete : BackupRestoreOutcome
+    data object SettingsRecoveryPending : BackupRestoreOutcome
+}
+
 @JsonClass(generateAdapter = true)
 data class ExpenseTrackerBackup(
     val formatVersion: Int,
@@ -124,7 +130,8 @@ fun AccountEntity.toBackup() = BackupAccount(
     iconName = iconName,
     colorHex = colorHex,
     isArchived = isArchived,
-    createdAt = createdAt.toString()
+    createdAt = createdAt.toString(),
+    internalKey = internalKey
 )
 
 fun BackupAccount.toEntity() = AccountEntity(
@@ -136,7 +143,8 @@ fun BackupAccount.toEntity() = AccountEntity(
     iconName = iconName,
     colorHex = colorHex,
     isArchived = isArchived,
-    createdAt = java.time.Instant.parse(createdAt)
+    createdAt = java.time.Instant.parse(createdAt),
+    internalKey = internalKey
 )
 
 fun CategoryEntity.toBackup() = BackupCategory(

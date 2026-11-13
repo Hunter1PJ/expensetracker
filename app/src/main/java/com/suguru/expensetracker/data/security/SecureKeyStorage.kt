@@ -57,7 +57,11 @@ class AndroidKeystoreSecureStorage(
 
     init {
         if (isAndroidKeyStoreAvailable) {
-            ensureMasterKey()
+            try {
+                ensureMasterKey()
+            } catch (_: Exception) {
+                // Key operations fail closed; storage remains unavailable until Android Keystore works.
+            }
         }
     }
 
@@ -96,26 +100,20 @@ class AndroidKeystoreSecureStorage(
         }
 
         try {
-            if (isAndroidKeyStoreAvailable && keyStore != null) {
-                val cipher = Cipher.getInstance(TRANSFORMATION)
-                cipher.init(Cipher.ENCRYPT_MODE, getSecretKey())
-                val iv = cipher.iv
-                val encryptedBytes = cipher.doFinal(trimmed.toByteArray(Charsets.UTF_8))
-
-                sharedPreferences.edit()
-                    .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
-                    .putString(KEY_CIPHERTEXT, Base64.encodeToString(encryptedBytes, Base64.NO_WRAP))
-                    .apply()
-            } else {
-                // JVM test environment fallback
-                val encoded = Base64.encodeToString(trimmed.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-                sharedPreferences.edit()
-                    .putString(KEY_CIPHERTEXT, encoded)
-                    .putString(KEY_IV, "FALLBACK")
-                    .apply()
+            if (!isAndroidKeyStoreAvailable || keyStore == null) {
+                throw IllegalStateException("Secure key storage is unavailable.")
             }
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.ENCRYPT_MODE, getSecretKey())
+            val iv = cipher.iv
+            val encryptedBytes = cipher.doFinal(trimmed.toByteArray(Charsets.UTF_8))
+
+            sharedPreferences.edit()
+                .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
+                .putString(KEY_CIPHERTEXT, Base64.encodeToString(encryptedBytes, Base64.NO_WRAP))
+                .apply()
         } catch (_: Exception) {
-            // Never expose exception details that might leak key traces
+            throw IllegalStateException("Secure key storage is unavailable.")
         }
     }
 
@@ -123,22 +121,22 @@ class AndroidKeystoreSecureStorage(
     override fun getKey(): String? {
         val ivString = sharedPreferences.getString(KEY_IV, null) ?: return null
         val ciphertextString = sharedPreferences.getString(KEY_CIPHERTEXT, null) ?: return null
+        if (ivString == "FALLBACK") {
+            deleteKey()
+            return null
+        }
+        if (!isAndroidKeyStoreAvailable || keyStore == null) return null
 
         return try {
-            if (isAndroidKeyStoreAvailable && keyStore != null && ivString != "FALLBACK") {
-                val iv = Base64.decode(ivString, Base64.NO_WRAP)
-                val ciphertext = Base64.decode(ciphertextString, Base64.NO_WRAP)
+            val iv = Base64.decode(ivString, Base64.NO_WRAP)
+            val ciphertext = Base64.decode(ciphertextString, Base64.NO_WRAP)
 
-                val cipher = Cipher.getInstance(TRANSFORMATION)
-                val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
-                cipher.init(Cipher.DECRYPT_MODE, getSecretKey(), spec)
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+            cipher.init(Cipher.DECRYPT_MODE, getSecretKey(), spec)
 
-                val decryptedBytes = cipher.doFinal(ciphertext)
-                String(decryptedBytes, Charsets.UTF_8)
-            } else {
-                val decodedBytes = Base64.decode(ciphertextString, Base64.NO_WRAP)
-                String(decodedBytes, Charsets.UTF_8)
-            }
+            val decryptedBytes = cipher.doFinal(ciphertext)
+            String(decryptedBytes, Charsets.UTF_8)
         } catch (_: Exception) {
             null
         }
@@ -153,7 +151,11 @@ class AndroidKeystoreSecureStorage(
     }
 
     override fun hasKey(): Boolean {
-        return sharedPreferences.contains(KEY_IV) && sharedPreferences.contains(KEY_CIPHERTEXT)
+        if (sharedPreferences.getString(KEY_IV, null) == "FALLBACK") {
+            deleteKey()
+            return false
+        }
+        return isAndroidKeyStoreAvailable && sharedPreferences.contains(KEY_IV) && sharedPreferences.contains(KEY_CIPHERTEXT)
     }
 
     companion object {

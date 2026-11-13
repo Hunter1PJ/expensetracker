@@ -23,6 +23,21 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun getAccountById(id: Long): AccountEntity?
 
+    @Query("SELECT * FROM accounts WHERE internal_key = :internalKey LIMIT 1")
+    suspend fun getInternalAccount(internalKey: String): AccountEntity?
+
+    @Query("SELECT * FROM accounts WHERE is_archived = 0")
+    suspend fun getActiveAccounts(): List<AccountEntity>
+
+    @Query("SELECT COUNT(*) FROM accounts")
+    suspend fun getAccountCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAccountIfAbsent(account: AccountEntity): Long
+
+    @Query("UPDATE accounts SET is_archived = 0 WHERE internal_key = :internalKey")
+    suspend fun activateInternalAccount(internalKey: String)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAccount(account: AccountEntity): Long
 

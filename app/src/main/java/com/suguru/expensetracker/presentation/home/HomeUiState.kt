@@ -2,6 +2,7 @@ package com.suguru.expensetracker.presentation.home
 
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.parser.TransactionCandidate
 
 data class CurrencySummaryUiModel(
@@ -52,7 +53,7 @@ data class HomeUiState(
     val isAiFeatureEnabled: Boolean = true,
     val isAiConfigured: Boolean = false,
     val isAiExtracting: Boolean = false,
-    val aiExtractionError: String? = null,
+    val aiExtractionError: AiError? = null,
     val extractedCandidates: List<TransactionCandidate> = emptyList()
 ) {
     val hasAccounts: Boolean get() = accounts.isNotEmpty()

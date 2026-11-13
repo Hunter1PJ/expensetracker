@@ -17,7 +17,11 @@ object ExpenseTrackerDatabaseProvider {
                 context.applicationContext,
                 ExpenseTrackerDatabase::class.java,
                 "expense_tracker.db"
-            ).addMigrations(ExpenseTrackerDatabase.MIGRATION_1_2)
+            ).addMigrations(
+                ExpenseTrackerDatabase.MIGRATION_1_2,
+                ExpenseTrackerDatabase.MIGRATION_2_3,
+                ExpenseTrackerDatabase.MIGRATION_3_4
+            )
             .build().also { instance = it }
         }
     }

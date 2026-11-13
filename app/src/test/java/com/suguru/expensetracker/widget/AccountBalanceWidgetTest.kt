@@ -294,6 +294,9 @@ class AccountBalanceWidgetTest {
             )
         )
         override val settings: Flow<AppSettings> = settingsFlow
+        override suspend fun restoreSettings(value: AppSettings) {
+            settingsFlow.value = value
+        }
         override suspend fun setThemeMode(value: ThemeMode) {}
         override suspend fun setPreferredCurrency(value: String?) {}
         override suspend fun setWeekStart(value: WeekStart) {}

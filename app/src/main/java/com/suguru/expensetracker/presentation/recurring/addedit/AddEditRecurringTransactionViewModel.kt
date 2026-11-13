@@ -60,6 +60,11 @@ class AddEditRecurringTransactionViewModel(
     private val _uiState = MutableStateFlow(AddEditRecurringUiState(ruleId = ruleId, isEditMode = ruleId > 0L))
     val uiState: StateFlow<AddEditRecurringUiState> = _uiState.asStateFlow()
 
+    private fun defaultAccountId(accounts: List<Account>, currentSelection: Long?): Long? {
+        if (currentSelection != null && accounts.any { it.id == currentSelection }) return currentSelection
+        return accounts.firstOrNull { it.internalKey == "default" }?.id ?: accounts.firstOrNull()?.id
+    }
+
     init {
         viewModelScope.launch {
             combine(
@@ -69,7 +74,7 @@ class AddEditRecurringTransactionViewModel(
                 Pair(accounts, categories)
             }.collect { (accounts, categories) ->
                 _uiState.update { current ->
-                    val defaultAccount = current.selectedAccountId ?: accounts.firstOrNull()?.id
+                    val defaultAccount = defaultAccountId(accounts, current.selectedAccountId)
                     val filteredCategories = filterCategories(categories, current.type)
                     val defaultCategory = current.selectedCategoryId ?: filteredCategories.firstOrNull()?.id
 
@@ -184,7 +189,7 @@ class AddEditRecurringTransactionViewModel(
         val state = _uiState.value
         if (state.isSaving) return
 
-        val accountId = state.selectedAccountId
+        val accountId = state.selectedAccountId ?: defaultAccountId(state.availableAccounts, null)
         if (accountId == null) {
             _uiState.update { it.copy(errorMessage = "Please select an account") }
             return

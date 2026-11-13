@@ -1,5 +1,9 @@
 package com.suguru.expensetracker.presentation.transactions.add
 
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.setContent
 import com.suguru.expensetracker.domain.fake.FakeAccountRepository
 import com.suguru.expensetracker.domain.fake.FakeCategoryRepository
 import com.suguru.expensetracker.domain.fake.FakeTransactionRepository
@@ -26,10 +30,16 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(AndroidJUnit4::class)
 class AddTransactionViewModelTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
 
     private val testDispatcher = StandardTestDispatcher()
 
@@ -89,6 +99,74 @@ class AddTransactionViewModelTest {
         assertEquals(1, state.categories.size)
         assertEquals(categoryId1, state.selectedCategoryId)
         assertEquals(TransactionType.EXPENSE, state.transactionType)
+    }
+
+    @Test
+    fun `internal default account is selected automatically for expense creation`() = runTest(testDispatcher) {
+        val internalAccountId = accountRepository.insertAccount(
+            Account(
+                name = "Internal Default",
+                type = AccountType.CASH,
+                initialBalance = Money(0L, "USD"),
+                internalKey = "default"
+            )
+        )
+        accountRepository.insertAccount(
+            Account(name = "Legacy Checking", type = AccountType.BANK, initialBalance = Money(100000L, "USD"))
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(internalAccountId, viewModel.uiState.value.selectedAccountId)
+    }
+
+    @Test
+    fun `expense form hides explicit account selector`() {
+        val expenseCategory = Category(
+            name = "Groceries",
+            type = CategoryType.EXPENSE,
+            iconName = "shopping_cart",
+            colorHex = "#10B981"
+        )
+
+        composeTestRule.setContent {
+            AddTransactionScreenContent(
+                uiState = AddTransactionUiState(
+                    transactionType = TransactionType.EXPENSE,
+                    accounts = listOf(
+                        Account(
+                            id = 1L,
+                            name = "Internal Default",
+                            type = AccountType.CASH,
+                            initialBalance = Money(0L, "USD"),
+                            internalKey = "default"
+                        ),
+                        Account(
+                            id = 2L,
+                            name = "Legacy Checking",
+                            type = AccountType.BANK,
+                            initialBalance = Money(25000L, "USD")
+                        )
+                    ),
+                    categories = listOf(expenseCategory),
+                    selectedAccountId = 1L,
+                    selectedCategoryId = expenseCategory.id
+                ),
+                onNavigateBack = {},
+                onTransactionTypeChanged = {},
+                onAmountChanged = {},
+                onAccountSelected = {},
+                onDestinationAccountSelected = {},
+                onCategorySelected = {},
+                onNoteChanged = {},
+                onTransactionTimeChanged = {},
+                onDismissError = {},
+                onSaveTransaction = {}
+            )
+        }
+
+        composeTestRule.onNodeWithTag("account_selector").assertDoesNotExist()
     }
 
     @Test
@@ -432,10 +510,32 @@ class AddTransactionViewModelTest {
         assertEquals("Taxi ride to office", state.note)
         assertEquals(accountId, state.selectedAccountId)
         assertEquals(categoryId, state.selectedCategoryId)
+        assertEquals(com.suguru.expensetracker.domain.parser.CandidateSource.OFFLINE_PARSER, state.candidateSource)
         assertNull(state.aiAmountWarning)
         assertFalse(state.aiAccountMatchAmbiguous)
         assertFalse(state.aiCategoryMatchAmbiguous)
         assertFalse(state.isSavedSuccessfully) // Strict: must never save automatically
+    }
+
+    @Test
+    fun `populateFromCandidate preserves Gemini source and fallback warning`() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        val candidate = com.suguru.expensetracker.domain.parser.TransactionCandidate(
+            rawText = "Paid 25 for taxi",
+            suggestedTitle = "Taxi",
+            transactionType = TransactionType.EXPENSE,
+            amount = Money(2500L, "USD"),
+            date = java.time.LocalDate.of(2026, 11, 10),
+            confidence = com.suguru.expensetracker.domain.parser.ParseConfidence.HIGH,
+            warnings = listOf(com.suguru.expensetracker.domain.parser.ParseWarning.INVALID_API_KEY),
+            source = com.suguru.expensetracker.domain.parser.CandidateSource.OFFLINE_PARSER
+        )
+
+        viewModel.populateFromCandidate(candidate)
+
+        assertEquals(com.suguru.expensetracker.domain.parser.CandidateSource.OFFLINE_PARSER, viewModel.uiState.value.candidateSource)
+        assertTrue(viewModel.uiState.value.aiSourceWarnings.contains(com.suguru.expensetracker.domain.parser.ParseWarning.INVALID_API_KEY))
+        assertFalse(viewModel.uiState.value.isSavedSuccessfully)
     }
 
     @Test

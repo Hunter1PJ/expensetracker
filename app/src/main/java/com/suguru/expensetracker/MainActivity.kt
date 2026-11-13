@@ -17,7 +17,6 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 class MainActivity : ComponentActivity() {
   private val currentDestinationState = mutableStateOf<NavDestination?>(null)
-  private val currentAccountIdState = mutableStateOf<Long?>(null)
   private val currentBudgetIdState = mutableStateOf<Long?>(null)
   private val currentTransactionTypeState = mutableStateOf<TransactionType?>(null)
 
@@ -35,7 +34,6 @@ class MainActivity : ComponentActivity() {
         else -> isSystemInDarkTheme()
       }
       val dest by currentDestinationState
-      val accId by currentAccountIdState
       val budgetId by currentBudgetIdState
       val txType by currentTransactionTypeState
 
@@ -43,12 +41,10 @@ class MainActivity : ComponentActivity() {
         ExpenseTrackerApp(
           appContainer = appContainer,
           initialDestination = dest,
-          initialAccountId = accId,
           initialBudgetId = budgetId,
           initialTransactionType = txType,
           onResetNavigation = {
             currentDestinationState.value = null
-            currentAccountIdState.value = null
             currentBudgetIdState.value = null
             currentTransactionTypeState.value = null
           }
@@ -66,16 +62,14 @@ class MainActivity : ComponentActivity() {
   private fun handleIntent(intent: Intent?) {
     if (intent?.action == "com.suguru.expensetracker.action.NAVIGATE") {
       val destStr = intent.getStringExtra("destination")
-      val accId = intent.getLongExtra("accountId", -1L).takeIf { it != -1L }
       val budgetId = intent.getLongExtra("budgetId", -1L).takeIf { it != -1L }
       val typeStr = intent.getStringExtra("transactionType")
       currentDestinationState.value = when (destStr) {
-        "account_management" -> NavDestination.AccountManagement
+        "home" -> NavDestination.Home
         "add_transaction" -> NavDestination.AddTransaction
         "budgets" -> NavDestination.Budgets
         else -> null
       }
-      currentAccountIdState.value = accId
       currentBudgetIdState.value = budgetId
       currentTransactionTypeState.value = typeStr?.let {
         try {

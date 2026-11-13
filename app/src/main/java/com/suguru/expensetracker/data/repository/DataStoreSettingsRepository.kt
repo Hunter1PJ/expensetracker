@@ -82,6 +82,22 @@ class DataStoreSettingsRepository(
             )
         }
 
+    override suspend fun restoreSettings(value: AppSettings) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.THEME_MODE] = value.themeMode.name
+            if (value.preferredCurrencyCode == null) {
+                preferences.remove(PreferencesKeys.PREFERRED_CURRENCY_CODE)
+            } else {
+                preferences[PreferencesKeys.PREFERRED_CURRENCY_CODE] = value.preferredCurrencyCode
+            }
+            preferences[PreferencesKeys.WEEK_START] = value.weekStart.name
+            preferences[PreferencesKeys.DATE_FORMAT] = value.dateFormat.name
+            preferences[PreferencesKeys.TIME_FORMAT] = value.timeFormat.name
+            preferences[PreferencesKeys.SHOW_CURRENCY_CODE] = value.showCurrencyCode
+            preferences[PreferencesKeys.CONFIRM_BEFORE_DELETE] = value.confirmBeforeDelete
+        }
+    }
+
     override suspend fun setThemeMode(value: ThemeMode) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME_MODE] = value.name

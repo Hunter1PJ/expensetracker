@@ -215,8 +215,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
     private fun createNavigateAction(context: Context, data: AccountBalanceWidgetData): Action {
         val intent = Intent(context, MainActivity::class.java).apply {
             action = "com.suguru.expensetracker.action.NAVIGATE"
-            putExtra("destination", "account_management")
-            putExtra("accountId", data.accountId)
+            putExtra("destination", "home")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
         return actionStartActivity(intent)

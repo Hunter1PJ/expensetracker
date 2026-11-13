@@ -18,6 +18,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY is_archived ASC, is_system DESC, name ASC")
     fun observeAllCategories(): Flow<List<CategoryEntity>>
 
+    @Query("SELECT * FROM categories")
+    suspend fun getAllCategories(): List<CategoryEntity>
+
     @Query("SELECT * FROM categories WHERE is_archived = 0 AND (type = :type OR type = 'BOTH') ORDER BY is_system DESC, name ASC")
     fun observeActiveCategoriesByType(type: CategoryType): Flow<List<CategoryEntity>>
 
