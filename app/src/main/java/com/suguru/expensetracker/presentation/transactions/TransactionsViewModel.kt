@@ -23,13 +23,12 @@ import java.time.ZoneId
 private data class FilterParams(
     val query: String,
     val typeFilter: TransactionTypeFilter,
-    val accountFilterId: Long?,
     val categoryFilterId: Long?
 )
 
 /**
- * ViewModel managing the full Transaction History list, search, and multi-faceted filtering.
- * Reactively joins transaction data with accounts and categories to avoid N+1 queries.
+ * ViewModel managing the full Transaction History list, search, and filtering.
+ * Preserves historical Transfer visibility while hiding multi-account filtering and selection.
  */
 class TransactionsViewModel(
     private val observeTransactionsUseCase: ObserveTransactionsUseCase,
@@ -40,19 +39,16 @@ class TransactionsViewModel(
 
     private val _searchQuery = MutableStateFlow("")
     private val _selectedType = MutableStateFlow(TransactionTypeFilter.ALL)
-    private val _selectedAccountId = MutableStateFlow<Long?>(null)
     private val _selectedCategoryId = MutableStateFlow<Long?>(null)
 
     private val _filterParams = combine(
         _searchQuery,
         _selectedType,
-        _selectedAccountId,
         _selectedCategoryId
-    ) { query, type, accountId, categoryId ->
+    ) { query, type, categoryId ->
         FilterParams(
             query = query,
             typeFilter = type,
-            accountFilterId = accountId,
             categoryFilterId = categoryId
         )
     }
@@ -78,18 +74,7 @@ class TransactionsViewModel(
             }
             if (!matchesType) return@filter false
 
-            // 2. Account filter
-            val matchesAccount = if (filter.accountFilterId == null) {
-                true
-            } else {
-                when (tx.type) {
-                    TransactionType.EXPENSE, TransactionType.INCOME -> tx.accountId == filter.accountFilterId
-                    TransactionType.TRANSFER -> tx.accountId == filter.accountFilterId || tx.destinationAccountId == filter.accountFilterId
-                }
-            }
-            if (!matchesAccount) return@filter false
-
-            // 3. Category filter
+            // 2. Category filter
             val matchesCategory = if (filter.categoryFilterId == null) {
                 true
             } else {
@@ -100,20 +85,16 @@ class TransactionsViewModel(
             }
             if (!matchesCategory) return@filter false
 
-            // 4. Search query filter
+            // 3. Search query filter (note, category, type)
             if (filter.query.isNotBlank()) {
                 val cleanQuery = filter.query.trim().lowercase()
-                val sourceAccount = accountMap[tx.accountId]
-                val destAccount = tx.destinationAccountId?.let { accountMap[it] }
                 val category = tx.categoryId?.let { categoryMap[it] }
 
                 val noteMatches = tx.note?.lowercase()?.contains(cleanQuery) == true
-                val sourceAccountMatches = sourceAccount?.name?.lowercase()?.contains(cleanQuery) == true
-                val destAccountMatches = destAccount?.name?.lowercase()?.contains(cleanQuery) == true
                 val categoryMatches = category?.name?.lowercase()?.contains(cleanQuery) == true
                 val typeMatches = tx.type.name.lowercase().contains(cleanQuery)
 
-                noteMatches || sourceAccountMatches || destAccountMatches || categoryMatches || typeMatches
+                noteMatches || categoryMatches || typeMatches
             } else {
                 true
             }
@@ -154,9 +135,7 @@ class TransactionsViewModel(
             isLoading = false,
             searchQuery = filter.query,
             selectedType = filter.typeFilter,
-            selectedAccountId = filter.accountFilterId,
             selectedCategoryId = filter.categoryFilterId,
-            accounts = accounts,
             categories = categories,
             groupedTransactions = dateGroups,
             hasAnyTransactionsInDb = transactions.isNotEmpty(),
@@ -176,10 +155,6 @@ class TransactionsViewModel(
         _selectedType.value = type
     }
 
-    fun onAccountFilterChanged(accountId: Long?) {
-        _selectedAccountId.value = accountId
-    }
-
     fun onCategoryFilterChanged(categoryId: Long?) {
         _selectedCategoryId.value = categoryId
     }
@@ -187,7 +162,6 @@ class TransactionsViewModel(
     fun clearFilters() {
         _searchQuery.value = ""
         _selectedType.value = TransactionTypeFilter.ALL
-        _selectedAccountId.value = null
         _selectedCategoryId.value = null
     }
 
@@ -205,13 +179,7 @@ class TransactionsViewModel(
             TransactionType.EXPENSE -> {
                 val formattedAmount = "- ${MoneyParser.format(tx.amount, includeSymbol = true, useGrouping = true, showExplicitSign = false)}"
                 val title = category?.name ?: "Expense"
-                val subtitle = buildString {
-                    append(sourceAccount?.name ?: "Account")
-                    if (!tx.note.isNullOrBlank()) {
-                        append(" • ")
-                        append(tx.note)
-                    }
-                }
+                val subtitle = tx.note?.trim()?.takeIf { it.isNotEmpty() } ?: ""
 
                 TransactionListItemUiModel(
                     id = tx.id,
@@ -231,13 +199,7 @@ class TransactionsViewModel(
             TransactionType.INCOME -> {
                 val formattedAmount = "+ ${MoneyParser.format(tx.amount, includeSymbol = true, useGrouping = true, showExplicitSign = false)}"
                 val title = category?.name ?: "Income"
-                val subtitle = buildString {
-                    append(sourceAccount?.name ?: "Account")
-                    if (!tx.note.isNullOrBlank()) {
-                        append(" • ")
-                        append(tx.note)
-                    }
-                }
+                val subtitle = tx.note?.trim()?.takeIf { it.isNotEmpty() } ?: ""
 
                 TransactionListItemUiModel(
                     id = tx.id,

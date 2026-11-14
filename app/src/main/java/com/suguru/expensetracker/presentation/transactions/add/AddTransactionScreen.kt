@@ -73,7 +73,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
-import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.components.EmptyState
@@ -109,8 +108,6 @@ fun AddTransactionScreen(
         onNavigateBack = onNavigateBack,
         onTransactionTypeChanged = viewModel::onTransactionTypeChanged,
         onAmountChanged = viewModel::onAmountChanged,
-        onAccountSelected = viewModel::onAccountSelected,
-        onDestinationAccountSelected = viewModel::onDestinationAccountSelected,
         onCategorySelected = viewModel::onCategorySelected,
         onNoteChanged = viewModel::onNoteChanged,
         onTransactionTimeChanged = viewModel::onTransactionTimeChanged,
@@ -127,8 +124,6 @@ fun AddTransactionScreenContent(
     onNavigateBack: () -> Unit,
     onTransactionTypeChanged: (TransactionType) -> Unit,
     onAmountChanged: (String) -> Unit,
-    onAccountSelected: (Long) -> Unit,
-    onDestinationAccountSelected: (Long) -> Unit,
     onCategorySelected: (Long) -> Unit,
     onNoteChanged: (String) -> Unit,
     onTransactionTimeChanged: (Instant) -> Unit,
@@ -258,57 +253,21 @@ fun AddTransactionScreenContent(
                             )
                         }
 
-                        // Account suggestions / warnings
-                        if (uiState.aiAccountMatchAmbiguous && uiState.aiAccountSuggestion != null) {
+                        // Category suggestions / warnings
+                        if (uiState.aiCategoryMatchAmbiguous && uiState.aiCategorySuggestion != null) {
                             Text(
-                                text = "• " + stringResource(R.string.ai_ambiguous_account_warning, uiState.aiAccountSuggestion),
+                                text = "• " + stringResource(R.string.ai_ambiguous_category_warning, uiState.aiCategorySuggestion),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.financialWarning,
-                                modifier = Modifier.testTag("ai_ambiguous_account_warning")
+                                modifier = Modifier.testTag("ai_ambiguous_category_warning")
                             )
-                        } else if (uiState.selectedAccountId == null && uiState.aiAccountSuggestion != null) {
+                        } else if (uiState.selectedCategoryId == null && uiState.aiCategorySuggestion != null) {
                             Text(
-                                text = "• " + stringResource(R.string.ai_unmatched_account_hint, uiState.aiAccountSuggestion),
+                                text = "• " + stringResource(R.string.ai_unmatched_category_hint, uiState.aiCategorySuggestion),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                modifier = Modifier.testTag("ai_unmatched_account_hint")
+                                modifier = Modifier.testTag("ai_unmatched_category_hint")
                             )
-                        }
-
-                        // Category suggestions / warnings
-                        if (uiState.transactionType != TransactionType.TRANSFER) {
-                            if (uiState.aiCategoryMatchAmbiguous && uiState.aiCategorySuggestion != null) {
-                                Text(
-                                    text = "• " + stringResource(R.string.ai_ambiguous_category_warning, uiState.aiCategorySuggestion),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ExpenseTrackerTheme.extendedColors.financialWarning,
-                                    modifier = Modifier.testTag("ai_ambiguous_category_warning")
-                                )
-                            } else if (uiState.selectedCategoryId == null && uiState.aiCategorySuggestion != null) {
-                                Text(
-                                    text = "• " + stringResource(R.string.ai_unmatched_category_hint, uiState.aiCategorySuggestion),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                    modifier = Modifier.testTag("ai_unmatched_category_hint")
-                                )
-                            }
-                        } else {
-                            // Transfer destination warnings
-                            if (uiState.aiDestinationAccountMatchAmbiguous && uiState.aiDestinationAccountSuggestion != null) {
-                                Text(
-                                    text = "• " + stringResource(R.string.ai_ambiguous_dest_account_warning, uiState.aiDestinationAccountSuggestion),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ExpenseTrackerTheme.extendedColors.financialWarning,
-                                    modifier = Modifier.testTag("ai_ambiguous_dest_account_warning")
-                                )
-                            } else if (uiState.selectedDestinationAccountId == null && uiState.aiDestinationAccountSuggestion != null) {
-                                Text(
-                                    text = "• " + stringResource(R.string.ai_unmatched_dest_account_hint, uiState.aiDestinationAccountSuggestion),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                    modifier = Modifier.testTag("ai_unmatched_dest_account_hint")
-                                )
-                            }
                         }
 
                         uiState.aiWarnings.forEach { warning ->
@@ -391,8 +350,7 @@ fun AddTransactionScreenContent(
             ) {
                 val types = listOf(
                     TransactionType.EXPENSE to stringResource(R.string.type_expense),
-                    TransactionType.INCOME to stringResource(R.string.type_income),
-                    TransactionType.TRANSFER to stringResource(R.string.type_transfer)
+                    TransactionType.INCOME to stringResource(R.string.type_income)
                 )
 
                 types.forEachIndexed { index, (type, label) ->
@@ -489,8 +447,8 @@ fun AddTransactionScreenContent(
                 }
             }
 
-            // Check if accounts exist
-            if (!uiState.hasAccounts) {
+            // Check if internal default account is available
+            if (!uiState.hasDefaultAccount) {
                 EmptyState(
                     title = stringResource(R.string.no_accounts_title),
                     description = stringResource(R.string.no_accounts_desc),
@@ -499,81 +457,39 @@ fun AddTransactionScreenContent(
                     testTag = "no_accounts_empty_state"
                 )
             } else {
-                // 3. Destination Account Selector (If Transfer)
-                if (uiState.transactionType == TransactionType.TRANSFER) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                    ) {
-                        SectionHeader(title = stringResource(R.string.to_account_label))
+                // 3. Category Selector (Expense or Income)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 540.dp)
+                ) {
+                    SectionHeader(title = stringResource(R.string.category_label))
 
-                        Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
+                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
 
-                        if (uiState.validDestinationAccounts.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.no_dest_accounts_desc),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                modifier = Modifier.padding(vertical = ExpenseTrackerSpacing.sm)
-                            )
-                        } else {
-                            FlowRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("destination_account_selector"),
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                            ) {
-                                uiState.validDestinationAccounts.forEach { account ->
-                                    val isSelected = uiState.selectedDestinationAccountId == account.id
-                                    AccountChip(
-                                        account = account,
-                                        isSelected = isSelected,
-                                        onClick = { onDestinationAccountSelected(account.id) },
-                                        testTag = "dest_account_item_${account.id}"
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 5. Category Selector (If Expense or Income)
-                if (uiState.transactionType != TransactionType.TRANSFER) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                    ) {
-                        SectionHeader(title = stringResource(R.string.category_label))
-
-                        Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                        if (uiState.categories.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.no_categories_desc),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                modifier = Modifier.padding(vertical = ExpenseTrackerSpacing.sm)
-                            )
-                        } else {
-                            FlowRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("category_selector"),
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                            ) {
-                                uiState.categories.forEach { category ->
-                                    val isSelected = uiState.selectedCategoryId == category.id
-                                    CategoryChip(
-                                        category = category,
-                                        isSelected = isSelected,
-                                        onClick = { onCategorySelected(category.id) },
-                                        testTag = "category_item_${category.id}"
-                                    )
-                                }
+                    if (uiState.categories.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.no_categories_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                            modifier = Modifier.padding(vertical = ExpenseTrackerSpacing.sm)
+                        )
+                    } else {
+                        FlowRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("category_selector"),
+                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                        ) {
+                            uiState.categories.forEach { category ->
+                                val isSelected = uiState.selectedCategoryId == category.id
+                                CategoryChip(
+                                    category = category,
+                                    isSelected = isSelected,
+                                    onClick = { onCategorySelected(category.id) },
+                                    testTag = "category_item_${category.id}"
+                                )
                             }
                         }
                     }
@@ -670,7 +586,7 @@ fun AddTransactionScreenContent(
                 // 8. Save Button
                 Button(
                     onClick = onSaveTransaction,
-                    enabled = !uiState.isSaving && uiState.hasAccounts,
+                    enabled = !uiState.isSaving && uiState.hasDefaultAccount,
                     shape = ExpenseTrackerRadius.button,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -735,66 +651,6 @@ fun AddTransactionScreenContent(
             }
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-}
-
-@Composable
-private fun AccountChip(
-    account: Account,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    testTag: String
-) {
-    Surface(
-        shape = ExpenseTrackerRadius.chip,
-        color = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            ExpenseTrackerTheme.extendedColors.cardBackground
-        },
-        border = androidx.compose.foundation.BorderStroke(
-            width = if (isSelected) 1.5.dp else 1.dp,
-            color = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                ExpenseTrackerTheme.extendedColors.cardBorder
-            }
-        ),
-        modifier = modifier
-            .clip(ExpenseTrackerRadius.chip)
-            .clickable(onClick = onClick)
-            .testTag(testTag)
-    ) {
-        Row(
-            modifier = Modifier.padding(
-                horizontal = ExpenseTrackerSpacing.md,
-                vertical = ExpenseTrackerSpacing.sm
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-        ) {
-            Icon(
-                imageVector = Icons.Default.AccountBalance,
-                contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.textSecondary,
-                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
-            )
-            Text(
-                text = account.name,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
-            )
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
-                )
-            }
         }
     }
 }

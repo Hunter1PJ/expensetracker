@@ -3,11 +3,11 @@ package com.suguru.expensetracker.presentation.transactions.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.error.DomainException
+import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.CategoryType
 import com.suguru.expensetracker.domain.model.Transaction
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.usecase.account.GetAccountUseCase
-import com.suguru.expensetracker.domain.usecase.account.ObserveActiveAccountsUseCase
 import com.suguru.expensetracker.domain.usecase.category.GetCategoryUseCase
 import com.suguru.expensetracker.domain.usecase.category.ObserveCategoriesByTypeUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.GetTransactionUseCase
@@ -28,27 +28,32 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 
 /**
- * ViewModel managing state and operations for editing an existing financial transaction.
- * Preserves historical archived accounts and categories while strictly enforcing domain rules.
+ * ViewModel managing state and operations for editing an existing Expense or Income transaction.
+ * Preserves the persisted account reference and keeps historical Transfer records read-only.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditTransactionViewModel(
     private val transactionId: Long,
     private val getTransactionUseCase: GetTransactionUseCase,
     private val updateTransactionUseCase: UpdateTransactionUseCase,
-    private val observeActiveAccountsUseCase: ObserveActiveAccountsUseCase,
     private val observeCategoriesByTypeUseCase: ObserveCategoriesByTypeUseCase,
     private val getAccountUseCase: GetAccountUseCase,
     private val getCategoryUseCase: GetCategoryUseCase,
     private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
 ) : ViewModel() {
 
+    private companion object {
+        const val TRANSFER_READ_ONLY_MESSAGE =
+            "Historical transfer transactions are read-only and cannot be edited or converted."
+        const val TRANSFER_NOT_SUPPORTED_MESSAGE =
+            "Transfers are not supported."
+    }
+
     private val _uiState = MutableStateFlow(EditTransactionUiState(transactionId = transactionId, isLoading = true))
     val uiState: StateFlow<EditTransactionUiState> = _uiState.asStateFlow()
 
-    private var historicalSourceAccount: com.suguru.expensetracker.domain.model.Account? = null
-    private var historicalDestAccount: com.suguru.expensetracker.domain.model.Account? = null
-    private var historicalCategory: com.suguru.expensetracker.domain.model.Category? = null
+    private var persistedTransaction: Transaction? = null
+    private var historicalCategory: Category? = null
 
     init {
         loadInitialData()
@@ -62,16 +67,14 @@ class EditTransactionViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
+                            isTransactionLoaded = false,
                             error = AddTransactionError.Unknown("Transaction not found")
                         )
                     }
                     return@launch
                 }
 
-                // Check historical archived references
-                historicalSourceAccount = getAccountUseCase(tx.accountId)
-                historicalDestAccount = tx.destinationAccountId?.let { getAccountUseCase(it) }
-                historicalCategory = tx.categoryId?.let { getCategoryUseCase(it) }
+                persistedTransaction = tx
 
                 // Format amount into plain decimal string for input field
                 val decimalAmount = MoneyParser.format(
@@ -81,61 +84,60 @@ class EditTransactionViewModel(
                     showExplicitSign = false
                 )
 
+                if (tx.type == TransactionType.TRANSFER) {
+                    val fromAccount = getAccountUseCase(tx.accountId)
+                    val toAccount = tx.destinationAccountId?.let { getAccountUseCase(it) }
+                    val formattedAmount = MoneyParser.format(
+                        money = tx.amount,
+                        includeSymbol = true,
+                        useGrouping = true,
+                        showExplicitSign = false
+                    )
+
+                    _uiState.update {
+                        it.copy(
+                            transactionId = tx.id,
+                            transactionType = tx.type,
+                            amount = decimalAmount,
+                            currencyCode = tx.amount.currencyCode,
+                            selectedCategoryId = null,
+                            note = tx.note ?: "",
+                            transactionTime = tx.transactionTime,
+                            isLoading = false,
+                            isTransactionLoaded = true,
+                            isReadOnlyTransfer = true,
+                            transferFromAccountName = fromAccount?.name,
+                            transferToAccountName = toAccount?.name,
+                            transferAmountFormatted = formattedAmount
+                        )
+                    }
+                    return@launch
+                }
+
+                historicalCategory = tx.categoryId?.let { getCategoryUseCase(it) }
+
                 _uiState.update {
                     it.copy(
                         transactionId = tx.id,
                         transactionType = tx.type,
                         amount = decimalAmount,
-                        selectedAccountId = tx.accountId,
-                        selectedDestinationAccountId = tx.destinationAccountId,
+                        currencyCode = tx.amount.currencyCode,
                         selectedCategoryId = tx.categoryId,
                         note = tx.note ?: "",
                         transactionTime = tx.transactionTime,
-                        isLoading = false
+                        isLoading = false,
+                        isTransactionLoaded = true,
+                        isReadOnlyTransfer = false
                     )
                 }
 
-                observeAccounts()
                 observeCategories()
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        isTransactionLoaded = false,
                         error = AddTransactionError.Unknown(e.localizedMessage ?: "Failed to load transaction")
-                    )
-                }
-            }
-        }
-    }
-
-    private fun defaultAccountId(accounts: List<com.suguru.expensetracker.domain.model.Account>, currentSelection: Long?): Long? {
-        if (currentSelection != null && accounts.any { it.id == currentSelection }) return currentSelection
-        return accounts.firstOrNull { it.internalKey == "default" }?.id ?: accounts.firstOrNull()?.id
-    }
-
-    private fun observeAccounts() {
-        viewModelScope.launch {
-            observeActiveAccountsUseCase().collect { activeAccounts ->
-                _uiState.update { state ->
-                    // Merge active accounts with historical archived account if it exists and was selected
-                    val allAccounts = activeAccounts.toMutableList()
-                    val histSource = historicalSourceAccount
-                    if (histSource != null && histSource.isArchived && allAccounts.none { it.id == histSource.id }) {
-                        allAccounts.add(histSource)
-                    }
-                    val histDest = historicalDestAccount
-                    if (histDest != null && histDest.isArchived && allAccounts.none { it.id == histDest.id }) {
-                        allAccounts.add(histDest)
-                    }
-
-                    val updatedAccountId = defaultAccountId(allAccounts, state.selectedAccountId)
-                    val isDestValid = allAccounts.any { it.id == state.selectedDestinationAccountId }
-                    val updatedDestId = if (isDestValid) state.selectedDestinationAccountId else null
-
-                    state.copy(
-                        accounts = allAccounts,
-                        selectedAccountId = updatedAccountId,
-                        selectedDestinationAccountId = updatedDestId
                     )
                 }
             }
@@ -163,7 +165,7 @@ class EditTransactionViewModel(
                         }
 
                         val isSelectedCategoryValid = allCategories.any { it.id == state.selectedCategoryId }
-                        val updatedCategoryId = if (state.transactionType == TransactionType.TRANSFER) {
+                        val updatedCategoryId = if (state.isReadOnlyTransfer || state.transactionType == TransactionType.TRANSFER) {
                             null
                         } else if (isSelectedCategoryValid) {
                             state.selectedCategoryId
@@ -181,54 +183,40 @@ class EditTransactionViewModel(
     }
 
     fun onTransactionTypeChanged(type: TransactionType) {
-        _uiState.update { state ->
-            state.copy(
-                transactionType = type,
-                selectedCategoryId = if (type == TransactionType.TRANSFER) null else state.selectedCategoryId,
-                selectedDestinationAccountId = if (type == TransactionType.TRANSFER) state.selectedDestinationAccountId else null,
-                error = null
-            )
+        val state = _uiState.value
+        val persistedType = persistedTransaction?.type
+        if (state.isReadOnlyTransfer || persistedType == TransactionType.TRANSFER) {
+            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_READ_ONLY_MESSAGE)) }
+            return
         }
+        if (type == TransactionType.TRANSFER) {
+            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_NOT_SUPPORTED_MESSAGE)) }
+            return
+        }
+        // Persisted transaction type (Expense vs Income) is immutable on edit.
+        _uiState.update { it.copy(error = null) }
     }
 
     fun onAmountChanged(amount: String) {
+        if (_uiState.value.isReadOnlyTransfer) return
         val sanitized = amount.replace(',', '.')
         if (sanitized.isEmpty() || sanitized.matches(Regex("^\\d*\\.?\\d{0,3}$"))) {
             _uiState.update { it.copy(amount = sanitized, error = null) }
         }
     }
 
-    fun onAccountSelected(accountId: Long) {
-        _uiState.update { state ->
-            val newSelectedAccount = state.accounts.find { it.id == accountId }
-            val newCurrency = newSelectedAccount?.initialBalance?.currencyCode
-
-            val destAccount = state.accounts.find { it.id == state.selectedDestinationAccountId }
-            val isDestStillValid = destAccount != null &&
-                    destAccount.id != accountId &&
-                    destAccount.initialBalance.currencyCode == newCurrency
-
-            state.copy(
-                selectedAccountId = accountId,
-                selectedDestinationAccountId = if (isDestStillValid) state.selectedDestinationAccountId else null,
-                error = null
-            )
-        }
-    }
-
-    fun onDestinationAccountSelected(accountId: Long) {
-        _uiState.update { it.copy(selectedDestinationAccountId = accountId, error = null) }
-    }
-
     fun onCategorySelected(categoryId: Long) {
+        if (_uiState.value.isReadOnlyTransfer) return
         _uiState.update { it.copy(selectedCategoryId = categoryId, error = null) }
     }
 
     fun onNoteChanged(note: String) {
+        if (_uiState.value.isReadOnlyTransfer) return
         _uiState.update { it.copy(note = note) }
     }
 
     fun onTransactionTimeChanged(time: Instant) {
+        if (_uiState.value.isReadOnlyTransfer) return
         _uiState.update { it.copy(transactionTime = time) }
     }
 
@@ -240,20 +228,22 @@ class EditTransactionViewModel(
         val state = _uiState.value
         if (state.isSaving) return
 
-        // 1. Validate Account existence
-        if (!state.hasAccounts || state.selectedAccountId == null) {
-            _uiState.update { it.copy(error = AddTransactionError.AccountRequired) }
+        val existing = persistedTransaction
+        if (existing == null || !state.isTransactionLoaded) {
+            _uiState.update { it.copy(error = AddTransactionError.Unknown("Transaction not found")) }
             return
         }
 
-        val sourceAccount = state.selectedAccount
-        if (sourceAccount == null) {
-            _uiState.update { it.copy(error = AddTransactionError.AccountRequired) }
+        if (state.isReadOnlyTransfer ||
+            existing.type == TransactionType.TRANSFER ||
+            state.transactionType == TransactionType.TRANSFER
+        ) {
+            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_READ_ONLY_MESSAGE)) }
             return
         }
 
-        // 2. Validate Amount
-        val parseResult = MoneyParser.parse(state.amount, sourceAccount.initialBalance.currencyCode)
+        // 1. Validate Amount using the persisted transaction currency
+        val parseResult = MoneyParser.parse(state.amount, existing.amount.currencyCode)
         if (parseResult.isFailure) {
             _uiState.update { it.copy(error = AddTransactionError.InvalidAmount) }
             return
@@ -265,59 +255,26 @@ class EditTransactionViewModel(
             return
         }
 
-        // 3. Validate Category / Destination based on type
-        when (state.transactionType) {
-            TransactionType.EXPENSE, TransactionType.INCOME -> {
-                if (state.selectedCategoryId == null) {
-                    _uiState.update { it.copy(error = AddTransactionError.CategoryRequired) }
-                    return
-                }
-            }
-            TransactionType.TRANSFER -> {
-                if (state.selectedDestinationAccountId == null) {
-                    _uiState.update { it.copy(error = AddTransactionError.DestinationRequired) }
-                    return
-                }
-                if (state.selectedAccountId == state.selectedDestinationAccountId) {
-                    _uiState.update { it.copy(error = AddTransactionError.SameSourceAndDestination) }
-                    return
-                }
-                val destAccount = state.selectedDestinationAccount
-                if (destAccount == null || destAccount.initialBalance.currencyCode != sourceAccount.initialBalance.currencyCode) {
-                    _uiState.update { it.copy(error = AddTransactionError.CurrencyMismatch) }
-                    return
-                }
-            }
+        // 2. Validate Category
+        if (state.selectedCategoryId == null) {
+            _uiState.update { it.copy(error = AddTransactionError.CategoryRequired) }
+            return
         }
 
-        // 4. Construct updated domain transaction
-        val updatedTransaction = Transaction(
-            id = transactionId,
-            type = state.transactionType,
+        // 3. Construct updated domain transaction preserving original persisted accountId & type
+        val updatedTransaction = existing.copy(
             amount = money,
-            accountId = sourceAccount.id,
-            destinationAccountId = if (state.transactionType == TransactionType.TRANSFER) state.selectedDestinationAccountId else null,
-            categoryId = if (state.transactionType != TransactionType.TRANSFER) state.selectedCategoryId else null,
+            categoryId = state.selectedCategoryId,
             note = state.note.trim().ifEmpty { null },
             transactionTime = state.transactionTime
         )
 
-        // 5. Execute use case
+        // 4. Execute use case
         _uiState.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
             try {
                 updateTransactionUseCase(updatedTransaction)
-                widgetRefreshCoordinator?.refreshAccountBalanceWidgets(updatedTransaction.accountId)
-                updatedTransaction.destinationAccountId?.let { destId ->
-                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(destId)
-                }
-                // Also refresh original account just in case it was changed
-                historicalSourceAccount?.let { orig ->
-                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(orig.id)
-                }
-                historicalDestAccount?.let { origDest ->
-                    widgetRefreshCoordinator?.refreshAccountBalanceWidgets(origDest.id)
-                }
+                widgetRefreshCoordinator?.refreshAccountBalanceWidgets(existing.accountId)
                 _uiState.update { it.copy(isSaving = false, isSavedSuccessfully = true, error = null) }
                 onSuccess()
             } catch (e: DomainException) {

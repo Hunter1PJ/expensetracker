@@ -243,7 +243,6 @@ fun ExpenseTrackerApp(
                     transactionId = txId,
                     getTransactionUseCase = resolvedContainer!!.getTransactionUseCase,
                     updateTransactionUseCase = resolvedContainer.updateTransactionUseCase,
-                    observeActiveAccountsUseCase = resolvedContainer.observeActiveAccountsUseCase,
                     observeCategoriesByTypeUseCase = resolvedContainer.observeCategoriesByTypeUseCase,
                     getAccountUseCase = resolvedContainer.getAccountUseCase,
                     getCategoryUseCase = resolvedContainer.getCategoryUseCase
@@ -358,7 +357,8 @@ fun ExpenseTrackerApp(
                     updateRecurringTransactionUseCase = resolvedContainer.updateRecurringTransactionUseCase,
                     getRecurringTransactionUseCase = resolvedContainer.getRecurringTransactionUseCase,
                     observeActiveAccountsUseCase = resolvedContainer.observeActiveAccountsUseCase,
-                    observeActiveCategoriesUseCase = resolvedContainer.observeActiveCategoriesUseCase
+                    observeActiveCategoriesUseCase = resolvedContainer.observeActiveCategoriesUseCase,
+                    getCategoryUseCase = resolvedContainer.getCategoryUseCase
                 )
             }
 

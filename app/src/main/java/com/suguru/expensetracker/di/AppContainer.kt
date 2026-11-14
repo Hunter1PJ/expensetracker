@@ -372,7 +372,6 @@ class AppContainer(private val context: Context) {
             transactionId = transactionId,
             getTransactionUseCase = getTransactionUseCase,
             updateTransactionUseCase = updateTransactionUseCase,
-            observeActiveAccountsUseCase = observeActiveAccountsUseCase,
             observeCategoriesByTypeUseCase = observeCategoriesByTypeUseCase,
             getAccountUseCase = getAccountUseCase,
             getCategoryUseCase = getCategoryUseCase,
@@ -423,7 +422,8 @@ class AppContainer(private val context: Context) {
             updateRecurringTransactionUseCase = updateRecurringTransactionUseCase,
             getRecurringTransactionUseCase = getRecurringTransactionUseCase,
             observeActiveAccountsUseCase = observeActiveAccountsUseCase,
-            observeActiveCategoriesUseCase = observeActiveCategoriesUseCase
+            observeActiveCategoriesUseCase = observeActiveCategoriesUseCase,
+            getCategoryUseCase = getCategoryUseCase
         )
     }
 

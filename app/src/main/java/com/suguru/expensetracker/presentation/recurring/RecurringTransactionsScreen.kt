@@ -215,7 +215,9 @@ fun RecurringTransactionsScreen(
                         val pausedCount = state.rules.size - activeCount
 
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("recurring_rules_list"),
                             contentPadding = PaddingValues(
                                 horizontal = ExpenseTrackerSpacing.screenHorizontal,
                                 vertical = ExpenseTrackerSpacing.screenVertical
@@ -362,54 +364,59 @@ private fun RecurringRuleCard(
                 ) {
                     TransactionTypeBadge(type = rule.type)
                     StatusChip(status = rule.status)
+                    if (rule.isReadOnly) {
+                        ReadOnlyChip()
+                    }
                 }
 
-                Box {
-                    IconButton(
-                        onClick = { menuExpanded = true },
-                        modifier = Modifier
-                            .size(36.dp)
-                            .testTag("rule_menu_button_${rule.id}")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Actions",
-                            tint = ExpenseTrackerTheme.extendedColors.textSecondary
-                        )
-                    }
+                if (!rule.isReadOnly) {
+                    Box {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("rule_menu_button_${rule.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Actions",
+                                tint = ExpenseTrackerTheme.extendedColors.textSecondary
+                            )
+                        }
 
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
-                        modifier = Modifier.background(ExpenseTrackerTheme.extendedColors.surfaceElevated)
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.action_edit),
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onEdit()
-                            },
-                            modifier = Modifier.testTag("rule_edit_item_${rule.id}")
-                        )
-                        if (rule.isActive) {
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            modifier = Modifier.background(ExpenseTrackerTheme.extendedColors.surfaceElevated)
+                        ) {
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        stringResource(R.string.action_pause),
-                                        color = ExpenseTrackerTheme.extendedColors.financialNegative
+                                        stringResource(R.string.action_edit),
+                                        color = MaterialTheme.colorScheme.onBackground
                                     )
                                 },
                                 onClick = {
                                     menuExpanded = false
-                                    onPause()
+                                    onEdit()
                                 },
-                                modifier = Modifier.testTag("rule_pause_item_${rule.id}")
+                                modifier = Modifier.testTag("rule_edit_item_${rule.id}")
                             )
+                            if (rule.isActive) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.action_pause),
+                                            color = ExpenseTrackerTheme.extendedColors.financialNegative
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onPause()
+                                    },
+                                    modifier = Modifier.testTag("rule_pause_item_${rule.id}")
+                                )
+                            }
                         }
                     }
                 }
@@ -426,7 +433,11 @@ private fun RecurringRuleCard(
                 ) {
                     val title = rule.note?.ifBlank { null }
                         ?: rule.categoryName
-                        ?: if (rule.type == TransactionType.TRANSFER) "${rule.accountName} → ${rule.destinationAccountName ?: ""}" else rule.accountName
+                        ?: when (rule.type) {
+                            TransactionType.EXPENSE -> stringResource(R.string.type_expense)
+                            TransactionType.INCOME -> stringResource(R.string.type_income)
+                            TransactionType.TRANSFER -> stringResource(R.string.detail_transfer_readonly_title)
+                        }
 
                     Text(
                         text = title,
@@ -435,20 +446,19 @@ private fun RecurringRuleCard(
                         color = MaterialTheme.colorScheme.onBackground
                     )
 
-                    val subtitle = when (rule.type) {
-                        TransactionType.EXPENSE, TransactionType.INCOME -> {
-                            "${rule.accountName} • ${rule.categoryName ?: ""}"
-                        }
-                        TransactionType.TRANSFER -> {
-                            "${rule.accountName} → ${rule.destinationAccountName ?: ""}"
-                        }
+                    val subtitle = when {
+                        rule.type == TransactionType.TRANSFER -> stringResource(R.string.recurring_transfer_readonly_subtitle)
+                        !rule.note.isNullOrBlank() && !rule.categoryName.isNullOrBlank() -> rule.categoryName
+                        else -> null
                     }
 
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                    )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+                    }
                 }
 
                 Text(
@@ -578,6 +588,23 @@ private fun StatusChip(status: RecurringStatus) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = textColor
+        )
+    }
+}
+
+@Composable
+private fun ReadOnlyChip() {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(ExpenseTrackerTheme.extendedColors.surfaceElevated)
+            .padding(horizontal = ExpenseTrackerSpacing.sm, vertical = ExpenseTrackerSpacing.xxs)
+    ) {
+        Text(
+            text = stringResource(R.string.badge_read_only),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = ExpenseTrackerTheme.extendedColors.textSecondary
         )
     }
 }

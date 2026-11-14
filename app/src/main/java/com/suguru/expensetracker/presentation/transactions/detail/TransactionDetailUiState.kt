@@ -26,6 +26,7 @@ data class TransactionDetailUiState(
     val isExpense: Boolean get() = type == TransactionType.EXPENSE
     val isIncome: Boolean get() = type == TransactionType.INCOME
     val isTransfer: Boolean get() = type == TransactionType.TRANSFER
+    val canEdit: Boolean get() = transaction != null && !isTransfer
 
     val isSourceAccountArchived: Boolean get() = sourceAccount?.isArchived == true
     val isDestinationAccountArchived: Boolean get() = destinationAccount?.isArchived == true

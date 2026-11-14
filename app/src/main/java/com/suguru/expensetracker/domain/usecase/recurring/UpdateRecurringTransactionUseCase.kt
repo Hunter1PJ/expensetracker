@@ -27,7 +27,21 @@ class UpdateRecurringTransactionUseCase(
         // CRITICAL FIX: Load persisted record FIRST to preserve original account ID
         val existingRule = recurringTransactionRepository.getRecurringTransactionById(rule.id)
             ?: throw DomainException.TransactionNotFound(rule.id)
-        
+
+        if (existingRule.type == com.suguru.expensetracker.domain.model.TransactionType.TRANSFER ||
+            rule.type == com.suguru.expensetracker.domain.model.TransactionType.TRANSFER
+        ) {
+            throw DomainException.InvalidTransfer(
+                "Historical recurring transfer rules are read-only and cannot be edited, converted, or reactivated."
+            )
+        }
+
+        if (rule.type != existingRule.type) {
+            throw DomainException.InvalidTransfer(
+                "Recurring transaction type cannot be changed after creation."
+            )
+        }
+
         // Preserve the original persisted accountId - DO NOT accept different ID from UI
         // Only update allowed fields: amount, categoryId, startDate, endDate, nextOccurrence, note, isActive
         val resolvedRule = existingRule.copy(

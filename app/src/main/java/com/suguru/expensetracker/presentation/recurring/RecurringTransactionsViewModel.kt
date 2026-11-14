@@ -82,8 +82,8 @@ class RecurringTransactionsViewModel(
         categoryMap: Map<Long, Category>
     ): RecurringTransactionUiModel {
         val sourceAccount = accountMap[rule.accountId]
-        val destAccount = rule.destinationAccountId?.let { accountMap[it] }
         val category = rule.categoryId?.let { categoryMap[it] }
+        val isTransfer = rule.type == TransactionType.TRANSFER
 
         val formattedAmount = MoneyParser.format(rule.amount)
 
@@ -91,25 +91,21 @@ class RecurringTransactionsViewModel(
             TransactionType.EXPENSE, TransactionType.INCOME -> {
                 sourceAccount == null || sourceAccount.isArchived || category == null || category.isArchived
             }
-            TransactionType.TRANSFER -> {
-                sourceAccount == null || sourceAccount.isArchived || destAccount == null || destAccount.isArchived
-            }
+            TransactionType.TRANSFER -> false
         }
 
         val status = when {
-            !rule.isActive -> RecurringStatus.PAUSED
+            isTransfer || !rule.isActive -> RecurringStatus.PAUSED
             needsAttention -> RecurringStatus.NEEDS_ATTENTION
             rule.endDate != null && rule.endDate <= LocalDate.now().plusDays(14) -> RecurringStatus.ENDING_SOON
             else -> RecurringStatus.ACTIVE
         }
 
         val statusDetail = when {
-            sourceAccount == null -> "Source account missing"
-            sourceAccount.isArchived -> "Source account is archived"
-            rule.type == TransactionType.TRANSFER && destAccount == null -> "Destination account missing"
-            rule.type == TransactionType.TRANSFER && destAccount?.isArchived == true -> "Destination account is archived"
-            rule.type != TransactionType.TRANSFER && category == null -> "Category missing"
-            rule.type != TransactionType.TRANSFER && category?.isArchived == true -> "Category is archived"
+            isTransfer || !rule.isActive -> null
+            category == null -> "Category missing"
+            category.isArchived -> "Category is archived"
+            sourceAccount == null || sourceAccount.isArchived -> "Schedule configuration unavailable"
             else -> null
         }
 
@@ -117,8 +113,6 @@ class RecurringTransactionsViewModel(
             id = rule.id,
             type = rule.type,
             formattedAmount = formattedAmount,
-            accountName = sourceAccount?.name ?: "Unknown Account",
-            destinationAccountName = destAccount?.name,
             categoryName = category?.name,
             categoryIcon = category?.iconName,
             frequency = rule.frequency,
@@ -126,7 +120,8 @@ class RecurringTransactionsViewModel(
             endDate = rule.endDate,
             nextOccurrence = rule.nextOccurrence,
             note = rule.note,
-            isActive = rule.isActive,
+            isActive = if (isTransfer) false else rule.isActive,
+            isReadOnly = isTransfer,
             status = status,
             statusDetail = statusDetail
         )

@@ -125,7 +125,7 @@ class DashboardUseCaseTest {
             val midMonthTime = monthStart.plusSeconds(3600 * 24 * 5) // Sep 6, 2026
 
             // 1. USD Income: +$3,000.00 (300,000 units)
-            createTransactionUseCase(
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.INCOME,
                     amount = Money(300000L, "USD"),
@@ -136,7 +136,7 @@ class DashboardUseCaseTest {
             )
 
             // 2. USD Expense: -$800.00 (80,000 units)
-            createTransactionUseCase(
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.EXPENSE,
                     amount = Money(80000L, "USD"),
@@ -146,9 +146,9 @@ class DashboardUseCaseTest {
                 )
             )
 
-            // 3. USD Transfer: $150.00 (15,000 units) from Chase Bank to Wallet
+            // 3. Historical USD Transfer: $150.00 (15,000 units) from Chase Bank to Wallet
             // Transfer must NOT increase income or expense
-            createTransactionUseCase(
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.TRANSFER,
                     amount = Money(15000L, "USD"),
@@ -160,7 +160,7 @@ class DashboardUseCaseTest {
             )
 
             // 4. UZS Expense: -1,200,000 so'm
-            createTransactionUseCase(
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.EXPENSE,
                     amount = Money(1200000L, "UZS"),
@@ -200,8 +200,8 @@ class DashboardUseCaseTest {
         runBlocking {
             val midMonthTime = monthStart.plusSeconds(3600 * 24 * 3)
 
-            // Transfer $100 from Chase to Wallet
-            createTransactionUseCase(
+            // Historical Transfer $100 from Chase to Wallet
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.TRANSFER,
                     amount = Money(10000L, "USD"),
@@ -236,12 +236,12 @@ class DashboardUseCaseTest {
             val t5 = monthStart.plusSeconds(500)
             val t6 = monthStart.plusSeconds(600)
 
-            createTransactionUseCase(Transaction(type = TransactionType.INCOME, amount = Money(100L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t1))
-            createTransactionUseCase(Transaction(type = TransactionType.INCOME, amount = Money(200L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t2))
-            createTransactionUseCase(Transaction(type = TransactionType.INCOME, amount = Money(300L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t3))
-            createTransactionUseCase(Transaction(type = TransactionType.INCOME, amount = Money(400L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t4))
-            createTransactionUseCase(Transaction(type = TransactionType.INCOME, amount = Money(500L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t5))
-            createTransactionUseCase(Transaction(type = TransactionType.INCOME, amount = Money(600L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t6))
+            transactionRepository.insertTransaction(Transaction(type = TransactionType.INCOME, amount = Money(100L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t1))
+            transactionRepository.insertTransaction(Transaction(type = TransactionType.INCOME, amount = Money(200L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t2))
+            transactionRepository.insertTransaction(Transaction(type = TransactionType.INCOME, amount = Money(300L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t3))
+            transactionRepository.insertTransaction(Transaction(type = TransactionType.INCOME, amount = Money(400L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t4))
+            transactionRepository.insertTransaction(Transaction(type = TransactionType.INCOME, amount = Money(500L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t5))
+            transactionRepository.insertTransaction(Transaction(type = TransactionType.INCOME, amount = Money(600L, "USD"), accountId = usdBankAccountId, categoryId = salaryCategoryId, transactionTime = t6))
 
             val recents = observeRecentTransactionsUseCase(limit = 5).first()
             assertEquals(5, recents.size)

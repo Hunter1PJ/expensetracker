@@ -34,6 +34,7 @@ class TransactionUseCaseTest {
     private lateinit var deleteTransactionUseCase: DeleteTransactionUseCase
     private lateinit var getTransactionUseCase: GetTransactionUseCase
 
+    private var internalDefaultAccountId: Long = 0L
     private var usdAccountId: Long = 0L
     private var uzsAccountId: Long = 0L
     private var archivedAccountId: Long = 0L
@@ -55,7 +56,15 @@ class TransactionUseCaseTest {
             deleteTransactionUseCase = DeleteTransactionUseCase(transactionRepository)
             getTransactionUseCase = GetTransactionUseCase(transactionRepository)
 
-            // Seed accounts
+            // Seed internal default account and legacy accounts
+            internalDefaultAccountId = accountRepository.insertAccount(
+                Account(
+                    name = "Internal Default",
+                    type = AccountType.CASH,
+                    initialBalance = Money(0L, "USD"),
+                    internalKey = "default"
+                )
+            )
             usdAccountId = accountRepository.insertAccount(
                 Account(name = "USD Checking", type = AccountType.BANK, initialBalance = Money(100000L, "USD"))
             )
@@ -100,7 +109,7 @@ class TransactionUseCaseTest {
             val saved = getTransactionUseCase(id)
             assertNotNull(saved)
             assertEquals(2500L, saved?.amount?.amountInMinorUnits)
-            assertEquals(usdAccountId, saved?.accountId)
+            assertEquals(internalDefaultAccountId, saved?.accountId)
         }
     }
 
@@ -160,8 +169,8 @@ class TransactionUseCaseTest {
         }
     }
 
-    @Test(expected = DomainException.AccountArchived::class)
-    fun createExpense_withArchivedAccount_throwsException() {
+    @Test
+    fun createExpense_withArchivedSuppliedAccount_usesInternalDefaultAccount() {
         runBlocking {
             val tx = Transaction(
                 type = TransactionType.EXPENSE,
@@ -170,7 +179,35 @@ class TransactionUseCaseTest {
                 categoryId = expenseCategoryId,
                 transactionTime = Instant.now()
             )
-            createTransactionUseCase(tx)
+            val id = createTransactionUseCase(tx)
+            val saved = getTransactionUseCase(id)
+            assertNotNull(saved)
+            assertEquals(internalDefaultAccountId, saved?.accountId)
+        }
+    }
+
+    @Test(expected = DomainException.AccountArchived::class)
+    fun updateExpense_withArchivedPersistedAccount_throwsException() {
+        runBlocking {
+            val persistedId = transactionRepository.insertTransaction(
+                Transaction(
+                    type = TransactionType.EXPENSE,
+                    amount = Money(1500L, "USD"),
+                    accountId = archivedAccountId,
+                    categoryId = expenseCategoryId,
+                    transactionTime = Instant.now()
+                )
+            )
+            updateTransactionUseCase(
+                Transaction(
+                    id = persistedId,
+                    type = TransactionType.EXPENSE,
+                    amount = Money(2000L, "USD"),
+                    accountId = archivedAccountId,
+                    categoryId = expenseCategoryId,
+                    transactionTime = Instant.now()
+                )
+            )
         }
     }
 
@@ -202,6 +239,9 @@ class TransactionUseCaseTest {
             )
             val id = createTransactionUseCase(tx)
             assertEquals(1L, id)
+            val saved = getTransactionUseCase(id)
+            assertNotNull(saved)
+            assertEquals(internalDefaultAccountId, saved?.accountId)
         }
     }
 
@@ -221,8 +261,8 @@ class TransactionUseCaseTest {
 
     // --- TRANSFER TESTS ---
 
-    @Test
-    fun createTransfer_validSameCurrency_succeeds() {
+    @Test(expected = DomainException.InvalidTransfer::class)
+    fun createTransfer_validSameCurrency_throwsInvalidTransfer() {
         runBlocking {
             val tx = Transaction(
                 type = TransactionType.TRANSFER,
@@ -232,8 +272,7 @@ class TransactionUseCaseTest {
                 categoryId = null,
                 transactionTime = Instant.now()
             )
-            val id = createTransactionUseCase(tx)
-            assertEquals(1L, id)
+            createTransactionUseCase(tx)
         }
     }
 
@@ -282,8 +321,8 @@ class TransactionUseCaseTest {
         }
     }
 
-    @Test(expected = DomainException.AccountArchived::class)
-    fun createTransfer_withArchivedDestination_throwsException() {
+    @Test(expected = DomainException.InvalidTransfer::class)
+    fun createTransfer_withArchivedDestination_throwsInvalidTransfer() {
         runBlocking {
             val tx = Transaction(
                 type = TransactionType.TRANSFER,

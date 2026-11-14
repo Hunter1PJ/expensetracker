@@ -73,7 +73,6 @@ fun TransactionsScreen(
         uiState = uiState,
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onTypeFilterChanged = viewModel::onTypeFilterChanged,
-        onAccountFilterChanged = viewModel::onAccountFilterChanged,
         onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
         onClearFilters = viewModel::clearFilters,
         onNavigateToDetail = onNavigateToDetail,
@@ -88,7 +87,6 @@ fun TransactionsScreenContent(
     uiState: TransactionsUiState,
     onSearchQueryChanged: (String) -> Unit,
     onTypeFilterChanged: (TransactionTypeFilter) -> Unit,
-    onAccountFilterChanged: (Long?) -> Unit,
     onCategoryFilterChanged: (Long?) -> Unit,
     onClearFilters: () -> Unit,
     onNavigateToDetail: (Long) -> Unit,
@@ -201,8 +199,8 @@ fun TransactionsScreenContent(
                     }
                 }
 
-                // 3. Secondary Filter Row (Accounts & Categories)
-                if (uiState.accounts.isNotEmpty() || uiState.categories.isNotEmpty()) {
+                // 3. Category Filter Row
+                if (uiState.categories.isNotEmpty() && uiState.selectedType != TransactionTypeFilter.TRANSFER) {
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
                     Row(
                         modifier = Modifier
@@ -212,53 +210,28 @@ fun TransactionsScreenContent(
                         horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Account Filter Chips
-                        if (uiState.accounts.isNotEmpty()) {
-                            val isAllAccountsSelected = uiState.selectedAccountId == null
+                        val isAllCategoriesSelected = uiState.selectedCategoryId == null
+                        ExpenseTrackerFilterChip(
+                            text = stringResource(R.string.filter_all_categories),
+                            selected = isAllCategoriesSelected,
+                            onClick = { onCategoryFilterChanged(null) },
+                            testTag = "category_filter_all"
+                        )
+
+                        uiState.categories.forEach { category ->
+                            val isSelected = uiState.selectedCategoryId == category.id
                             ExpenseTrackerFilterChip(
-                                text = stringResource(R.string.filter_all_accounts),
-                                selected = isAllAccountsSelected,
-                                onClick = { onAccountFilterChanged(null) },
-                                testTag = "account_filter_all"
+                                text = category.name,
+                                selected = isSelected,
+                                onClick = { onCategoryFilterChanged(category.id) },
+                                testTag = "category_filter_${category.id}"
                             )
-
-                            uiState.accounts.forEach { account ->
-                                val isSelected = uiState.selectedAccountId == account.id
-                                ExpenseTrackerFilterChip(
-                                    text = account.name,
-                                    selected = isSelected,
-                                    onClick = { onAccountFilterChanged(account.id) },
-                                    testTag = "account_filter_${account.id}"
-                                )
-                            }
-                        }
-
-                        // Category Filter Chips
-                        if (uiState.categories.isNotEmpty() && uiState.selectedType != TransactionTypeFilter.TRANSFER) {
-                            val isAllCategoriesSelected = uiState.selectedCategoryId == null
-                            ExpenseTrackerFilterChip(
-                                text = stringResource(R.string.filter_all_categories),
-                                selected = isAllCategoriesSelected,
-                                onClick = { onCategoryFilterChanged(null) },
-                                testTag = "category_filter_all"
-                            )
-
-                            uiState.categories.forEach { category ->
-                                val isSelected = uiState.selectedCategoryId == category.id
-                                ExpenseTrackerFilterChip(
-                                    text = category.name,
-                                    selected = isSelected,
-                                    onClick = { onCategoryFilterChanged(category.id) },
-                                    testTag = "category_filter_${category.id}"
-                                )
-                            }
                         }
                     }
                 }
 
                 // Active filter summary & clear action
                 val hasActiveFilters = uiState.selectedType != TransactionTypeFilter.ALL ||
-                        uiState.selectedAccountId != null ||
                         uiState.selectedCategoryId != null ||
                         uiState.searchQuery.isNotBlank()
 
@@ -376,7 +349,7 @@ fun TransactionsScreenContent(
                                         dateGroup.transactions.forEachIndexed { index, item ->
                                             FinancialListRow(
                                                 title = item.title,
-                                                subtitle = item.subtitle,
+                                                subtitle = item.subtitle.takeIf { it.isNotBlank() },
                                                 trailingSubtitle = item.timeFormatted,
                                                 amountText = item.formattedAmount,
                                                 amountColor = when (item.isPositive) {

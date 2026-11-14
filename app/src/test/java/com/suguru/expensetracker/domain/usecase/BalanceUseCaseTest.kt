@@ -84,7 +84,7 @@ class BalanceUseCaseTest {
     fun calculateBalance_withIncomeExpensesAndTransfers_isExact() {
         runBlocking {
             // 1. Add Income to Account A: +$500.00 (50000 units) -> Expected A: $1,500.00 (150000)
-            createTransactionUseCase(
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.INCOME,
                     amount = Money(50000L, "USD"),
@@ -95,7 +95,7 @@ class BalanceUseCaseTest {
             )
 
             // 2. Add Expense from Account A: -$120.50 (12050 units) -> Expected A: $1,379.50 (137950)
-            createTransactionUseCase(
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.EXPENSE,
                     amount = Money(12050L, "USD"),
@@ -105,10 +105,10 @@ class BalanceUseCaseTest {
                 )
             )
 
-            // 3. Transfer from Account A to Account B: $300.00 (30000 units)
+            // 3. Historical Transfer from Account A to Account B: $300.00 (30000 units)
             // -> Expected A: 137950 - 30000 = 107950 ($1,079.50)
             // -> Expected B: 20000 + 30000 = 50000 ($500.00)
-            createTransactionUseCase(
+            transactionRepository.insertTransaction(
                 Transaction(
                     type = TransactionType.TRANSFER,
                     amount = Money(30000L, "USD"),

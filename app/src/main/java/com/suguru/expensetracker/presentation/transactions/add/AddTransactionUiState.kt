@@ -14,12 +14,10 @@ import java.time.Instant
 data class AddTransactionUiState(
     val transactionType: TransactionType = TransactionType.EXPENSE,
     val amount: String = "",
-    val selectedAccountId: Long? = null,
-    val selectedDestinationAccountId: Long? = null,
+    val defaultAccount: Account? = null,
     val selectedCategoryId: Long? = null,
     val note: String = "",
     val transactionTime: Instant = Instant.now(),
-    val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
     val isSaving: Boolean = false,
     val error: AddTransactionError? = null,
@@ -29,33 +27,18 @@ data class AddTransactionUiState(
     val aiAmountWarning: String? = null,
     val aiCategorySuggestion: String? = null,
     val aiCategoryMatchAmbiguous: Boolean = false,
-    val aiAccountSuggestion: String? = null,
-    val aiAccountMatchAmbiguous: Boolean = false,
-    val aiDestinationAccountSuggestion: String? = null,
-    val aiDestinationAccountMatchAmbiguous: Boolean = false,
     val aiWarnings: List<String> = emptyList(),
     val aiSourceWarnings: List<ParseWarning> = emptyList()
 ) {
-    val selectedAccount: Account?
-        get() = accounts.find { it.id == selectedAccountId }
-
-    val selectedDestinationAccount: Account?
-        get() = accounts.find { it.id == selectedDestinationAccountId }
-
     val selectedCategory: Category?
         get() = categories.find { it.id == selectedCategoryId }
 
     val currencyCode: String
-        get() = selectedAccount?.initialBalance?.currencyCode ?: "USD"
+        get() = defaultAccount?.initialBalance?.currencyCode ?: "USD"
 
     val currencySymbol: String
         get() = MoneyParser.getCurrencySymbol(currencyCode)
 
-    val validDestinationAccounts: List<Account>
-        get() = accounts.filter {
-            it.id != selectedAccountId && it.initialBalance.currencyCode == currencyCode
-        }
-
-    val hasAccounts: Boolean
-        get() = accounts.isNotEmpty()
+    val hasDefaultAccount: Boolean
+        get() = defaultAccount != null
 }

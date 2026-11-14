@@ -90,7 +90,12 @@ class HomeViewModelTest {
     fun populatedState_formatsBalancesAndCalculatesMonthlyFlows() = runTest {
         // Create 2 accounts: USD and UZS
         val usdId = accountRepository.insertAccount(
-            Account(name = "Main Bank", type = AccountType.BANK, initialBalance = Money(150000L, "USD"))
+            Account(
+                name = "Main Bank",
+                type = AccountType.BANK,
+                initialBalance = Money(150000L, "USD"),
+                internalKey = "default"
+            )
         )
         val uzsId = accountRepository.insertAccount(
             Account(name = "Cash Wallet", type = AccountType.CASH, initialBalance = Money(3000000L, "UZS"))

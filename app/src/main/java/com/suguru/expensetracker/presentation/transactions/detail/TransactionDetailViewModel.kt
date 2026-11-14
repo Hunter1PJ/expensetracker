@@ -55,8 +55,16 @@ class TransactionDetailViewModel(
                     return@launch
                 }
 
-                val sourceAccount = getAccountUseCase(tx.accountId)
-                val destAccount = tx.destinationAccountId?.let { getAccountUseCase(it) }
+                val sourceAccount = if (tx.type == TransactionType.TRANSFER) {
+                    getAccountUseCase(tx.accountId)
+                } else {
+                    null
+                }
+                val destAccount = if (tx.type == TransactionType.TRANSFER) {
+                    tx.destinationAccountId?.let { getAccountUseCase(it) }
+                } else {
+                    null
+                }
                 val category = tx.categoryId?.let { getCategoryUseCase(it) }
 
                 val showCurrencyCodeSetting = try {

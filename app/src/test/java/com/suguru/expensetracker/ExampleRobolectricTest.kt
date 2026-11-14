@@ -60,7 +60,12 @@ class ExampleRobolectricTest {
         val transactionRepo = RoomTransactionRepository(database.transactionDao())
 
         val accountId = accountRepo.insertAccount(
-            Account(name = "Main Bank", type = AccountType.BANK, initialBalance = Money(100000L, "USD"))
+            Account(
+                name = "Main Bank",
+                type = AccountType.BANK,
+                initialBalance = Money(100000L, "USD"),
+                internalKey = "default"
+            )
         )
         val categoryId = categoryRepo.insertCategory(
             Category(name = "Coffee", type = CategoryType.EXPENSE, iconName = "local_cafe", colorHex = "#795548")

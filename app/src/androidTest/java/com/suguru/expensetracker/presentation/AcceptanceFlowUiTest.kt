@@ -103,13 +103,12 @@ class AcceptanceFlowUiTest {
         var saveRequested = false
         var backRequested = false
         val state = AddTransactionUiState(
-            accounts = listOf(
-                Account(
-                    id = 1,
-                    name = "Cash",
-                    type = AccountType.CASH,
-                    initialBalance = Money(0, "USD")
-                )
+            defaultAccount = Account(
+                id = 1,
+                name = "Internal Default",
+                type = AccountType.CASH,
+                initialBalance = Money(0, "USD"),
+                internalKey = "default"
             ),
             categories = listOf(
                 Category(
@@ -120,7 +119,6 @@ class AcceptanceFlowUiTest {
                     colorHex = "#000000"
                 )
             ),
-            selectedAccountId = 1,
             selectedCategoryId = 1,
             isAiAssisted = true,
             candidateSource = CandidateSource.OFFLINE_PARSER,
@@ -135,8 +133,6 @@ class AcceptanceFlowUiTest {
                     onNavigateBack = { backRequested = true },
                     onTransactionTypeChanged = {},
                     onAmountChanged = {},
-                    onAccountSelected = {},
-                    onDestinationAccountSelected = {},
                     onCategorySelected = {},
                     onNoteChanged = {},
                     onTransactionTimeChanged = {},
@@ -164,7 +160,6 @@ class AcceptanceFlowUiTest {
             ExpenseTrackerTheme {
                 SettingsScreen(
                     viewModel = viewModel,
-                    onNavigateToAccounts = {},
                     onNavigateToCategories = {},
                     onNavigateToRecurring = {},
                     onNavigateToDataAndStorage = {}
@@ -192,7 +187,6 @@ class AcceptanceFlowUiTest {
             ExpenseTrackerTheme {
                 SettingsScreen(
                     viewModel = viewModel,
-                    onNavigateToAccounts = {},
                     onNavigateToCategories = {},
                     onNavigateToRecurring = {},
                     onNavigateToDataAndStorage = {}
@@ -222,7 +216,6 @@ class AcceptanceFlowUiTest {
             ExpenseTrackerTheme {
                 SettingsScreen(
                     viewModel = viewModel,
-                    onNavigateToAccounts = {},
                     onNavigateToCategories = {},
                     onNavigateToRecurring = {},
                     onNavigateToDataAndStorage = {}
@@ -247,7 +240,6 @@ class AcceptanceFlowUiTest {
             ExpenseTrackerTheme {
                 SettingsScreen(
                     viewModel = viewModel,
-                    onNavigateToAccounts = {},
                     onNavigateToCategories = {},
                     onNavigateToRecurring = {},
                     onNavigateToDataAndStorage = {}
@@ -276,7 +268,6 @@ class AcceptanceFlowUiTest {
             ExpenseTrackerTheme {
                 SettingsScreen(
                     viewModel = viewModel,
-                    onNavigateToAccounts = {},
                     onNavigateToCategories = {},
                     onNavigateToRecurring = {},
                     onNavigateToDataAndStorage = {}

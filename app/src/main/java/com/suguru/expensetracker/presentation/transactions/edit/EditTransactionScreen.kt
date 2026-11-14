@@ -28,7 +28,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Category
@@ -72,7 +72,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
-import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
@@ -108,8 +107,6 @@ fun EditTransactionScreen(
         onNavigateBack = onNavigateBack,
         onTransactionTypeChanged = viewModel::onTransactionTypeChanged,
         onAmountChanged = viewModel::onAmountChanged,
-        onAccountSelected = viewModel::onAccountSelected,
-        onDestinationAccountSelected = viewModel::onDestinationAccountSelected,
         onCategorySelected = viewModel::onCategorySelected,
         onNoteChanged = viewModel::onNoteChanged,
         onTransactionTimeChanged = viewModel::onTransactionTimeChanged,
@@ -126,8 +123,6 @@ fun EditTransactionScreenContent(
     onNavigateBack: () -> Unit,
     onTransactionTypeChanged: (TransactionType) -> Unit,
     onAmountChanged: (String) -> Unit,
-    onAccountSelected: (Long) -> Unit,
-    onDestinationAccountSelected: (Long) -> Unit,
     onCategorySelected: (Long) -> Unit,
     onNoteChanged: (String) -> Unit,
     onTransactionTimeChanged: (Instant) -> Unit,
@@ -258,7 +253,86 @@ fun EditTransactionScreenContent(
                         }
                     }
 
-                    // 1. Transaction Type Segmented Row
+                    if (uiState.isReadOnlyTransfer) {
+                        val formattedDate = remember(uiState.transactionTime) {
+                            val localDate = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalDate()
+                            localDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                        }
+
+                        ExpenseTrackerCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 540.dp),
+                            shape = RoundedCornerShape(ExpenseTrackerRadius.xl),
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
+                            contentPadding = PaddingValues(ExpenseTrackerSpacing.xxl),
+                            testTag = "edit_transfer_readonly_card"
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.CompareArrows,
+                                        contentDescription = null,
+                                        tint = ExpenseTrackerTheme.extendedColors.financialNeutral,
+                                        modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = stringResource(R.string.detail_transfer_readonly_title),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.detail_transfer_readonly_desc),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                        )
+                                    }
+                                }
+
+                                if (uiState.transferAmountFormatted.isNotBlank()) {
+                                    Text(
+                                        text = uiState.transferAmountFormatted,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ExpenseTrackerTheme.extendedColors.financialNeutral
+                                    )
+                                }
+
+                                Text(
+                                    text = "${stringResource(R.string.from_account_label)}: ${uiState.transferFromAccountName ?: "Unknown Account"}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "${stringResource(R.string.to_account_label)}: ${uiState.transferToAccountName ?: "Unknown Account"}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "${stringResource(R.string.date_time_label)}: $formattedDate",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                )
+                                if (uiState.note.isNotBlank()) {
+                                    Text(
+                                        text = "${stringResource(R.string.note_label)}: ${uiState.note}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                    )
+                                }
+                            }
+                        }
+                    } else if (uiState.isTransactionLoaded) {
+                    // 1. Transaction Type Segmented Row (Expense / Income only)
                     SingleChoiceSegmentedButtonRow(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -267,8 +341,7 @@ fun EditTransactionScreenContent(
                     ) {
                         val types = listOf(
                             TransactionType.EXPENSE to stringResource(R.string.type_expense),
-                            TransactionType.INCOME to stringResource(R.string.type_income),
-                            TransactionType.TRANSFER to stringResource(R.string.type_transfer)
+                            TransactionType.INCOME to stringResource(R.string.type_income)
                         )
 
                         types.forEachIndexed { index, (type, label) ->
@@ -276,6 +349,7 @@ fun EditTransactionScreenContent(
                             SegmentedButton(
                                 selected = isSelected,
                                 onClick = { onTransactionTypeChanged(type) },
+                                enabled = isSelected,
                                 shape = SegmentedButtonDefaults.itemShape(index = index, count = types.size),
                                 colors = SegmentedButtonDefaults.colors(
                                     activeContainerColor = when (type) {
@@ -367,47 +441,7 @@ fun EditTransactionScreenContent(
                         }
                     }
 
-                    // 3. Destination Account Selector (If Transfer)
-                    if (uiState.transactionType == TransactionType.TRANSFER) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .widthIn(max = 540.dp)
-                        ) {
-                            SectionHeader(title = stringResource(R.string.to_account_label))
-
-                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                            if (uiState.validDestinationAccounts.isEmpty()) {
-                                Text(
-                                    text = stringResource(R.string.no_dest_accounts_desc),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                    modifier = Modifier.padding(vertical = ExpenseTrackerSpacing.sm)
-                                )
-                            } else {
-                                FlowRow(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("destination_account_selector"),
-                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                                ) {
-                                    uiState.validDestinationAccounts.forEach { account ->
-                                        val isSelected = uiState.selectedDestinationAccountId == account.id
-                                        AccountChip(
-                                            account = account,
-                                            isSelected = isSelected,
-                                            onClick = { onDestinationAccountSelected(account.id) },
-                                            testTag = "dest_account_item_${account.id}"
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 5. Category Selector (If Expense or Income)
+                    // 3. Category Selector (Expense / Income)
                     if (uiState.transactionType != TransactionType.TRANSFER) {
                         Column(
                             modifier = Modifier
@@ -535,11 +569,11 @@ fun EditTransactionScreenContent(
 
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
 
-                    // 8. Save Button
+                    // 6. Save Button
                     PrimaryButton(
                         text = if (uiState.isSaving) stringResource(R.string.action_saving) else stringResource(R.string.action_save_changes),
                         onClick = onSaveTransaction,
-                        enabled = !uiState.isSaving && uiState.hasAccounts,
+                        enabled = !uiState.isSaving && uiState.isTransactionLoaded && !uiState.isReadOnlyTransfer,
                         leadingIcon = Icons.Default.Save,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -548,6 +582,7 @@ fun EditTransactionScreenContent(
                     )
 
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxl))
+                    }
                 }
             }
         }
@@ -589,66 +624,6 @@ fun EditTransactionScreenContent(
             }
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-}
-
-@Composable
-private fun AccountChip(
-    account: Account,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    testTag: String
-) {
-    Surface(
-        shape = ExpenseTrackerRadius.chip,
-        color = if (isSelected) {
-            ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.22f)
-        } else {
-            ExpenseTrackerTheme.extendedColors.surface
-        },
-        border = androidx.compose.foundation.BorderStroke(
-            width = if (isSelected) 1.5.dp else 1.dp,
-            color = if (isSelected) {
-                ExpenseTrackerTheme.extendedColors.primaryPurple
-            } else {
-                ExpenseTrackerTheme.extendedColors.borderSubtle
-            }
-        ),
-        modifier = modifier
-            .clip(ExpenseTrackerRadius.chip)
-            .clickable(onClick = onClick)
-            .testTag(testTag)
-    ) {
-        Row(
-            modifier = Modifier.padding(
-                horizontal = ExpenseTrackerSpacing.md,
-                vertical = ExpenseTrackerSpacing.sm
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-        ) {
-            Icon(
-                imageVector = if (account.isArchived) Icons.Default.Archive else Icons.Default.AccountBalance,
-                contentDescription = null,
-                tint = if (isSelected) ExpenseTrackerTheme.extendedColors.primaryPurple else ExpenseTrackerTheme.extendedColors.textSecondary,
-                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
-            )
-            Text(
-                text = if (account.isArchived) "${account.name} (Archived)" else account.name,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) MaterialTheme.colorScheme.onBackground else ExpenseTrackerTheme.extendedColors.textSecondary
-            )
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = ExpenseTrackerTheme.extendedColors.primaryPurple,
-                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
-                )
-            }
         }
     }
 }

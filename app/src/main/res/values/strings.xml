@@ -22,7 +22,7 @@
     <string name="placeholder_settings_desc">Preferences, backup/export, currency, and theme configurations will be available here.</string>
 
     <!-- Transactions List & Filtering -->
-    <string name="search_transactions_hint">Search note, category, account…</string>
+    <string name="search_transactions_hint">Search note, category, type…</string>
     <string name="filter_all">All</string>
     <string name="filter_all_accounts">All Accounts</string>
     <string name="filter_all_categories">All Categories</string>
@@ -43,6 +43,8 @@
     <string name="title_edit_transaction">Edit Transaction</string>
     <string name="delete_transaction_title">Delete transaction?</string>
     <string name="delete_transaction_message">This will permanently remove this transaction and update your account balance.</string>
+    <string name="detail_transfer_readonly_title">Historical Transfer</string>
+    <string name="detail_transfer_readonly_desc">Transfer records are read-only history and cannot be edited or converted.</string>
 
     <!-- Home Dashboard -->
     <string name="home_header_title">Your Finances</string>
@@ -200,9 +202,10 @@
 
     <!-- Recurring Transactions -->
     <string name="title_recurring_transactions">Recurring Rules</string>
-    <string name="settings_recurring_desc">Manage scheduled expenses, incomes, and transfers</string>
+    <string name="settings_recurring_desc">Manage scheduled expenses and incomes</string>
     <string name="title_add_recurring">Add Recurring Rule</string>
     <string name="title_edit_recurring">Edit Recurring Rule</string>
+    <string name="title_recurring_transfer_readonly">Historical Recurring Transfer</string>
     <string name="action_add_recurring">Add Rule</string>
     <string name="action_save_recurring">Save Rule</string>
     <string name="action_update_recurring">Update Rule</string>
@@ -221,8 +224,12 @@
     <string name="status_paused">Paused</string>
     <string name="status_ending_soon">Ending Soon</string>
     <string name="status_needs_attention">Needs Attention</string>
+    <string name="badge_read_only">Read-only</string>
+    <string name="recurring_transfer_readonly_subtitle">Paused • Read-only historical transfer</string>
+    <string name="recurring_transfer_readonly_desc">Historical recurring transfers are paused and read-only. They cannot be edited, converted, or reactivated.</string>
+    <string name="recurring_frequency_locked_desc">Schedule frequency cannot be changed after creation</string>
     <string name="no_recurring_title">No recurring rules yet</string>
-    <string name="no_recurring_desc">Automate your regular rent, salary, subscriptions, or savings transfers.</string>
+    <string name="no_recurring_desc">Automate your regular rent, salary, and subscriptions.</string>
     <string name="dialog_deactivate_recurring_title">Pause recurring rule?</string>
     <string name="dialog_deactivate_recurring_message">This recurring rule will stop generating future transactions until reactivated.</string>
     <string name="error_recurring_start_after_end">Start date must be on or before end date.</string>

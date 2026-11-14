@@ -15,8 +15,6 @@ data class RecurringTransactionUiModel(
     val id: Long,
     val type: TransactionType,
     val formattedAmount: String,
-    val accountName: String,
-    val destinationAccountName: String?,
     val categoryName: String?,
     val categoryIcon: String?,
     val frequency: RecurrenceFrequency,
@@ -25,6 +23,7 @@ data class RecurringTransactionUiModel(
     val nextOccurrence: LocalDate,
     val note: String?,
     val isActive: Boolean,
+    val isReadOnly: Boolean = false,
     val status: RecurringStatus,
     val statusDetail: String? = null
 )

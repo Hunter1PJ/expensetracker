@@ -148,15 +148,17 @@ fun TransactionDetailScreenContent(
                     },
                     actions = {
                         if (uiState.transaction != null) {
-                            IconButton(
-                                onClick = onNavigateToEdit,
-                                modifier = Modifier.testTag("edit_transaction_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = stringResource(R.string.action_edit),
-                                    tint = ExpenseTrackerTheme.extendedColors.primaryPurple
-                                )
+                            if (uiState.canEdit) {
+                                IconButton(
+                                    onClick = onNavigateToEdit,
+                                    modifier = Modifier.testTag("edit_transaction_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = stringResource(R.string.action_edit),
+                                        tint = ExpenseTrackerTheme.extendedColors.primaryPurple
+                                    )
+                                }
                             }
                             IconButton(
                                 onClick = {
@@ -329,17 +331,15 @@ fun TransactionDetailScreenContent(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
                         ) {
-                            // Source Account
-                            DetailInfoRow(
-                                icon = Icons.Default.AccountBalance,
-                                label = if (uiState.isTransfer) stringResource(R.string.from_account_label) else stringResource(R.string.account_label),
-                                value = uiState.sourceAccount?.name ?: "Unknown Account",
-                                isArchived = uiState.isSourceAccountArchived,
-                                testTag = "detail_source_account"
-                            )
-
-                            // Destination Account (if Transfer)
+                            // Historical Transfer Accounts (read-only context)
                             if (uiState.isTransfer) {
+                                DetailInfoRow(
+                                    icon = Icons.Default.AccountBalance,
+                                    label = stringResource(R.string.from_account_label),
+                                    value = uiState.sourceAccount?.name ?: "Unknown Account",
+                                    isArchived = uiState.isSourceAccountArchived,
+                                    testTag = "detail_source_account"
+                                )
                                 HorizontalDivider(color = ExpenseTrackerTheme.extendedColors.borderSubtle, thickness = 0.5.dp)
                                 DetailInfoRow(
                                     icon = Icons.AutoMirrored.Filled.CompareArrows,
@@ -348,11 +348,8 @@ fun TransactionDetailScreenContent(
                                     isArchived = uiState.isDestinationAccountArchived,
                                     testTag = "detail_dest_account"
                                 )
-                            }
-
-                            // Category (if Expense/Income)
-                            if (!uiState.isTransfer) {
-                                HorizontalDivider(color = ExpenseTrackerTheme.extendedColors.borderSubtle, thickness = 0.5.dp)
+                            } else {
+                                // Category (Expense / Income)
                                 DetailInfoRow(
                                     icon = Icons.Default.Category,
                                     label = stringResource(R.string.category_label),
@@ -423,17 +420,59 @@ fun TransactionDetailScreenContent(
                         }
                     }
 
+                    if (uiState.isTransfer) {
+                        ExpenseTrackerCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 540.dp),
+                            shape = RoundedCornerShape(ExpenseTrackerRadius.lg),
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                            contentPadding = PaddingValues(ExpenseTrackerSpacing.md),
+                            testTag = "detail_transfer_readonly_banner"
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.CompareArrows,
+                                    contentDescription = null,
+                                    tint = ExpenseTrackerTheme.extendedColors.financialNeutral,
+                                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
+                                )
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.detail_transfer_readonly_title),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.detail_transfer_readonly_desc),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
 
                     // 4. Primary Actions
-                    PrimaryButton(
-                        text = stringResource(R.string.action_edit),
-                        onClick = onNavigateToEdit,
-                        leadingIcon = Icons.Default.Edit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                    )
+                    if (uiState.canEdit) {
+                        PrimaryButton(
+                            text = stringResource(R.string.action_edit),
+                            onClick = onNavigateToEdit,
+                            leadingIcon = Icons.Default.Edit,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 540.dp)
+                                .testTag("detail_edit_button")
+                        )
+                    }
 
                     DangerButton(
                         text = stringResource(R.string.action_delete),

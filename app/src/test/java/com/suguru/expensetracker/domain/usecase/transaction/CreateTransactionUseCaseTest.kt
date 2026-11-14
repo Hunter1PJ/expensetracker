@@ -37,7 +37,7 @@ class CreateTransactionUseCaseTest {
     private var incomeCategoryId: Long = 0L
 
     @Test
-    fun createNewExpense_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking {
+    fun createNewExpense_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -78,12 +78,15 @@ class CreateTransactionUseCaseTest {
         // Assert: Transaction must use internal default account, NOT the supplied other account
         val savedTransaction = getTransactionUseCase(transactionId)
         assertNotNull(savedTransaction)
-        assertEquals(internalDefaultAccountId, savedTransaction?.accountId, 
-            "New Expense must use internal default account, not supplied account ID")
+        assertEquals(
+            "New Expense must use internal default account, not supplied account ID",
+            internalDefaultAccountId,
+            savedTransaction?.accountId
+        )
     }
 
     @Test
-    fun createNewIncome_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking {
+    fun createNewIncome_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -124,12 +127,15 @@ class CreateTransactionUseCaseTest {
         // Assert: Transaction must use internal default account, NOT the supplied other account
         val savedTransaction = getTransactionUseCase(transactionId)
         assertNotNull(savedTransaction)
-        assertEquals(internalDefaultAccountId, savedTransaction?.accountId, 
-            "New Income must use internal default account, not supplied account ID")
+        assertEquals(
+            "New Income must use internal default account, not supplied account ID",
+            internalDefaultAccountId,
+            savedTransaction?.accountId
+        )
     }
 
     @Test
-    fun createNewExpense_withAiSuppliedAccountId_enforcesInternalDefault() = runBlocking {
+    fun createNewExpense_withAiSuppliedAccountId_enforcesInternalDefault() = runBlocking<Unit> {
         // Arrange - Simulate AI parsing that suggests a specific account
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -170,12 +176,15 @@ class CreateTransactionUseCaseTest {
         // Assert: Internal default account must be used, NOT AI-suggested account
         val savedTransaction = getTransactionUseCase(transactionId)
         assertNotNull(savedTransaction)
-        assertEquals(internalDefaultAccountId, savedTransaction?.accountId, 
-            "AI-supplied account ID cannot override internal default for new transactions")
+        assertEquals(
+            "AI-supplied account ID cannot override internal default for new transactions",
+            internalDefaultAccountId,
+            savedTransaction?.accountId
+        )
     }
 
     @Test
-    fun createNewExpense_withMissingAccountId_enforcesInternalDefault() = runBlocking {
+    fun createNewExpense_withMissingAccountId_enforcesInternalDefault() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -213,12 +222,15 @@ class CreateTransactionUseCaseTest {
         // Assert: Internal default account must be used
         val savedTransaction = getTransactionUseCase(transactionId)
         assertNotNull(savedTransaction)
-        assertEquals(internalDefaultAccountId, savedTransaction?.accountId, 
-            "Missing account ID should resolve to internal default")
+        assertEquals(
+            "Missing account ID should resolve to internal default",
+            internalDefaultAccountId,
+            savedTransaction?.accountId
+        )
     }
 
     @Test(expected = DomainException.InvalidTransactionId::class)
-    fun createTransaction_withNonZeroId_throwsInvalidTransactionId() = runBlocking {
+    fun createTransaction_withNonZeroId_throwsInvalidTransactionId() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -245,7 +257,7 @@ class CreateTransactionUseCaseTest {
     }
 
     @Test(expected = DomainException.InvalidTransfer::class)
-    fun createNewTransfer_notSupported_throwsInvalidTransfer() = runBlocking {
+    fun createNewTransfer_notSupported_throwsInvalidTransfer() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -273,7 +285,7 @@ class CreateTransactionUseCaseTest {
     }
 
     @Test
-    fun createNewExpense_preservesCurrencyBehavior() = runBlocking {
+    fun createNewExpense_preservesCurrencyBehavior() = runBlocking<Unit> {
         // Arrange - Verify currency validation still works
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -285,8 +297,12 @@ class CreateTransactionUseCaseTest {
             categoryRepository,
             null
         )
+        getTransactionUseCase = GetTransactionUseCase(transactionRepository)
 
-        // Seed USD account and UZS account with different currencies
+        // Seed internal default account (USD) alongside legacy USD and UZS accounts
+        internalDefaultAccountId = accountRepository.insertAccount(
+            Account(name = "Internal Default", type = AccountType.CASH, initialBalance = Money(0L, "USD"), internalKey = "default")
+        )
         usdAccountId = accountRepository.insertAccount(
             Account(name = "USD Checking", type = AccountType.BANK, initialBalance = Money(100000L, "USD"))
         )
@@ -310,10 +326,11 @@ class CreateTransactionUseCaseTest {
         val transactionId = createTransactionUseCase(validTransaction)
         assertNotNull(transactionId)
 
-        // Assert: Transaction created successfully with correct currency
+        // Assert: Transaction created successfully with correct currency and internal default account
         val savedTransaction = getTransactionUseCase(transactionId)
         assertNotNull(savedTransaction)
         assertEquals("USD", savedTransaction?.amount?.currencyCode)
+        assertEquals(internalDefaultAccountId, savedTransaction?.accountId)
     }
 
     private var aiSuggestedAccountId: Long = 0L

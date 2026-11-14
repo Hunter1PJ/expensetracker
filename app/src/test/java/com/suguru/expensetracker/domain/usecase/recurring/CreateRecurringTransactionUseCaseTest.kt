@@ -37,7 +37,7 @@ class CreateRecurringTransactionUseCaseTest {
     private var incomeCategoryId: Long = 0L
 
     @Test
-    fun createNewRecurringExpense_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking {
+    fun createNewRecurringExpense_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -81,12 +81,15 @@ class CreateRecurringTransactionUseCaseTest {
         // Assert: Rule must use internal default account, NOT the supplied other account
         val savedRule = getRecurringTransactionUseCase(ruleId)
         assertNotNull(savedRule)
-        assertEquals(internalDefaultAccountId, savedRule?.accountId, 
-            "New recurring Expense must use internal default account, not supplied account ID")
+        assertEquals(
+            "New recurring Expense must use internal default account, not supplied account ID",
+            internalDefaultAccountId,
+            savedRule?.accountId
+        )
     }
 
     @Test
-    fun createNewRecurringIncome_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking {
+    fun createNewRecurringIncome_enforcesInternalDefaultAccount_evenWhenDifferentValidIdSupplied() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -130,12 +133,15 @@ class CreateRecurringTransactionUseCaseTest {
         // Assert: Rule must use internal default account, NOT the supplied other account
         val savedRule = getRecurringTransactionUseCase(ruleId)
         assertNotNull(savedRule)
-        assertEquals(internalDefaultAccountId, savedRule?.accountId, 
-            "New recurring Income must use internal default account, not supplied account ID")
+        assertEquals(
+            "New recurring Income must use internal default account, not supplied account ID",
+            internalDefaultAccountId,
+            savedRule?.accountId
+        )
     }
 
     @Test
-    fun createNewRecurringExpense_withAiSuppliedAccountId_enforcesInternalDefault() = runBlocking {
+    fun createNewRecurringExpense_withAiSuppliedAccountId_enforcesInternalDefault() = runBlocking<Unit> {
         // Arrange - Simulate AI parsing that suggests a specific account
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -179,12 +185,15 @@ class CreateRecurringTransactionUseCaseTest {
         // Assert: Internal default account must be used, NOT AI-suggested account
         val savedRule = getRecurringTransactionUseCase(ruleId)
         assertNotNull(savedRule)
-        assertEquals(internalDefaultAccountId, savedRule?.accountId, 
-            "AI-supplied account ID cannot override internal default for new recurring rules")
+        assertEquals(
+            "AI-supplied account ID cannot override internal default for new recurring rules",
+            internalDefaultAccountId,
+            savedRule?.accountId
+        )
     }
 
     @Test
-    fun createNewRecurringExpense_withMissingAccountId_enforcesInternalDefault() = runBlocking {
+    fun createNewRecurringExpense_withMissingAccountId_enforcesInternalDefault() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -225,12 +234,15 @@ class CreateRecurringTransactionUseCaseTest {
         // Assert: Internal default account must be used
         val savedRule = getRecurringTransactionUseCase(ruleId)
         assertNotNull(savedRule)
-        assertEquals(internalDefaultAccountId, savedRule?.accountId, 
-            "Missing account ID should resolve to internal default")
+        assertEquals(
+            "Missing account ID should resolve to internal default",
+            internalDefaultAccountId,
+            savedRule?.accountId
+        )
     }
 
     @Test(expected = DomainException.InvalidTransactionId::class)
-    fun createRecurringRule_withNonZeroId_throwsInvalidTransactionId() = runBlocking {
+    fun createRecurringRule_withNonZeroId_throwsInvalidTransactionId() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -260,7 +272,7 @@ class CreateRecurringTransactionUseCaseTest {
     }
 
     @Test(expected = DomainException.InvalidTransfer::class)
-    fun createNewRecurringTransfer_notSupported_throwsInvalidTransfer() = runBlocking {
+    fun createNewRecurringTransfer_notSupported_throwsInvalidTransfer() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -291,7 +303,7 @@ class CreateRecurringTransactionUseCaseTest {
     }
 
     @Test
-    fun createNewRecurringExpense_preservesCurrencyBehavior() = runBlocking {
+    fun createNewRecurringExpense_preservesCurrencyBehavior() = runBlocking<Unit> {
         // Arrange - Verify currency validation still works
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -303,8 +315,12 @@ class CreateRecurringTransactionUseCaseTest {
             categoryRepository,
             null
         )
+        getRecurringTransactionUseCase = GetRecurringTransactionUseCase(recurringTransactionRepository)
 
-        // Seed USD account and UZS account with different currencies
+        // Seed internal default account (USD) alongside legacy USD and UZS accounts
+        internalDefaultAccountId = accountRepository.insertAccount(
+            Account(name = "Internal Default", type = AccountType.CASH, initialBalance = Money(0L, "USD"), internalKey = "default")
+        )
         usdAccountId = accountRepository.insertAccount(
             Account(name = "USD Checking", type = AccountType.BANK, initialBalance = Money(100000L, "USD"))
         )
@@ -331,10 +347,11 @@ class CreateRecurringTransactionUseCaseTest {
         val ruleId = createRecurringTransactionUseCase(validRule)
         assertNotNull(ruleId)
 
-        // Assert: Rule created successfully with correct currency
+        // Assert: Rule created successfully with correct currency and internal default account
         val savedRule = getRecurringTransactionUseCase(ruleId)
         assertNotNull(savedRule)
         assertEquals("USD", savedRule?.amount?.currencyCode)
+        assertEquals(internalDefaultAccountId, savedRule?.accountId)
     }
 
     private var aiSuggestedAccountId: Long = 0L
