@@ -348,4 +348,59 @@ class AiRepositoryImplTest {
         val candidate = (result as AiResult.Success).data.first()
         assertTrue(candidate.warnings.contains(ParseWarning.UNSUPPORTED_CURRENCY))
     }
+
+    @Test
+    fun extractTransactions_shorthandAmountFromAi_parsesMinorUnitsSafely() = runTest {
+        fakeStorage.saveKey("valid_key")
+        fakeProvider.mockResult = AiResult.Success(
+            ExtractedFinancialPayload(
+                items = listOf(
+                    ExtractedFinancialItem(
+                        transactionType = "EXPENSE",
+                        rawAmount = "50k",
+                        currency = "UZS",
+                        description = "Ovqatlanishga"
+                    ),
+                    ExtractedFinancialItem(
+                        transactionType = "EXPENSE",
+                        rawAmount = "1.5k",
+                        currency = "UZS",
+                        description = "Kofe"
+                    )
+                )
+            )
+        )
+
+        val result = repository.extractTransactions("50k ovqatlanishga va 1.5k kofe")
+        assertTrue(result is AiResult.Success)
+
+        val candidates = (result as AiResult.Success).data
+        assertEquals(2, candidates.size)
+        assertEquals(50000L, candidates[0].amount?.amountInMinorUnits)
+        assertEquals(1500L, candidates[1].amount?.amountInMinorUnits)
+    }
+
+    @Test
+    fun extractTransactions_physicalMeasurementInRawAmount_flagsMissingOrInvalidAmount() = runTest {
+        fakeStorage.saveKey("valid_key")
+        fakeProvider.mockResult = AiResult.Success(
+            ExtractedFinancialPayload(
+                items = listOf(
+                    ExtractedFinancialItem(
+                        transactionType = "EXPENSE",
+                        rawAmount = "50 kg",
+                        currency = "UZS",
+                        description = "Kartoshka"
+                    )
+                )
+            )
+        )
+
+        val result = repository.extractTransactions("50 kg kartoshka")
+        assertTrue(result is AiResult.Success)
+
+        val candidate = (result as AiResult.Success).data.first()
+        assertNull(candidate.amount)
+        assertTrue(candidate.warnings.contains(ParseWarning.INVALID_AMOUNT))
+    }
 }

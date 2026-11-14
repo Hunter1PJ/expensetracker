@@ -207,7 +207,7 @@ class AiRepositoryImpl(
      * - Currency ambiguities flagged
      * - Transfers checked for source and destination accounts
      */
-    private fun mapToTransactionCandidate(
+    private suspend fun mapToTransactionCandidate(
         item: ExtractedFinancialItem,
         defaultCurrency: String
     ): TransactionCandidate {
@@ -243,10 +243,8 @@ class AiRepositoryImpl(
                 confidence = ParseConfidence.LOW
             }
         } else {
-            // Strict deterministic money parsing: never Float/Double
-            val cleanAmountStr = item.rawAmount.replace(" ", "").replace(",", ".")
-            val parsedResult = MoneyParser.parse(cleanAmountStr, currencyToUse)
-            if (parsedResult.isSuccess) {
+            val parsedResult = parseAiAmount(item.rawAmount, currencyToUse)
+            if (parsedResult.isSuccess && parsedResult.getOrThrow().amountInMinorUnits > 0L) {
                 money = parsedResult.getOrThrow()
             } else {
                 warnings.add(ParseWarning.INVALID_AMOUNT)
@@ -301,6 +299,29 @@ class AiRepositoryImpl(
             norm.contains("kecha") || norm.contains("вчера") || norm.contains("yesterday") -> today.minusDays(1)
             norm.contains("oldingi kun") || norm.contains("позавчера") || norm.contains("before yesterday") -> today.minusDays(2)
             else -> today
+        }
+    }
+
+    private suspend fun parseAiAmount(rawAmount: String, currencyCode: String): Result<Money> {
+        val trimmed = rawAmount.trim()
+        if (trimmed.isEmpty()) return Result.failure(IllegalArgumentException("Empty amount"))
+
+        val cleanAmountStr = trimmed.replace(" ", "").replace("\u00A0", "")
+        val directResult = MoneyParser.parse(cleanAmountStr, currencyCode)
+        if (directResult.isSuccess) {
+            return directResult
+        }
+
+        return try {
+            val parseResult = offlineParser.parse(trimmed, currencyCode)
+            val candidate = parseResult.firstOrNull()
+            if (candidate?.amount != null) {
+                Result.success(candidate.amount)
+            } else {
+                Result.failure(IllegalArgumentException("Invalid amount format: $rawAmount"))
+            }
+        } catch (_: Exception) {
+            Result.failure(IllegalArgumentException("Invalid amount format: $rawAmount"))
         }
     }
 }

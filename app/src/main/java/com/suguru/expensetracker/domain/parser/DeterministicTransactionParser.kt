@@ -4,7 +4,6 @@ import com.suguru.expensetracker.domain.model.Money
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.util.MoneyParser
 import java.time.LocalDate
-import java.util.regex.Pattern
 
 /**
  * Deterministic, rule-based natural language transaction parser supporting Uzbek, Russian, and English.
@@ -44,8 +43,15 @@ class DeterministicTransactionParser(
         var confidence = ParseConfidence.HIGH
 
         if (amountResult.amount == null) {
-            warnings.add(ParseWarning.MISSING_AMOUNT)
+            if (amountResult.error == "Amount is too large" || amountResult.isInvalid) {
+                warnings.add(ParseWarning.INVALID_AMOUNT)
+            } else {
+                warnings.add(ParseWarning.MISSING_AMOUNT)
+            }
             confidence = ParseConfidence.LOW
+        } else if (amountResult.isMultipleAmounts) {
+            warnings.add(ParseWarning.MULTIPLE_AMOUNTS_DETECTED)
+            confidence = ParseConfidence.AMBIGUOUS
         } else if (amountResult.isAmbiguous) {
             warnings.add(ParseWarning.AMBIGUOUS_AMOUNT)
             confidence = ParseConfidence.AMBIGUOUS
@@ -62,7 +68,7 @@ class DeterministicTransactionParser(
         }
 
         val finalType = type ?: TransactionType.EXPENSE // Default fallback to expense if ambiguous
-        val title = cleanTitle(line)
+        val title = cleanTitle(line, amountResult.rawAmountToken)
 
         // Extract category/account suggestions based on keywords
         val category = detectCategory(normalized, finalType)
@@ -81,14 +87,17 @@ class DeterministicTransactionParser(
             confidence = confidence,
             warnings = warnings,
             isUnitPriceInterpretation = isUnitPrice && !isExplicitTotal,
-            parseError = if (amountResult.error != null) amountResult.error else null
+            parseError = amountResult.error
         )
     }
 
     private data class AmountParseResult(
         val amount: Money?,
+        val rawAmountToken: String?,
         val isAmbiguous: Boolean,
-        val error: String?
+        val isMultipleAmounts: Boolean = false,
+        val isInvalid: Boolean = false,
+        val error: String? = null
     )
 
     private data class AccountDetectionResult(
@@ -100,14 +109,27 @@ class DeterministicTransactionParser(
     private fun detectDate(normalized: String, today: LocalDate): LocalDate {
         return when {
             normalized.contains("kecha") || normalized.contains("вчера") || normalized.contains("yesterday") -> today.minusDays(1)
+            normalized.contains("oldingi kun") || normalized.contains("позавчера") || normalized.contains("before yesterday") -> today.minusDays(2)
             else -> today
         }
     }
 
     private fun detectType(normalized: String): TransactionType? {
-        val expenseKeywords = listOf("sarfladim", "xarajat", "to'ladim", "toledim", "spent", "paid", "потратил", "оплатил", "купил", "олдим" /* context dependent */)
-        val incomeKeywords = listOf("oldim", "maosh", "oylik", "daromad", "received", "salary", "получил", "зарплата", "прибыль")
-        val transferKeywords = listOf("o'tkazdim", "o'tkazma", "transfer", "перевод", "перевел", "kartamdan")
+        val expenseKeywords = listOf(
+            "sarfladim", "sarf", "xarajat", "to'ladim", "toladim", "toledim", "berdim", "ishlatdim", "xarid", "harid",
+            "spent", "paid", "bought", "purchase", "expense",
+            "потратил", "потратила", "оплатил", "оплатила", "купил", "купила", "заплатил", "заплатила", "расход", "покупка"
+        )
+        val incomeKeywords = listOf(
+            "oldim", "tushdi", "maosh", "oylik", "daromad", "kirdi", "ish haq",
+            "received", "got", "salary", "income", "earned", "deposit",
+            "получил", "получила", "пришло", "заработал", "заработала", "зарплата", "доход", "прибыль"
+        )
+        val transferKeywords = listOf(
+            "o'tkazdim", "otkazdim", "o'tkazma", "otkazma", "otkazish",
+            "transfer", "transferred",
+            "перевод", "перевел", "перевела", "перевести", "kartamdan"
+        )
 
         val hasTransfer = transferKeywords.any { normalized.contains(it) }
         val hasIncome = incomeKeywords.any { normalized.contains(it) && !normalized.contains("non") && !normalized.contains("tuxum") }
@@ -123,64 +145,250 @@ class DeterministicTransactionParser(
 
     private fun extractAmountAndCurrency(line: String, defaultCurrency: String): AmountParseResult {
         val normalized = line.lowercase()
+        val detectedCurrency = detectCurrency(normalized, defaultCurrency)
 
-        // Match patterns like "5000 so'm", "$25", "2 million", "500 ming", "25000 сум", "500 рублей"
-        // Let's search for numbers and magnitude modifiers
-        
-        // Handle magnitudes like "2 million", "2 mln", "500 ming"
-        var multiplier = 1L
-        var rawNumberStr: String? = null
-        var detectedCurrency = defaultCurrency
-
-        // Regex for numbers with optional decimals
-        val numberRegex = Regex("(\\d+[\\d\\s.,]*)")
-        val matchResult = numberRegex.find(line)
-
-        if (matchResult == null) {
-            return AmountParseResult(null, false, "No numeric amount found")
+        val candidates = findNumberCandidates(line)
+        if (candidates.isEmpty()) {
+            return AmountParseResult(null, null, isAmbiguous = false, error = "No numeric amount found")
         }
 
-        val numStrMatch = matchResult.value.replace(" ", "").replace(",", ".")
-        
-        // Check magnitudes following the number
-        val afterNumber = line.substring(matchResult.range.last + 1).trim().lowercase()
-        when {
-            afterNumber.startsWith("million") || afterNumber.startsWith("mln") -> multiplier = 1_000_000L
-            afterNumber.startsWith("ming") || afterNumber.startsWith("тыс") -> multiplier = 1_000L
+        val amountCandidates = candidates.filter { !isDateToken(it) && !isPhysicalUnitCandidate(it) }
+        if (amountCandidates.isEmpty()) {
+            return AmountParseResult(null, null, isAmbiguous = false, error = "No numeric amount found")
         }
 
-        // Detect currency in string
-        detectedCurrency = when {
-            normalized.contains("so'm") || normalized.contains("som") || normalized.contains("сум") -> "UZS"
-            normalized.contains("usd") || normalized.contains("$") -> "USD"
-            normalized.contains("eur") || normalized.contains("€") -> "EUR"
-            normalized.contains("rub") || normalized.contains("руб") -> "RUB"
+        val isMultiple = amountCandidates.size > 1
+        val primary = amountCandidates.first()
+
+        val parsedMoneyResult = parseMoneyFromCandidate(primary, detectedCurrency)
+        if (parsedMoneyResult.isFailure) {
+            val errorMsg = parsedMoneyResult.exceptionOrNull()?.message ?: "Invalid amount"
+            return AmountParseResult(null, primary.rawMatch, isAmbiguous = true, isInvalid = true, error = errorMsg)
+        }
+
+        val money = parsedMoneyResult.getOrThrow()
+        if (money.amountInMinorUnits <= 0L) {
+            return AmountParseResult(money, primary.rawMatch, isAmbiguous = true, isInvalid = true, error = "Amount must be greater than zero")
+        }
+
+        return AmountParseResult(
+            amount = money,
+            rawAmountToken = primary.rawMatch,
+            isAmbiguous = isMultiple,
+            isMultipleAmounts = isMultiple,
+            error = null
+        )
+    }
+
+    private data class NumberCandidate(
+        val rawMatch: String,
+        val numberString: String,
+        val suffixString: String?
+    )
+
+    private fun findNumberCandidates(line: String): List<NumberCandidate> {
+        val list = mutableListOf<NumberCandidate>()
+        val regex = Regex("(?:[$€£¥₽]\\s*)?(\\d+(?:[\\s.,]\\d+)*)\\s*([a-zA-Zа-яА-Я'`’.]+)?")
+        val matches = regex.findAll(line)
+
+        for (match in matches) {
+            val fullMatch = match.value.trim()
+            val numGroup = match.groupValues[1].trim()
+            val suffixGroup = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }?.trim()
+
+            list.add(NumberCandidate(fullMatch, numGroup, suffixGroup))
+        }
+        return list
+    }
+
+    private fun isDateToken(candidate: NumberCandidate): Boolean {
+        val num = candidate.numberString.toLongOrNull() ?: return false
+        val suffix = candidate.suffixString?.lowercase() ?: return false
+
+        val monthKeywords = setOf(
+            "январь", "января", "февраль", "февраля", "март", "марта", "апрель", "апреля", "май", "мая", "июнь", "июня",
+            "июль", "июля", "август", "августа", "сентябрь", "сентября", "октябрь", "октября", "ноябрь", "ноября", "декабрь", "декабря",
+            "january", "february", "march", "april", "june", "july", "august", "september", "october", "november", "december",
+            "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+            "yanvar", "fevral", "mart", "aprel", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr",
+            "yil", "год", "года"
+        )
+        return (num in 1..31 || num in 1900..2100) && monthKeywords.contains(suffix)
+    }
+
+    private fun detectCurrency(normalized: String, defaultCurrency: String): String {
+        return when {
+            normalized.contains("so'm") || normalized.contains("som") || normalized.contains("сум") || normalized.contains("сўм") || normalized.contains("uzs") -> "UZS"
+            normalized.contains("usd") || normalized.contains("$") || normalized.contains("доллар") -> "USD"
+            normalized.contains("eur") || normalized.contains("€") || normalized.contains("евро") -> "EUR"
+            normalized.contains("rub") || normalized.contains("руб") || normalized.contains("рублей") || normalized.contains("рубль") || normalized.contains("₽") -> "RUB"
             else -> defaultCurrency
         }
+    }
 
-        // Parse base number using MoneyParser
-        val baseParse = MoneyParser.parse(numStrMatch, detectedCurrency)
-        if (baseParse.isFailure) {
-            return AmountParseResult(null, false, baseParse.exceptionOrNull()?.message ?: "Invalid amount")
+    private fun isPhysicalUnitCandidate(candidate: NumberCandidate): Boolean {
+        val suffix = candidate.suffixString?.lowercase()?.trimEnd('.', ',', ';') ?: return false
+        val hasExplicitCurrencySymbol = candidate.rawMatch.any { it in "\$€£¥₽" }
+        return isPhysicalUnit(suffix) && !hasExplicitCurrencySymbol
+    }
+
+    private fun parseMoneyFromCandidate(candidate: NumberCandidate, currencyCode: String): Result<Money> {
+        val multiplier = resolveMultiplier(candidate.suffixString)
+        val cleanNumberStr = candidate.numberString.replace(" ", "").replace("\u00A0", "")
+
+        if (multiplier == 1L) {
+            val sanitized = sanitizeNumericString(cleanNumberStr, currencyCode)
+            return MoneyParser.parse(sanitized, currencyCode)
         }
 
-        val baseMoney = baseParse.getOrThrow()
-        val finalMinorUnits = try {
-            Math.multiplyExact(baseMoney.amountInMinorUnits, multiplier)
+        // Multiplier > 1 (e.g. 1,000 or 1,000,000)
+        val normalizedDecimalStr = cleanNumberStr.replace(',', '.')
+        val parts = normalizedDecimalStr.split('.')
+        if (parts.size > 2) {
+            return Result.failure(IllegalArgumentException("Invalid number format: multiple decimal points"))
+        }
+
+        val integerPartStr = parts[0]
+        val fractionPartStr = if (parts.size == 2) parts[1] else ""
+
+        if (integerPartStr.isNotEmpty() && !integerPartStr.all { it.isDigit() }) {
+            return Result.failure(IllegalArgumentException("Invalid characters in number"))
+        }
+        if (fractionPartStr.isNotEmpty() && !fractionPartStr.all { it.isDigit() }) {
+            return Result.failure(IllegalArgumentException("Invalid characters in decimal fraction"))
+        }
+
+        val integerPart = if (integerPartStr.isEmpty()) 0L else {
+            try {
+                integerPartStr.toLong()
+            } catch (e: NumberFormatException) {
+                return Result.failure(IllegalArgumentException("Amount is too large"))
+            }
+        }
+
+        val wholeFromInteger = try {
+            Math.multiplyExact(integerPart, multiplier)
         } catch (e: ArithmeticException) {
-            return AmountParseResult(null, false, "Amount is too large")
+            return Result.failure(IllegalArgumentException("Amount is too large"))
         }
 
-        return AmountParseResult(Money(finalMinorUnits, detectedCurrency), false, null)
+        val wholeFromFraction = if (fractionPartStr.isEmpty()) {
+            0L
+        } else {
+            val fractionLen = fractionPartStr.length
+            var scale = 1L
+            repeat(fractionLen) {
+                scale *= 10L
+            }
+            if (multiplier % scale != 0L) {
+                val rawFrac = fractionPartStr.toLong()
+                (rawFrac * multiplier) / scale
+            } else {
+                val factor = multiplier / scale
+                val rawFrac = fractionPartStr.toLong()
+                try {
+                    Math.multiplyExact(rawFrac, factor)
+                } catch (e: ArithmeticException) {
+                    return Result.failure(IllegalArgumentException("Amount is too large"))
+                }
+            }
+        }
+
+        val totalBaseUnits = try {
+            Math.addExact(wholeFromInteger, wholeFromFraction)
+        } catch (e: ArithmeticException) {
+            return Result.failure(IllegalArgumentException("Amount is too large"))
+        }
+
+        val decimals = MoneyParser.getDecimalPlaces(currencyCode)
+        var currencyMultiplier = 1L
+        repeat(decimals) {
+            currencyMultiplier *= 10L
+        }
+
+        val totalMinorUnits = try {
+            Math.multiplyExact(totalBaseUnits, currencyMultiplier)
+        } catch (e: ArithmeticException) {
+            return Result.failure(IllegalArgumentException("Amount is too large"))
+        }
+
+        return Result.success(Money(totalMinorUnits, currencyCode))
+    }
+
+    private fun resolveMultiplier(suffix: String?): Long {
+        if (suffix.isNullOrBlank()) return 1L
+        val norm = suffix.lowercase().trimEnd('.', ',', ';')
+
+        if (isPhysicalUnit(norm)) return 1L
+
+        return when {
+            // Thousands (1,000)
+            norm == "k" || norm == "к" -> 1_000L
+            norm.startsWith("ming") || norm.startsWith("тыс") || norm.startsWith("тыщ") || norm.startsWith("thousand") -> 1_000L
+
+            // Millions (1,000,000)
+            norm == "m" || norm == "м" -> 1_000_000L
+            norm.startsWith("mln") || norm.startsWith("млн") || norm.startsWith("million") || norm.startsWith("миллион") -> 1_000_000L
+
+            // Billions (1,000,000,000)
+            norm == "b" || norm == "б" || norm.startsWith("bln") || norm.startsWith("млрд") || norm.startsWith("billion") || norm.startsWith("миллиард") -> 1_000_000_000L
+
+            else -> 1L
+        }
+    }
+
+    private fun isPhysicalUnit(norm: String): Boolean {
+        val physicalUnits = setOf(
+            "kg", "кг", "g", "гр", "gram", "грамм",
+            "km", "км", "m2", "м2", "m3", "м3", "cm", "см", "mm", "мм",
+            "kw", "kwt", "квт", "kv",
+            "kb", "mb", "gb", "tb",
+            "pcs", "шт", "ta", "dona", "dosa",
+            "l", "litr", "литр", "min", "мин", "hour", "chas", "час"
+        )
+        return physicalUnits.contains(norm)
+    }
+
+    private fun sanitizeNumericString(str: String, currencyCode: String): String {
+        val s = str.replace(" ", "").replace("\u00A0", "")
+        val decimals = MoneyParser.getDecimalPlaces(currencyCode)
+
+        if (decimals == 0) {
+            return s.replace(",", "").replace(".", "")
+        }
+
+        if (s.contains(',') && s.contains('.')) {
+            return s.replace(",", "")
+        }
+
+        if (s.contains(',') && !s.contains('.')) {
+            val parts = s.split(',')
+            if (parts.size == 2 && parts[1].length == 3 && parts[0].length <= 3) {
+                return s.replace(",", "")
+            }
+            return s.replace(',', '.')
+        }
+
+        if (s.contains('.') && !s.contains(',')) {
+            val parts = s.split('.')
+            if (parts.size == 2 && parts[1].length == 3 && parts[0].length <= 3) {
+                return s.replace(".", "")
+            }
+            if (parts.size > 2) {
+                return s.replace(".", "")
+            }
+        }
+
+        return s
     }
 
     private fun detectCategory(normalized: String, type: TransactionType): String? {
         if (type == TransactionType.TRANSFER) return null
         return when {
-            normalized.contains("tuxum") || normalized.contains("sut") || normalized.contains("non") || normalized.contains("olma") || normalized.contains("продукты") || normalized.contains("groceries") -> "Groceries"
-            normalized.contains("taksi") || normalized.contains("taxi") || normalized.contains("транспорт") -> "Transport"
-            normalized.contains("tushlik") || normalized.contains("lunch") || normalized.contains("cafe") || normalized.contains("кафе") -> "Food & Dining"
-            normalized.contains("oylik") || normalized.contains("maosh") || normalized.contains("salary") || normalized.contains("зарплата") -> "Salary"
+            normalized.contains("oziq-ovqat") || normalized.contains("tuxum") || normalized.contains("sut") || normalized.contains("non") || normalized.contains("olma") || normalized.contains("продукты") || normalized.contains("groceries") || normalized.contains("супермаркет") || normalized.contains("bozor") -> "Groceries"
+            normalized.contains("taksi") || normalized.contains("taxi") || normalized.contains("транспорт") || normalized.contains("автобус") || normalized.contains("metro") || normalized.contains("метро") || normalized.contains("benzin") -> "Transport"
+            normalized.contains("ovqatlanish") || normalized.contains("ovqat") || normalized.contains("tushlik") || normalized.contains("lunch") || normalized.contains("cafe") || normalized.contains("кафе") || normalized.contains("ресторан") || normalized.contains("обед") || normalized.contains("ужин") -> "Food & Dining"
+            normalized.contains("oylik") || normalized.contains("maosh") || normalized.contains("salary") || normalized.contains("зарплата") || normalized.contains("доход") -> "Salary"
             else -> null
         }
     }
@@ -192,7 +400,15 @@ class DeterministicTransactionParser(
         }
     }
 
-    private fun cleanTitle(line: String): String {
-        return line.replace(Regex("(?i)\\b(bugun|kecha|sarfladim|oldim|o'tkazdim|so'm|som|сум|usd|eur|rub|\\$|€)\\b"), "").trim().replace(Regex("\\s+"), " ")
+    private fun cleanTitle(line: String, amountRawToken: String?): String {
+        var result = line
+        if (!amountRawToken.isNullOrBlank()) {
+            result = result.replace(amountRawToken, "", ignoreCase = true)
+        }
+        val cleanRegex = Regex(
+            "(?i)\\b(bugun|kecha|oldingi kun|вчера|позавчера|yesterday|today|sarfladim|sarf|to'ladim|toladim|toledim|oldim|o'tkazdim|otkazdim|купил|купила|потратил|потратила|оплатил|оплатила|получил|получила|перевел|перевела|spent|paid|bought|received|so'm|som|сум|сўм|usd|eur|rub|руб|рублей|\\$|€|\\bна\\b|\\bза\\b|\\bfor\\b|\\bon\\b)\\b"
+        )
+        result = result.replace(cleanRegex, "").trim().replace(Regex("\\s+"), " ")
+        return result.ifBlank { "Transaction" }
     }
 }

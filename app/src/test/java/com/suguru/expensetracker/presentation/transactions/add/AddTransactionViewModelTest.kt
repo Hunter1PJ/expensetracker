@@ -986,4 +986,105 @@ class AddTransactionViewModelTest {
         assertEquals("Updated consulting payout", saved.note)
         assertTrue(transactionRepository.getTransactionsByAccount(legacyAccountId).isEmpty())
     }
+
+    @Test
+    fun `unsupported transfer candidate populates with error and blocks saving`() = runTest(testDispatcher) {
+        val internalDefaultId = insertDefaultAccount()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val transferCandidate = TransactionCandidate(
+            rawText = "Transfer 100 to savings",
+            suggestedTitle = "Transfer",
+            transactionType = TransactionType.TRANSFER,
+            amount = Money(10000L, "USD"),
+            date = LocalDate.of(2026, 11, 10),
+            confidence = ParseConfidence.AMBIGUOUS
+        )
+
+        viewModel.populateFromCandidate(transferCandidate)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.error)
+        assertTrue(transactionRepository.getTransactionsByAccount(internalDefaultId).isEmpty())
+
+        viewModel.saveTransaction()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isSavedSuccessfully)
+        assertTrue(transactionRepository.getTransactionsByAccount(internalDefaultId).isEmpty())
+    }
+
+    @Test
+    fun `candidate with missing amount populates warning and blocks saving until amount provided`() = runTest(testDispatcher) {
+        val internalDefaultId = insertDefaultAccount()
+        categoryRepository.insertCategory(
+            Category(name = "Groceries", type = CategoryType.EXPENSE, iconName = "cart", colorHex = "#10B981")
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val missingAmountCandidate = TransactionCandidate(
+            rawText = "bought apples",
+            suggestedTitle = "apples",
+            transactionType = TransactionType.EXPENSE,
+            amount = null,
+            date = LocalDate.of(2026, 11, 10),
+            suggestedCategoryName = "Groceries",
+            warnings = listOf(ParseWarning.MISSING_AMOUNT),
+            confidence = ParseConfidence.LOW
+        )
+
+        viewModel.populateFromCandidate(missingAmountCandidate)
+        advanceUntilIdle()
+
+        val previewState = viewModel.uiState.value
+        assertEquals("", previewState.amount)
+        assertNotNull(previewState.aiAmountWarning)
+        assertFalse(previewState.isSavedSuccessfully)
+
+        // Saving with empty amount fails
+        viewModel.saveTransaction()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isSavedSuccessfully)
+        assertTrue(transactionRepository.getTransactionsByAccount(internalDefaultId).isEmpty())
+
+        // User enters valid amount and saves
+        viewModel.onAmountChanged("25.00")
+        viewModel.saveTransaction()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isSavedSuccessfully)
+        val txs = transactionRepository.getTransactionsByAccount(internalDefaultId)
+        assertEquals(1, txs.size)
+        assertEquals(2500L, txs.first().amount.amountInMinorUnits)
+    }
+
+    @Test
+    fun `rapid repeated save calls do not create duplicate transactions`() = runTest(testDispatcher) {
+        val internalDefaultId = insertDefaultAccount()
+        val catId = categoryRepository.insertCategory(
+            Category(name = "Groceries", type = CategoryType.EXPENSE, iconName = "cart", colorHex = "#10B981")
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onAmountChanged("50.00")
+        viewModel.onCategorySelected(catId)
+        viewModel.onNoteChanged("Groceries")
+
+        // Trigger multiple saves in rapid succession
+        viewModel.saveTransaction()
+        viewModel.saveTransaction()
+        viewModel.saveTransaction()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isSavedSuccessfully)
+        val txs = transactionRepository.getTransactionsByAccount(internalDefaultId)
+        assertEquals(1, txs.size)
+    }
 }

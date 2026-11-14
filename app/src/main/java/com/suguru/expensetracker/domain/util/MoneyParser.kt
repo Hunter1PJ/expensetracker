@@ -31,7 +31,7 @@ object MoneyParser {
      * @return [Result] containing [Money] on success, or an [IllegalArgumentException] on parse failure.
      */
     fun parse(input: String, currencyCode: String = "USD"): Result<Money> {
-        val trimmed = input.trim().replace(',', '.')
+        val trimmed = input.trim().replace(" ", "").replace("\u00A0", "").replace(',', '.')
         if (trimmed.isEmpty()) {
             return Result.failure(IllegalArgumentException("Amount cannot be empty"))
         }

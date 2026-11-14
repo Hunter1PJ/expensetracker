@@ -12,16 +12,21 @@ object GeminiRequestFactory {
 Your job is to extract financial transaction records from natural language user input in Uzbek (Latin and Cyrillic), Russian, and English.
 
 CRITICAL FINANCIAL SAFETY INSTRUCTIONS:
-1. NEVER invent transactions, accounts, categories, or amounts.
-2. If an amount is missing or not explicitly stated, set "rawAmount": null, "isAmountMissing": true, and add "amount" to "missingFields".
-3. Return amount as a raw numeric string (e.g. "25000", "150.50", "2000000"). Never calculate or approximate with floating point decimals.
-4. Transaction types must be one of: "EXPENSE", "INCOME", "TRANSFER", "AMBIGUOUS", "UNKNOWN".
-5. For TRANSFERS, both a source account ("sourceAccountSuggestion") and a destination account ("destinationAccountSuggestion") must be identified if possible. If unclear, mark "isAmbiguous": true.
-6. If currency is ambiguous or absent, flag "currencyAmbiguous": true and suggest the likely or default currency if evident.
-7. Support multi-transaction inputs: if user enters multiple transactions (either line-by-line or combined), output each as an individual object in the "items" array.
-8. If unit price or quantity is mentioned (e.g. "3 kg apples at 15000 each"), extract "quantity", "unit", and "unitPrice".
-9. For relative dates (e.g. "today", "yesterday", "kecha", "bugun", "вчера", "сегодня"), extract into "dateExpression".
-10. Return strictly valid JSON conforming exactly to the requested schema. No markdown formatting, no code blocks, no explanation text outside the JSON.
+1. NEVER invent transactions, accounts, categories, or amounts. Do not invent fake merchant names, locations, or dates.
+2. Recognize amount shorthand: "50k" -> "50000", "1.5k" -> "1500", "100 ming" -> "100000", "2 million" -> "2000000", "50к" -> "50000", "100 тыс" -> "100000". Output expanded plain numeric strings in "rawAmount".
+3. Distinguish physical measurements or quantities (e.g. "50 kg", "10 km", "3 pcs", "5 dona") from monetary amounts. A measurement unit without a monetary price is NOT a financial amount (set "rawAmount": null, "isAmountMissing": true, "unit": "kg", "quantity": "50").
+4. Remove thousand grouping separators (spaces, commas, dots used for grouping) in "rawAmount" (e.g. "50 000" -> "50000").
+5. If an amount is missing or not explicitly stated, set "rawAmount": null, "isAmountMissing": true, and add "amount" to "missingFields".
+6. Return amount as a raw numeric string (e.g. "25000", "1500", "2000000"). Never calculate or approximate with floating point decimals.
+7. Transaction types must be one of: "EXPENSE", "INCOME", "TRANSFER", "AMBIGUOUS", "UNKNOWN". Do not infer "INCOME" merely because the input contains a positive number.
+8. For TRANSFERS, both a source account ("sourceAccountSuggestion") and a destination account ("destinationAccountSuggestion") must be identified if possible. If unclear, mark "isAmbiguous": true.
+9. Respect explicit currency codes/symbols ("UZS", "USD", "EUR", "RUB", "$", "€", "₽", "so'm", "som", "сум"). If currency is ambiguous or absent, flag "currencyAmbiguous": true and suggest the likely or default currency if evident.
+10. Categories must be standard categories compatible with the transaction type (e.g. "Groceries", "Transport", "Food & Dining", "Salary"). Do not invent fabricated category names.
+11. Description/title must preserve user's meaningful note text without including amount, currency, or date expressions.
+12. Support multi-transaction inputs: if user enters multiple transactions (either line-by-line or combined), output each as an individual object in the "items" array.
+13. If unit price or quantity is mentioned (e.g. "3 kg apples at 15000 each"), extract "quantity", "unit", and "unitPrice".
+14. For relative dates (e.g. "today", "yesterday", "kecha", "bugun", "вчера", "сегодня"), extract into "dateExpression".
+15. Return strictly valid JSON conforming exactly to the requested schema. No markdown formatting, no code blocks, no explanation text outside the JSON.
 """
 
     private val RESPONSE_JSON_SCHEMA: Map<String, Any> = mapOf(
