@@ -2,10 +2,19 @@ package com.suguru.expensetracker.domain.usecase
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
+import com.suguru.expensetracker.BuildConfig
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabase
+import com.suguru.expensetracker.data.local.entity.AccountEntity
+import com.suguru.expensetracker.data.local.entity.BudgetEntity
+import com.suguru.expensetracker.data.local.entity.CategoryEntity
+import com.suguru.expensetracker.data.local.entity.RecurringOccurrenceEntity
+import com.suguru.expensetracker.data.local.entity.RecurringTransactionEntity
+import com.suguru.expensetracker.data.local.entity.TransactionEntity
 import com.suguru.expensetracker.data.repository.RoomBackupRepository
 import com.suguru.expensetracker.data.repository.RoomAccountRepository
 import com.suguru.expensetracker.data.repository.RoomCategoryRepository
@@ -17,9 +26,11 @@ import com.suguru.expensetracker.domain.usecase.backup.RestoreBackupUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.ExportTransactionsToCsvUseCase
 import com.suguru.expensetracker.presentation.startup.StartupProvisioningState
 import com.suguru.expensetracker.presentation.startup.allowsNavigation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
@@ -117,6 +128,9 @@ class BackupRestoreUseCaseTest {
         // 2. Perform backup
         val backup = createFullBackupUseCase()
         assertNotNull(backup)
+        assertEquals(2, backup.formatVersion)
+        assertEquals(4, backup.databaseSchemaVersion)
+        assertEquals(backup.checksum, backupRepository.computeChecksum(backup))
         assertEquals(1, backup.accounts.size)
         assertEquals(1, backup.categories.size)
         assertEquals(1, backup.transactions.size)
@@ -125,12 +139,14 @@ class BackupRestoreUseCaseTest {
         // Serialize to JSON string
         val json = backupRepository.serializeBackup(backup)
         assertTrue(json.contains("\"formatVersion\":2"))
+        assertTrue(json.contains("\"databaseSchemaVersion\":4"))
 
         // Deserialize back
         val parsedResult = backupRepository.deserializeBackup(json)
         assertTrue(parsedResult.isSuccess)
         val parsedBackup = parsedResult.getOrThrow()
         assertEquals(backup.checksum, parsedBackup.checksum)
+        assertEquals(4, parsedBackup.databaseSchemaVersion)
 
         // 3. Clear/restore database from backup
         val restoreResult = restoreBackupUseCase(parsedBackup)
@@ -534,6 +550,730 @@ class BackupRestoreUseCaseTest {
         assertTrue("Expected escaped note part in CSV but was:\n$csv", csv.contains(expectedPart))
         assertTrue(csv.contains("Debit Card"))
         assertTrue(csv.contains("Shopping"))
+    }
+
+    @Test
+    fun testExportAndRestoreRoomV4WithRecurringRulesAndOccurrences() = runBlocking {
+        val accountId = accountRepo.insertAccount(
+            Account(
+                name = "Primary Checking",
+                type = AccountType.BANK,
+                initialBalance = Money(100_000L, "USD")
+            )
+        )
+        val categoryId = categoryRepo.insertCategory(
+            Category(
+                name = "Utilities",
+                type = CategoryType.EXPENSE,
+                iconName = "bolt",
+                colorHex = "#2563EB"
+            )
+        )
+        val ruleId = database.recurringTransactionDao().insertRecurringTransaction(
+            RecurringTransactionEntity(
+                type = TransactionType.EXPENSE,
+                amountInMinorUnits = 4500L,
+                currencyCode = "USD",
+                accountId = accountId,
+                destinationAccountId = null,
+                categoryId = categoryId,
+                frequency = RecurrenceFrequency.MONTHLY,
+                startDate = LocalDate.of(2026, 1, 1),
+                endDate = null,
+                nextOccurrence = LocalDate.of(2026, 2, 1),
+                note = "Internet",
+                isActive = true
+            )
+        )
+        val txId = transactionRepo.insertTransaction(
+            Transaction(
+                type = TransactionType.EXPENSE,
+                amount = Money(4500L, "USD"),
+                accountId = accountId,
+                categoryId = categoryId,
+                transactionTime = Instant.parse("2026-01-01T10:00:00Z"),
+                note = "Internet",
+                recurringRuleId = ruleId,
+                recurringOccurrenceDate = LocalDate.of(2026, 1, 1)
+            )
+        )
+        database.recurringOccurrenceDao().insertOccurrence(
+            RecurringOccurrenceEntity(
+                ruleId = ruleId,
+                occurrenceDate = LocalDate.of(2026, 1, 1),
+                generatedTransactionId = txId,
+                status = RecurringOccurrenceStatus.GENERATED,
+                processedAt = Instant.parse("2026-01-01T10:00:00Z")
+            )
+        )
+        database.budgetDao().insertBudget(
+            BudgetEntity(
+                categoryId = categoryId,
+                limitAmountInMinorUnits = 20_000L,
+                currencyCode = "USD",
+                periodType = BudgetPeriodType.MONTHLY,
+                startDate = LocalDate.of(2026, 1, 1),
+                endDate = LocalDate.of(2026, 1, 31),
+                isActive = true
+            )
+        )
+
+        val backup = createFullBackupUseCase()
+        assertEquals(2, backup.formatVersion)
+        assertEquals(4, backup.databaseSchemaVersion)
+        assertEquals(backup.checksum, backupRepository.computeChecksum(backup))
+
+        val json = backupRepository.serializeBackup(backup)
+        assertTrue(json.contains("\"formatVersion\":2"))
+        assertTrue(json.contains("\"databaseSchemaVersion\":4"))
+
+        database.clearAllTables()
+        assertEquals(0, database.backupDao().getAllAccounts().size)
+
+        val parsed = backupRepository.deserializeBackup(json).getOrThrow()
+        val restoreResult = restoreBackupUseCase(parsed)
+        assertTrue(restoreResult.isSuccess)
+        assertEquals(BackupRestoreOutcome.Complete, restoreResult.getOrThrow())
+
+        assertEquals(1, database.backupDao().getAllCategories().size)
+        assertEquals(1, database.backupDao().getAllTransactions().size)
+        assertEquals(1, database.backupDao().getAllBudgets().size)
+        assertEquals(1, database.backupDao().getAllRecurringTransactions().size)
+        assertEquals(1, database.backupDao().getAllRecurringOccurrences().size)
+        assertEquals("Internet", database.backupDao().getAllRecurringTransactions().single().note)
+        assertEquals(txId, database.backupDao().getAllRecurringOccurrences().single().generatedTransactionId)
+    }
+
+    @Test
+    fun testImportSupportsHistoricalSchemaVersions1Through4AndV1V2Formats() = runBlocking {
+        val supportedCases = listOf(
+            1 to 1,
+            1 to 2,
+            2 to 2,
+            2 to 3,
+            2 to 4
+        )
+
+        for ((formatVer, schemaVer) in supportedCases) {
+            database.clearAllTables()
+            val candidate = ExpenseTrackerBackup(
+                formatVersion = formatVer,
+                appVersion = "1.0.0",
+                createdAt = "2026-01-15T00:00:00Z",
+                databaseSchemaVersion = schemaVer,
+                accounts = listOf(
+                    BackupAccount(
+                        id = 10L,
+                        name = "Cash-$formatVer-$schemaVer",
+                        type = "CASH",
+                        initialBalanceAmountInMinorUnits = 5_000L,
+                        initialBalanceCurrencyCode = "USD",
+                        iconName = "wallet",
+                        colorHex = "#10B981",
+                        isArchived = false,
+                        createdAt = "2026-01-01T00:00:00Z",
+                        internalKey = if (formatVer == 2) "default" else null
+                    )
+                ),
+                categories = listOf(
+                    BackupCategory(
+                        id = 20L,
+                        name = "Groceries",
+                        type = "EXPENSE",
+                        iconName = "shopping_cart",
+                        colorHex = "#22C55E",
+                        isSystem = false,
+                        isArchived = false
+                    )
+                ),
+                transactions = listOf(
+                    BackupTransaction(
+                        id = 30L,
+                        type = "EXPENSE",
+                        amountInMinorUnits = 1_200L,
+                        currencyCode = "USD",
+                        accountId = 10L,
+                        destinationAccountId = null,
+                        categoryId = 20L,
+                        transactionTime = "2026-01-10T12:00:00Z",
+                        note = "Milk",
+                        recurringRuleId = null,
+                        recurringOccurrenceDate = null,
+                        createdAt = "2026-01-10T12:00:00Z"
+                    )
+                ),
+                budgets = emptyList(),
+                recurringTransactions = emptyList(),
+                recurringOccurrences = emptyList(),
+                settings = BackupSettings(
+                    themeMode = "SYSTEM",
+                    preferredCurrencyCode = "USD",
+                    weekStart = "MONDAY",
+                    dateFormat = "SYSTEM_DEFAULT",
+                    timeFormat = "SYSTEM_DEFAULT",
+                    showCurrencyCode = true,
+                    confirmBeforeDelete = true
+                ),
+                checksum = null
+            )
+            val signed = candidate.copy(checksum = backupRepository.computeChecksum(candidate))
+            val result = restoreBackupUseCase(signed)
+
+            assertTrue("Expected restore success for formatVersion=$formatVer, schemaVersion=$schemaVer", result.isSuccess)
+            val accounts = database.backupDao().getAllAccounts()
+            assertTrue(accounts.any { it.name == "Cash-$formatVer-$schemaVer" })
+            assertNotNull(database.accountDao().getInternalAccount("default"))
+            val tx = database.backupDao().getAllTransactions().single()
+            assertEquals("Milk", tx.note)
+            assertEquals(1_200L, tx.amountInMinorUnits)
+        }
+    }
+
+    @Test
+    fun testUnsupportedVersionsAndInvalidChecksumDoNotMutateExistingRoomData() = runBlocking {
+        val existingAccountId = accountRepo.insertAccount(
+            Account(
+                name = "Existing Safe Wallet",
+                type = AccountType.CASH,
+                initialBalance = Money(75_000L, "EUR")
+            )
+        )
+        val existingCategoryId = categoryRepo.insertCategory(
+            Category(
+                name = "Existing Rent",
+                type = CategoryType.EXPENSE,
+                iconName = "home",
+                colorHex = "#EF4444"
+            )
+        )
+        transactionRepo.insertTransaction(
+            Transaction(
+                type = TransactionType.EXPENSE,
+                amount = Money(25_000L, "EUR"),
+                accountId = existingAccountId,
+                categoryId = existingCategoryId,
+                transactionTime = Instant.parse("2026-02-01T09:00:00Z"),
+                note = "Existing local tx"
+            )
+        )
+        settingsRepository.setPreferredCurrency("EUR")
+
+        val baseCandidate = ExpenseTrackerBackup(
+            formatVersion = 2,
+            appVersion = "1.0.0",
+            createdAt = "2026-03-01T00:00:00Z",
+            databaseSchemaVersion = 4,
+            accounts = listOf(
+                BackupAccount(
+                    id = 99L,
+                    name = "Incoming Replacement",
+                    type = "BANK",
+                    initialBalanceAmountInMinorUnits = 100L,
+                    initialBalanceCurrencyCode = "USD",
+                    iconName = "bank",
+                    colorHex = "#000000",
+                    isArchived = false,
+                    createdAt = "2026-03-01T00:00:00Z",
+                    internalKey = "default"
+                )
+            ),
+            categories = emptyList(),
+            transactions = emptyList(),
+            budgets = emptyList(),
+            recurringTransactions = emptyList(),
+            recurringOccurrences = emptyList(),
+            settings = BackupSettings(
+                themeMode = "DARK",
+                preferredCurrencyCode = "USD",
+                weekStart = "SUNDAY",
+                dateFormat = "SYSTEM_DEFAULT",
+                timeFormat = "SYSTEM_DEFAULT",
+                showCurrencyCode = false,
+                confirmBeforeDelete = false
+            ),
+            checksum = null
+        )
+
+        val futureSchema5 = baseCandidate.copy(databaseSchemaVersion = 5).let {
+            it.copy(checksum = backupRepository.computeChecksum(it))
+        }
+        val futureSchema99 = baseCandidate.copy(databaseSchemaVersion = 99).let {
+            it.copy(checksum = backupRepository.computeChecksum(it))
+        }
+        val invalidSchema0 = baseCandidate.copy(databaseSchemaVersion = 0).let {
+            it.copy(checksum = backupRepository.computeChecksum(it))
+        }
+        val unsupportedFormat3 = baseCandidate.copy(formatVersion = 3).let {
+            it.copy(checksum = backupRepository.computeChecksum(it))
+        }
+        val invalidChecksum = baseCandidate.copy(checksum = "deadbeef_invalid_checksum")
+
+        val invalidBackups = listOf(
+            futureSchema5 to "schema version",
+            futureSchema99 to "schema version",
+            invalidSchema0 to "schema version",
+            unsupportedFormat3 to "format version",
+            invalidChecksum to "checksum"
+        )
+
+        for ((badBackup, expectedMessagePart) in invalidBackups) {
+            val result = restoreBackupUseCase(badBackup)
+            assertTrue("Expected failure for $expectedMessagePart", result.isFailure)
+            assertTrue(
+                "Expected error message containing '$expectedMessagePart' but got '${result.exceptionOrNull()?.message}'",
+                result.exceptionOrNull()?.message?.contains(expectedMessagePart, ignoreCase = true) == true
+            )
+
+            // Verify existing Room data and settings were NOT mutated or cleared
+            val accountsAfter = database.backupDao().getAllAccounts()
+            assertEquals(1, accountsAfter.size)
+            assertEquals("Existing Safe Wallet", accountsAfter.single().name)
+            val txsAfter = database.backupDao().getAllTransactions()
+            assertEquals(1, txsAfter.size)
+            assertEquals("Existing local tx", txsAfter.single().note)
+            val categoriesAfter = database.backupDao().getAllCategories()
+            assertEquals(1, categoriesAfter.size)
+            assertEquals("Existing Rent", categoriesAfter.single().name)
+            assertFalse(backupRepository.hasPendingSettingsRecovery())
+            assertEquals("EUR", settingsRepository.settings.first().preferredCurrencyCode)
+        }
+    }
+
+    @Test
+    fun testInvalidForeignKeysDoNotPartiallyRestoreOrMutateExistingRoomData() = runBlocking {
+        val existingAccountId = accountRepo.insertAccount(
+            Account(
+                name = "Preserved Account",
+                type = AccountType.BANK,
+                initialBalance = Money(10_000L, "USD")
+            )
+        )
+        val existingCategoryId = categoryRepo.insertCategory(
+            Category(
+                name = "Preserved Category",
+                type = CategoryType.EXPENSE,
+                iconName = "star",
+                colorHex = "#F59E0B"
+            )
+        )
+        transactionRepo.insertTransaction(
+            Transaction(
+                type = TransactionType.EXPENSE,
+                amount = Money(500L, "USD"),
+                accountId = existingAccountId,
+                categoryId = existingCategoryId,
+                transactionTime = Instant.parse("2026-02-10T10:00:00Z"),
+                note = "Preserved Transaction"
+            )
+        )
+
+        val validAccount = BackupAccount(
+            id = 50L,
+            name = "Valid Incoming",
+            type = "CASH",
+            initialBalanceAmountInMinorUnits = 1_000L,
+            initialBalanceCurrencyCode = "USD",
+            iconName = "wallet",
+            colorHex = "#10B981",
+            isArchived = false,
+            createdAt = "2026-02-15T00:00:00Z",
+            internalKey = "default"
+        )
+        val validCategory = BackupCategory(
+            id = 60L,
+            name = "Valid Incoming Cat",
+            type = "EXPENSE",
+            iconName = "tag",
+            colorHex = "#10B981",
+            isSystem = false,
+            isArchived = false
+        )
+        val validRule = BackupRecurringTransaction(
+            id = 70L,
+            type = "EXPENSE",
+            amountInMinorUnits = 1_000L,
+            currencyCode = "USD",
+            accountId = 50L,
+            destinationAccountId = null,
+            categoryId = 60L,
+            frequency = "MONTHLY",
+            startDate = "2026-02-01",
+            endDate = null,
+            nextOccurrence = "2026-03-01",
+            note = "Rule",
+            isActive = true
+        )
+
+        val base = ExpenseTrackerBackup(
+            formatVersion = 2,
+            appVersion = "1.0.0",
+            createdAt = "2026-02-15T00:00:00Z",
+            databaseSchemaVersion = 4,
+            accounts = listOf(validAccount),
+            categories = listOf(validCategory),
+            transactions = emptyList(),
+            budgets = emptyList(),
+            recurringTransactions = listOf(validRule),
+            recurringOccurrences = emptyList(),
+            settings = null,
+            checksum = null
+        )
+
+        val brokenTxCategory = base.copy(
+            transactions = listOf(
+                BackupTransaction(
+                    id = 80L,
+                    type = "EXPENSE",
+                    amountInMinorUnits = 200L,
+                    currencyCode = "USD",
+                    accountId = 50L,
+                    destinationAccountId = null,
+                    categoryId = 9999L,
+                    transactionTime = "2026-02-15T00:00:00Z",
+                    note = "Bad category FK",
+                    recurringRuleId = null,
+                    recurringOccurrenceDate = null,
+                    createdAt = "2026-02-15T00:00:00Z"
+                )
+            )
+        )
+        val brokenOccurrenceRule = base.copy(
+            recurringOccurrences = listOf(
+                BackupRecurringOccurrence(
+                    id = 90L,
+                    ruleId = 8888L,
+                    occurrenceDate = "2026-02-01",
+                    generatedTransactionId = null,
+                    status = "GENERATED",
+                    processedAt = "2026-02-01T00:00:00Z"
+                )
+            )
+        )
+        val brokenBudgetCategory = base.copy(
+            budgets = listOf(
+                BackupBudget(
+                    id = 95L,
+                    categoryId = 7777L,
+                    limitAmountInMinorUnits = 5_000L,
+                    currencyCode = "USD",
+                    periodType = "MONTHLY",
+                    startDate = "2026-02-01",
+                    endDate = "2026-02-28",
+                    isActive = true
+                )
+            )
+        )
+
+        for (candidate in listOf(brokenTxCategory, brokenOccurrenceRule, brokenBudgetCategory)) {
+            val signed = candidate.copy(checksum = backupRepository.computeChecksum(candidate))
+            val result = restoreBackupUseCase(signed)
+            assertTrue(result.isFailure)
+
+            // Confirm NO partial restore occurred and original data remains intact
+            val accountsAfter = database.backupDao().getAllAccounts()
+            assertEquals(1, accountsAfter.size)
+            assertEquals("Preserved Account", accountsAfter.single().name)
+            val categoriesAfter = database.backupDao().getAllCategories()
+            assertEquals(1, categoriesAfter.size)
+            assertEquals("Preserved Category", categoriesAfter.single().name)
+            val txsAfter = database.backupDao().getAllTransactions()
+            assertEquals(1, txsAfter.size)
+            assertEquals("Preserved Transaction", txsAfter.single().note)
+            assertTrue(database.backupDao().getAllRecurringTransactions().isEmpty())
+            assertTrue(database.backupDao().getAllRecurringOccurrences().isEmpty())
+            assertTrue(database.backupDao().getAllBudgets().isEmpty())
+        }
+    }
+
+    @Test
+    fun testActualRoomDatabaseVersionMatchesBackupSchemaVersion() = runBlocking {
+        val openedDatabaseVersion = database.openHelper.readableDatabase.version
+        val snapshot = createFullBackupUseCase()
+
+        assertEquals(RoomBackupRepository.CURRENT_DATABASE_SCHEMA_VERSION, openedDatabaseVersion)
+        assertEquals(openedDatabaseVersion, snapshot.databaseSchemaVersion)
+    }
+
+    @Test
+    fun testCreateSnapshotUsesBuildConfigAppVersionByDefault() = runBlocking {
+        val snapshot = createFullBackupUseCase()
+
+        assertEquals(BuildConfig.VERSION_NAME, snapshot.appVersion)
+        assertNotEquals("1.0.0", snapshot.appVersion)
+        assertEquals(snapshot.checksum, backupRepository.computeChecksum(snapshot))
+        assertTrue(restoreBackupUseCase(snapshot).isSuccess)
+    }
+
+    @Test
+    fun testCreateSnapshotUsesInjectedAppVersionAndPreservesChecksumValidation() = runBlocking {
+        val injectedVersion = "2.4.0-test"
+        val customVersionRepository = RoomBackupRepository(
+            db = database,
+            settingsRepository = settingsRepository,
+            internalDefaultAccountProvisioner = InternalDefaultAccountProvisioner(database, settingsRepository),
+            appVersion = injectedVersion
+        )
+
+        val snapshot = customVersionRepository.createSnapshot()
+
+        assertEquals(injectedVersion, snapshot.appVersion)
+        assertEquals(snapshot.checksum, customVersionRepository.computeChecksum(snapshot))
+
+        val tamperedVersion = snapshot.copy(appVersion = "1.0.0")
+        val tamperedRestore = customVersionRepository.restoreSnapshot(tamperedVersion)
+        assertTrue(tamperedRestore.isFailure)
+        assertTrue(tamperedRestore.exceptionOrNull()?.message?.contains("checksum") == true)
+
+        assertTrue(customVersionRepository.restoreSnapshot(snapshot).isSuccess)
+    }
+
+    @Test
+    fun testBackupDaoAndSnapshotReturnAllSixCollectionsInDeterministicIdOrder() = runBlocking {
+        val now = Instant.parse("2026-03-01T12:00:00Z")
+        val accountIds = listOf(30L, 10L, 20L)
+        database.backupDao().insertAccounts(
+            accountIds.map { id ->
+                AccountEntity(
+                    id = id,
+                    name = "Account-$id",
+                    type = AccountType.BANK,
+                    initialBalanceAmountInMinorUnits = id * 100L,
+                    initialBalanceCurrencyCode = "USD",
+                    iconName = "bank",
+                    colorHex = "#10B981",
+                    isArchived = false,
+                    createdAt = now,
+                    internalKey = if (id == 10L) "default" else null
+                )
+            }
+        )
+
+        val categoryIds = listOf(33L, 11L, 22L)
+        database.backupDao().insertCategories(
+            categoryIds.map { id ->
+                CategoryEntity(
+                    id = id,
+                    name = "Category-$id",
+                    type = CategoryType.EXPENSE,
+                    iconName = "tag",
+                    colorHex = "#EF4444",
+                    isSystem = false,
+                    isArchived = false
+                )
+            }
+        )
+
+        val ruleIds = listOf(300L, 100L, 200L)
+        database.backupDao().insertRecurringTransactions(
+            ruleIds.map { id ->
+                RecurringTransactionEntity(
+                    id = id,
+                    type = TransactionType.EXPENSE,
+                    amountInMinorUnits = id * 10L,
+                    currencyCode = "USD",
+                    accountId = 10L,
+                    destinationAccountId = null,
+                    categoryId = 11L,
+                    frequency = RecurrenceFrequency.MONTHLY,
+                    startDate = LocalDate.of(2026, 1, 1),
+                    endDate = null,
+                    nextOccurrence = LocalDate.of(2026, 4, 1),
+                    note = "Rule-$id",
+                    isActive = true
+                )
+            }
+        )
+
+        val txIds = listOf(3000L, 1000L, 2000L)
+        database.backupDao().insertTransactions(
+            txIds.map { id ->
+                TransactionEntity(
+                    id = id,
+                    type = TransactionType.EXPENSE,
+                    amountInMinorUnits = id,
+                    currencyCode = "USD",
+                    accountId = 20L,
+                    destinationAccountId = null,
+                    categoryId = 22L,
+                    transactionTime = now,
+                    note = "Tx-$id",
+                    recurringRuleId = 100L,
+                    recurringOccurrenceDate = LocalDate.of(2026, 3, 1),
+                    createdAt = now
+                )
+            }
+        )
+
+        val occurrenceIds = listOf(30000L, 10000L, 20000L)
+        database.backupDao().insertRecurringOccurrences(
+            occurrenceIds.mapIndexed { index, id ->
+                RecurringOccurrenceEntity(
+                    id = id,
+                    ruleId = 100L,
+                    occurrenceDate = LocalDate.of(2026, 3, index + 1),
+                    generatedTransactionId = 1000L,
+                    status = RecurringOccurrenceStatus.GENERATED,
+                    processedAt = now
+                )
+            }
+        )
+
+        val budgetIds = listOf(300000L, 100000L, 200000L)
+        database.backupDao().insertBudgets(
+            budgetIds.map { id ->
+                BudgetEntity(
+                    id = id,
+                    categoryId = 33L,
+                    limitAmountInMinorUnits = id,
+                    currencyCode = "USD",
+                    periodType = BudgetPeriodType.MONTHLY,
+                    startDate = LocalDate.of(2026, 3, 1),
+                    endDate = LocalDate.of(2026, 3, 31),
+                    isActive = true
+                )
+            }
+        )
+
+        val daoAccounts = database.backupDao().getAllAccounts()
+        val daoCategories = database.backupDao().getAllCategories()
+        val daoTransactions = database.backupDao().getAllTransactions()
+        val daoBudgets = database.backupDao().getAllBudgets()
+        val daoRules = database.backupDao().getAllRecurringTransactions()
+        val daoOccurrences = database.backupDao().getAllRecurringOccurrences()
+
+        assertEquals(listOf(10L, 20L, 30L), daoAccounts.map { it.id })
+        assertEquals(listOf(11L, 22L, 33L), daoCategories.map { it.id })
+        assertEquals(listOf(1000L, 2000L, 3000L), daoTransactions.map { it.id })
+        assertEquals(listOf(100000L, 200000L, 300000L), daoBudgets.map { it.id })
+        assertEquals(listOf(100L, 200L, 300L), daoRules.map { it.id })
+        assertEquals(listOf(10000L, 20000L, 30000L), daoOccurrences.map { it.id })
+
+        val snapshot = createFullBackupUseCase()
+        assertEquals(listOf(10L, 20L, 30L), snapshot.accounts.map { it.id })
+        assertEquals(listOf(11L, 22L, 33L), snapshot.categories.map { it.id })
+        assertEquals(listOf(1000L, 2000L, 3000L), snapshot.transactions.map { it.id })
+        assertEquals(listOf(100000L, 200000L, 300000L), snapshot.budgets.map { it.id })
+        assertEquals(listOf(100L, 200L, 300L), snapshot.recurringTransactions.map { it.id })
+        assertEquals(listOf(10000L, 20000L, 30000L), snapshot.recurringOccurrences.map { it.id })
+        assertEquals("Account-10", snapshot.accounts.first().name)
+        assertEquals("Tx-3000", snapshot.transactions.last().note)
+        assertEquals(snapshot.checksum, backupRepository.computeChecksum(snapshot))
+    }
+
+    @Test
+    fun testCreateSnapshotExecutesSixRoomReadsInOneTransactionAndReadsSettingsOutside() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val recordedQueries = mutableListOf<Pair<String, Boolean>>()
+        lateinit var trackedDb: ExpenseTrackerDatabase
+        trackedDb = Room.inMemoryDatabaseBuilder(context, ExpenseTrackerDatabase::class.java)
+            .allowMainThreadQueries()
+            .setQueryCallback(
+                RoomDatabase.QueryCallback { sqlQuery, _ ->
+                    if (sqlQuery.contains("ORDER BY id ASC")) {
+                        recordedQueries += sqlQuery to trackedDb.inTransaction()
+                    }
+                },
+                { runnable -> runnable.run() }
+            )
+            .build()
+
+        try {
+            var settingsReadInsideTransaction: Boolean? = null
+            val transactionCheckingSettingsRepo = object : SettingsRepository by settingsRepository {
+                override val settings: Flow<AppSettings> = flow {
+                    settingsReadInsideTransaction = trackedDb.inTransaction()
+                    emit(settingsRepository.settings.first())
+                }
+            }
+            val trackedRepo = RoomBackupRepository(
+                db = trackedDb,
+                settingsRepository = transactionCheckingSettingsRepo,
+                appVersion = "1.5.0-test"
+            )
+
+            val snapshot = trackedRepo.createSnapshot()
+
+            assertEquals("1.5.0-test", snapshot.appVersion)
+            assertEquals(6, recordedQueries.size)
+            assertTrue(
+                "Expected all 6 backup SELECT queries to run inside a Room transaction, got: $recordedQueries",
+                recordedQueries.all { (_, inTx) -> inTx }
+            )
+            assertEquals(false, settingsReadInsideTransaction)
+        } finally {
+            trackedDb.close()
+        }
+    }
+
+    @Test
+    fun testConcurrentTransactionalMutationNeverProducesHalfWrittenSnapshot() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val diskDbFile = context.getDatabasePath("backup_concurrency_test_${System.nanoTime()}.db")
+        diskDbFile.parentFile?.mkdirs()
+        val concurrentDb = Room.databaseBuilder(context, ExpenseTrackerDatabase::class.java, diskDbFile.absolutePath)
+            .allowMainThreadQueries()
+            .build()
+
+        try {
+            val concurrentRepo = RoomBackupRepository(
+                db = concurrentDb,
+                settingsRepository = settingsRepository,
+                appVersion = BuildConfig.VERSION_NAME
+            )
+            val now = Instant.parse("2026-04-01T00:00:00Z")
+            val writerJob = async(Dispatchers.IO) {
+                for (i in 1L..25L) {
+                    concurrentDb.withTransaction {
+                        concurrentDb.backupDao().insertAccounts(
+                            listOf(
+                                AccountEntity(
+                                    id = i,
+                                    name = "Concurrent-$i",
+                                    type = AccountType.CASH,
+                                    initialBalanceAmountInMinorUnits = 100L * i,
+                                    initialBalanceCurrencyCode = "USD",
+                                    iconName = "wallet",
+                                    colorHex = "#10B981",
+                                    isArchived = false,
+                                    createdAt = now,
+                                    internalKey = if (i == 1L) "default" else null
+                                )
+                            )
+                        )
+                        concurrentDb.backupDao().insertTransactions(
+                            listOf(
+                                TransactionEntity(
+                                    id = i,
+                                    type = TransactionType.EXPENSE,
+                                    amountInMinorUnits = 50L,
+                                    currencyCode = "USD",
+                                    accountId = i,
+                                    destinationAccountId = null,
+                                    categoryId = null,
+                                    transactionTime = now,
+                                    note = "Tx-$i",
+                                    recurringRuleId = null,
+                                    recurringOccurrenceDate = null,
+                                    createdAt = now
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+
+            repeat(15) {
+                val snapshot = concurrentRepo.createSnapshot()
+                assertEquals(snapshot.accounts.size, snapshot.transactions.size)
+                assertEquals(snapshot.accounts.map { it.id }, snapshot.transactions.map { it.accountId })
+            }
+            writerJob.await()
+        } finally {
+            concurrentDb.close()
+            diskDbFile.delete()
+            java.io.File("${diskDbFile.absolutePath}-wal").delete()
+            java.io.File("${diskDbFile.absolutePath}-shm").delete()
+        }
     }
 
     // Helper fake implementation of settings

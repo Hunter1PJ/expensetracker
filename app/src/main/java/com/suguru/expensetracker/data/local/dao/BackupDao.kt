@@ -14,22 +14,22 @@ import com.suguru.expensetracker.data.local.entity.TransactionEntity
 @Dao
 interface BackupDao {
 
-    @Query("SELECT * FROM accounts")
+    @Query("SELECT * FROM accounts ORDER BY id ASC")
     suspend fun getAllAccounts(): List<AccountEntity>
 
-    @Query("SELECT * FROM categories")
+    @Query("SELECT * FROM categories ORDER BY id ASC")
     suspend fun getAllCategories(): List<CategoryEntity>
 
-    @Query("SELECT * FROM transactions")
+    @Query("SELECT * FROM transactions ORDER BY id ASC")
     suspend fun getAllTransactions(): List<TransactionEntity>
 
-    @Query("SELECT * FROM budgets")
+    @Query("SELECT * FROM budgets ORDER BY id ASC")
     suspend fun getAllBudgets(): List<BudgetEntity>
 
-    @Query("SELECT * FROM recurring_transactions")
+    @Query("SELECT * FROM recurring_transactions ORDER BY id ASC")
     suspend fun getAllRecurringTransactions(): List<RecurringTransactionEntity>
 
-    @Query("SELECT * FROM recurring_occurrences")
+    @Query("SELECT * FROM recurring_occurrences ORDER BY id ASC")
     suspend fun getAllRecurringOccurrences(): List<RecurringOccurrenceEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -75,6 +75,10 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.data.repository.DataStoreSettingsRepository(context.dataStore)
     }
 
+    val cloudBackupFingerprintStore: com.suguru.expensetracker.domain.repository.CloudBackupFingerprintStore by lazy {
+        com.suguru.expensetracker.data.repository.DataStoreCloudBackupFingerprintStore(context.dataStore)
+    }
+
     // AI BYOK Foundation
     val secureKeyStorage: com.suguru.expensetracker.data.security.SecureKeyStorage by lazy {
         com.suguru.expensetracker.data.security.AndroidKeystoreSecureStorage(context.applicationContext)
@@ -436,9 +440,9 @@ class AppContainer(private val context: Context) {
 
     val backupRepository: com.suguru.expensetracker.domain.repository.BackupRepository by lazy {
         com.suguru.expensetracker.data.repository.RoomBackupRepository(
-            database,
-            settingsRepository,
-            internalDefaultAccountProvisioner,
+            db = database,
+            settingsRepository = settingsRepository,
+            internalDefaultAccountProvisioner = internalDefaultAccountProvisioner,
             onProvisioningResult = { result ->
                 _provisioningState.value = StartupProvisioningState.Loading
                 startupScope.launch {
@@ -455,7 +459,8 @@ class AppContainer(private val context: Context) {
             },
             onSettingsRecoveryPending = {
                 _provisioningState.value = StartupProvisioningState.SettingsRecoveryPending
-            }
+            },
+            appVersion = com.suguru.expensetracker.BuildConfig.VERSION_NAME
         )
     }
 

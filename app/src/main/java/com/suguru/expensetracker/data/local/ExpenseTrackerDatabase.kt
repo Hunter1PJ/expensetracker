@@ -32,7 +32,7 @@ import com.suguru.expensetracker.data.local.entity.TransactionEntity
         RecurringOccurrenceEntity::class,
         PendingSettingsRecoveryEntity::class
     ],
-    version = 4,
+    version = ExpenseTrackerDatabase.SCHEMA_VERSION,
     exportSchema = true
 )
 @TypeConverters(ExpenseTrackerConverters::class)
@@ -47,6 +47,8 @@ abstract class ExpenseTrackerDatabase : RoomDatabase() {
     abstract fun pendingSettingsRecoveryDao(): PendingSettingsRecoveryDao
 
     companion object {
+        const val SCHEMA_VERSION = 4
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `recurring_occurrence_date` TEXT DEFAULT NULL")

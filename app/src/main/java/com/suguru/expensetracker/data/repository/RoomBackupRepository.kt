@@ -1,11 +1,18 @@
 package com.suguru.expensetracker.data.repository
 
 import androidx.room.withTransaction
+import com.suguru.expensetracker.BuildConfig
 import com.suguru.expensetracker.data.account.INTERNAL_DEFAULT_ACCOUNT_KEY
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabase
+import com.suguru.expensetracker.data.local.entity.AccountEntity
+import com.suguru.expensetracker.data.local.entity.BudgetEntity
+import com.suguru.expensetracker.data.local.entity.CategoryEntity
 import com.suguru.expensetracker.data.local.entity.PendingSettingsRecoveryEntity
+import com.suguru.expensetracker.data.local.entity.RecurringOccurrenceEntity
+import com.suguru.expensetracker.data.local.entity.RecurringTransactionEntity
+import com.suguru.expensetracker.data.local.entity.TransactionEntity
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.BackupRestoreOutcome
 import com.suguru.expensetracker.domain.model.BackupSettings
@@ -35,7 +42,8 @@ class RoomBackupRepository(
     private val settingsRepository: SettingsRepository,
     private val internalDefaultAccountProvisioner: InternalDefaultAccountProvisioner? = null,
     private val onProvisioningResult: (InternalDefaultAccountProvisioningResult) -> Unit = {},
-    private val onSettingsRecoveryPending: () -> Unit = {}
+    private val onSettingsRecoveryPending: () -> Unit = {},
+    private val appVersion: String = BuildConfig.VERSION_NAME
 ) : BackupRepository {
 
     private val moshi = Moshi.Builder()
@@ -125,27 +133,40 @@ class RoomBackupRepository(
         }
     }
 
+    private data class RoomSnapshotData(
+        val accounts: List<AccountEntity>,
+        val categories: List<CategoryEntity>,
+        val transactions: List<TransactionEntity>,
+        val budgets: List<BudgetEntity>,
+        val recurringTransactions: List<RecurringTransactionEntity>,
+        val recurringOccurrences: List<RecurringOccurrenceEntity>
+    )
+
     override suspend fun createSnapshot(): ExpenseTrackerBackup {
-        val backupDao = db.backupDao()
-        val accounts = backupDao.getAllAccounts()
-        val categories = backupDao.getAllCategories()
-        val transactions = backupDao.getAllTransactions()
-        val budgets = backupDao.getAllBudgets()
-        val recurringTransactions = backupDao.getAllRecurringTransactions()
-        val recurringOccurrences = backupDao.getAllRecurringOccurrences()
+        val snapshotData = db.withTransaction {
+            val backupDao = db.backupDao()
+            RoomSnapshotData(
+                accounts = backupDao.getAllAccounts(),
+                categories = backupDao.getAllCategories(),
+                transactions = backupDao.getAllTransactions(),
+                budgets = backupDao.getAllBudgets(),
+                recurringTransactions = backupDao.getAllRecurringTransactions(),
+                recurringOccurrences = backupDao.getAllRecurringOccurrences()
+            )
+        }
         val settings = settingsRepository.settings.first()
 
         val backup = ExpenseTrackerBackup(
-            formatVersion = 2,
-            appVersion = "1.0.0",
+            formatVersion = CURRENT_FORMAT_VERSION,
+            appVersion = appVersion,
             createdAt = Instant.now().toString(),
-            databaseSchemaVersion = 3,
-            accounts = accounts.map { it.toBackup() },
-            categories = categories.map { it.toBackup() },
-            transactions = transactions.map { it.toBackup() },
-            budgets = budgets.map { it.toBackup() },
-            recurringTransactions = recurringTransactions.map { it.toBackup() },
-            recurringOccurrences = recurringOccurrences.map { it.toBackup() },
+            databaseSchemaVersion = CURRENT_DATABASE_SCHEMA_VERSION,
+            accounts = snapshotData.accounts.map { it.toBackup() },
+            categories = snapshotData.categories.map { it.toBackup() },
+            transactions = snapshotData.transactions.map { it.toBackup() },
+            budgets = snapshotData.budgets.map { it.toBackup() },
+            recurringTransactions = snapshotData.recurringTransactions.map { it.toBackup() },
+            recurringOccurrences = snapshotData.recurringOccurrences.map { it.toBackup() },
             settings = settings.toBackup(),
             checksum = null
         )
@@ -255,11 +276,26 @@ class RoomBackupRepository(
     }
 
     private fun validateBackup(backup: ExpenseTrackerBackup): Result<Unit> {
-        if (backup.formatVersion !in 1..2) {
-            return Result.failure(IllegalArgumentException("Unsupported backup format version ${backup.formatVersion}. This app supports format versions 1 and 2."))
+        if (backup.formatVersion !in MIN_SUPPORTED_FORMAT_VERSION..CURRENT_FORMAT_VERSION) {
+            return Result.failure(
+                IllegalArgumentException(
+                    "Unsupported backup format version ${backup.formatVersion}. This app supports format versions $MIN_SUPPORTED_FORMAT_VERSION and $CURRENT_FORMAT_VERSION."
+                )
+            )
         }
-        if (backup.databaseSchemaVersion > 3) {
-            return Result.failure(IllegalArgumentException("This backup has an incompatible database schema version (${backup.databaseSchemaVersion}). Please update the app before restoring it."))
+        if (backup.databaseSchemaVersion < MIN_SUPPORTED_DATABASE_SCHEMA_VERSION) {
+            return Result.failure(
+                IllegalArgumentException(
+                    "Unsupported database schema version (${backup.databaseSchemaVersion})."
+                )
+            )
+        }
+        if (backup.databaseSchemaVersion > CURRENT_DATABASE_SCHEMA_VERSION) {
+            return Result.failure(
+                IllegalArgumentException(
+                    "This backup has an incompatible database schema version (${backup.databaseSchemaVersion}). Please update the app before restoring it."
+                )
+            )
         }
 
         val duplicateInternalKeys = backup.accounts
@@ -369,5 +405,12 @@ class RoomBackupRepository(
         }
 
         return Result.success(Unit)
+    }
+
+    companion object {
+        const val MIN_SUPPORTED_FORMAT_VERSION = 1
+        const val CURRENT_FORMAT_VERSION = 2
+        const val MIN_SUPPORTED_DATABASE_SCHEMA_VERSION = 1
+        const val CURRENT_DATABASE_SCHEMA_VERSION = ExpenseTrackerDatabase.SCHEMA_VERSION
     }
 }
