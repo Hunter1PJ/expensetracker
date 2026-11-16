@@ -79,6 +79,10 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.data.repository.DataStoreCloudBackupFingerprintStore(context.dataStore)
     }
 
+    val cloudBackupStateStore: com.suguru.expensetracker.domain.repository.CloudBackupStateStore by lazy {
+        com.suguru.expensetracker.data.repository.DataStoreCloudBackupStateStore(context.dataStore)
+    }
+
     // AI BYOK Foundation
     val secureKeyStorage: com.suguru.expensetracker.data.security.SecureKeyStorage by lazy {
         com.suguru.expensetracker.data.security.AndroidKeystoreSecureStorage(context.applicationContext)
