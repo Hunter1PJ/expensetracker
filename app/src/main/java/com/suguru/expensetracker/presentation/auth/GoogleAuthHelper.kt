@@ -42,7 +42,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.auth
-import com.suguru.expensetracker.R
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
@@ -84,6 +83,17 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
+private fun getDefaultWebClientId(context: Context): String? {
+    val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+    if (resId == 0) return null
+    return try {
+        val clientId = context.getString(resId)
+        clientId.ifBlank { null }
+    } catch (_: Exception) {
+        null
+    }
+}
+
 /**
  * Attempts silent auto sign-in using an already-authorized Google account.
  * Single credential option per request for Android API 36 responsiveness.
@@ -105,9 +115,7 @@ fun attemptAutoSignIn(
         onAuthSuccess()
         return
     }
-    val clientId = try {
-        context.getString(R.string.default_web_client_id)
-    } catch (_: Exception) {
+    val clientId = getDefaultWebClientId(context) ?: run {
         onUnauthenticated()
         return
     }
@@ -150,9 +158,7 @@ fun onGoogleSignInClicked(
     scope: CoroutineScope,
     onAuthCancelled: () -> Unit = {}
 ) {
-    val clientId = try {
-        context.getString(R.string.default_web_client_id)
-    } catch (_: Exception) {
+    val clientId = getDefaultWebClientId(context) ?: run {
         onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
         return
     }
