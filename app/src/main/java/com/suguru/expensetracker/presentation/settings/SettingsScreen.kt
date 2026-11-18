@@ -217,7 +217,15 @@ fun SettingsScreen(
                 is SettingsUiState.Success -> {
                     val settings = state.settings
 
-                    // 1. Management Section
+                    // 1. Account / Cloud Backup Section
+                    if (createCloudBackupViewModel != null && onShowMessage != null) {
+                        CloudBackupSection(
+                            createCloudBackupViewModel = createCloudBackupViewModel,
+                            onShowMessage = onShowMessage
+                        )
+                    }
+
+                    // 2. Financial Structures Section
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -266,13 +274,6 @@ fun SettingsScreen(
                                 testTag = "settings_item_export"
                             )
                         }
-                    }
-
-                    if (createCloudBackupViewModel != null && onShowMessage != null) {
-                        CloudBackupSection(
-                            createCloudBackupViewModel = createCloudBackupViewModel,
-                            onShowMessage = onShowMessage
-                        )
                     }
 
                     // 2. AI Assistant (BYOK) Section

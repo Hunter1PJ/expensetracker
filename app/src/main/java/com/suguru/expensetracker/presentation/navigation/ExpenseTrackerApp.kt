@@ -115,11 +115,7 @@ fun ExpenseTrackerApp(
         if (resolvedContainer != null && !hasRunStartupCheck) {
             hasRunStartupCheck = true
             resolvedContainer.ensureInternalDefaultAccountProvisioning()
-            val firebaseReady = try {
-                com.google.firebase.FirebaseApp.getApps(context).isNotEmpty()
-            } catch (_: Exception) {
-                false
-            }
+            val firebaseReady = com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(context)
             if (firebaseReady) {
                 com.suguru.expensetracker.presentation.auth.attemptAutoSignIn(
                     context = context,

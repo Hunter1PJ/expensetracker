@@ -29,11 +29,7 @@ class ExpenseTrackerApplication : Application() {
 
         RecurringTransactionWorker.enqueuePeriodicWork(this)
 
-        val firebaseReady = try {
-            com.google.firebase.FirebaseApp.getApps(this).isNotEmpty()
-        } catch (_: Exception) {
-            false
-        }
+        val firebaseReady = com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(this)
 
         applicationScope.launch {
             when (val result = appContainer.ensureInternalDefaultAccountProvisioning()) {

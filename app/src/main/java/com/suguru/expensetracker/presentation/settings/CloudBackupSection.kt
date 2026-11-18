@@ -85,11 +85,7 @@ fun CloudBackupSection(
 ) {
     val context = LocalContext.current
     val isFirebaseInitialized = remember(context) {
-        try {
-            FirebaseApp.getApps(context).isNotEmpty()
-        } catch (_: Exception) {
-            false
-        }
+        com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(context)
     }
 
     if (!isFirebaseInitialized) {

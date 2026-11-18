@@ -38,6 +38,8 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -56,6 +58,26 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 private const val AUTH_TAG = "Auth"
+
+/**
+ * Safely checks whether Firebase is initialized, attempting initialization from resources if available.
+ */
+fun isFirebaseInitialized(context: Context): Boolean {
+    if (FirebaseApp.getApps(context).isNotEmpty()) {
+        return true
+    }
+    return try {
+        val options = FirebaseOptions.fromResource(context)
+        if (options != null) {
+            FirebaseApp.initializeApp(context, options)
+            FirebaseApp.getApps(context).isNotEmpty()
+        } else {
+            false
+        }
+    } catch (_: Exception) {
+        false
+    }
+}
 
 data class CloudAuthUser(
     val uid: String,
@@ -146,6 +168,49 @@ fun attemptAutoSignIn(
     }
 }
 
+internal fun isUserCancellationException(e: Exception): Boolean {
+    if (e !is GetCredentialCancellationException) return false
+    val msg = e.message?.lowercase() ?: ""
+    if (msg.contains("[10]") ||
+        msg.contains("[12500]") ||
+        msg.contains("developer_error") ||
+        msg.contains("developer error") ||
+        msg.contains("sha") ||
+        msg.contains("signature") ||
+        msg.contains("mismatch")
+    ) {
+        return false
+    }
+    return true
+}
+
+internal fun mapAuthExceptionToUserMessage(e: Exception): String {
+    val msg = e.message?.lowercase() ?: ""
+    return when {
+        e is com.google.firebase.FirebaseNetworkException ||
+        e is java.net.UnknownHostException ||
+        e is java.io.IOException -> {
+            "Network failure. Please check your internet connection and try again."
+        }
+        msg.contains("[10]") ||
+        msg.contains("[12500]") ||
+        msg.contains("developer_error") ||
+        msg.contains("developer error") ||
+        msg.contains("sha") ||
+        msg.contains("signature") ||
+        e is androidx.credentials.exceptions.GetCredentialCustomException -> {
+            "Google Sign-In configuration error: Developer error [10/12500] or SHA-1 fingerprint mismatch."
+        }
+        e is com.google.firebase.auth.FirebaseAuthException -> {
+            "Firebase authentication failed. Please check your account configuration and try again."
+        }
+        else -> {
+            e.localizedMessage?.takeIf { it.isNotBlank() }
+                ?: "Google Sign-In failed. Please try again."
+        }
+    }
+}
+
 /**
  * Interactive Google Sign-In flow triggered by the user tapping "Sign in with Google".
  * Uses [GetSignInWithGoogleOption] as the sole credential option in [GetCredentialRequest].
@@ -159,12 +224,16 @@ fun onGoogleSignInClicked(
     onAuthCancelled: () -> Unit = {}
 ) {
     val clientId = getDefaultWebClientId(context) ?: run {
-        onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
+        val errorMsg = "Google Sign-In configuration missing: default_web_client_id not found"
+        Log.e(AUTH_TAG, "Stage: Config - $errorMsg")
+        onAuthError(errorMsg)
         return
     }
     val activity = context.findActivity()
     if (activity == null) {
-        onAuthError("Google Sign-In requires an active Activity context.")
+        val errorMsg = "Google Sign-In requires an active Activity context."
+        Log.e(AUTH_TAG, "Stage: Activity - $errorMsg")
+        onAuthError(errorMsg)
         return
     }
 
@@ -175,22 +244,36 @@ fun onGoogleSignInClicked(
 
     scope.launch {
         try {
+            Log.i(AUTH_TAG, "Stage: CredentialManager - Requesting credential")
             val cred = credentialManager.getCredential(activity, request).credential
             if (cred is CustomCredential && cred.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val token = GoogleIdTokenCredential.createFrom(cred.data).idToken
+                Log.i(AUTH_TAG, "Stage: FirebaseAuth - Signing in with ID token")
                 Firebase.auth.signInWithCredential(GoogleAuthProvider.getCredential(token, null)).await()
-                onAuthSuccess()
+                val currentUser = Firebase.auth.currentUser
+                if (currentUser != null) {
+                    Log.i(AUTH_TAG, "Stage: AuthSuccess - Authenticated UID=${currentUser.uid}")
+                    onAuthSuccess()
+                } else {
+                    val errorMsg = "Firebase authentication succeeded, but user account could not be verified."
+                    Log.e(AUTH_TAG, "Stage: FirebaseAuth - $errorMsg")
+                    onAuthError(errorMsg)
+                }
             } else {
-                onAuthError("Unexpected credential type returned by Google Sign-In.")
+                val errorMsg = "Unexpected credential type returned by Google Sign-In."
+                Log.e(AUTH_TAG, "Stage: CredentialParsing - $errorMsg")
+                onAuthError(errorMsg)
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: GetCredentialCancellationException) {
-            Log.w(AUTH_TAG, "Google Sign-In flow cancelled or dismissed: ${e.message}", e)
-            onAuthCancelled()
         } catch (e: Exception) {
-            Log.e(AUTH_TAG, "Google Sign-In failed", e)
-            onAuthError(e.localizedMessage ?: "Sign in failed")
+            if (isUserCancellationException(e)) {
+                Log.i(AUTH_TAG, "Stage: CredentialManager - User cancelled sign-in prompt")
+                onAuthCancelled()
+            } else {
+                Log.e(AUTH_TAG, "Stage: AuthFailure - ${e.javaClass.simpleName}: ${e.message}", e)
+                onAuthError(mapAuthExceptionToUserMessage(e))
+            }
         }
     }
 }
