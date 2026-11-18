@@ -64,6 +64,11 @@ class DataStoreCloudBackupStateStore(
                 keys.lastSuccessfulBackupAtEpochMillis,
                 state.lastSuccessfulBackupAtEpochMillis
             )
+            setOrRemoveLong(
+                preferences,
+                keys.lastSuccessfulRestoreAtEpochMillis,
+                state.lastSuccessfulRestoreAtEpochMillis
+            )
             setOrRemoveString(
                 preferences,
                 keys.lastSuccessfulSnapshotId,
@@ -141,6 +146,8 @@ class DataStoreCloudBackupStateStore(
 
         val lastSuccessfulBackupAtEpochMillis = (rawMap[keys.lastSuccessfulBackupAtEpochMillis] as? Long)
             ?.takeIf { it >= 0L }
+        val lastSuccessfulRestoreAtEpochMillis = (rawMap[keys.lastSuccessfulRestoreAtEpochMillis] as? Long)
+            ?.takeIf { it >= 0L }
         val lastSuccessfulSnapshotId = (rawMap[keys.lastSuccessfulSnapshotId] as? String)
             ?.takeIf { CloudBackupState.isValidSnapshotId(it) }
 
@@ -165,6 +172,7 @@ class DataStoreCloudBackupStateStore(
 
         return CloudBackupState(
             lastSuccessfulBackupAtEpochMillis = lastSuccessfulBackupAtEpochMillis,
+            lastSuccessfulRestoreAtEpochMillis = lastSuccessfulRestoreAtEpochMillis,
             lastSuccessfulSnapshotId = lastSuccessfulSnapshotId,
             pendingSnapshotId = pendingSnapshotId,
             pendingSinceEpochMillis = pendingSinceEpochMillis,
@@ -176,6 +184,7 @@ class DataStoreCloudBackupStateStore(
 
     internal data class UidPreferenceKeys(
         val lastSuccessfulBackupAtEpochMillis: Preferences.Key<Long>,
+        val lastSuccessfulRestoreAtEpochMillis: Preferences.Key<Long>,
         val lastSuccessfulSnapshotId: Preferences.Key<String>,
         val pendingSnapshotId: Preferences.Key<String>,
         val pendingSinceEpochMillis: Preferences.Key<Long>,
@@ -185,6 +194,7 @@ class DataStoreCloudBackupStateStore(
     ) {
         val allKeys: List<Preferences.Key<*>> = listOf(
             lastSuccessfulBackupAtEpochMillis,
+            lastSuccessfulRestoreAtEpochMillis,
             lastSuccessfulSnapshotId,
             pendingSnapshotId,
             pendingSinceEpochMillis,
@@ -202,6 +212,7 @@ class DataStoreCloudBackupStateStore(
             val uidPrefix = "$KEY_PREFIX${sha256Hex(uid)}_"
             return UidPreferenceKeys(
                 lastSuccessfulBackupAtEpochMillis = longPreferencesKey("${uidPrefix}last_successful_backup_at"),
+                lastSuccessfulRestoreAtEpochMillis = longPreferencesKey("${uidPrefix}last_successful_restore_at"),
                 lastSuccessfulSnapshotId = stringPreferencesKey("${uidPrefix}last_successful_snapshot_id"),
                 pendingSnapshotId = stringPreferencesKey("${uidPrefix}pending_snapshot_id"),
                 pendingSinceEpochMillis = longPreferencesKey("${uidPrefix}pending_since"),

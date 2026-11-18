@@ -44,6 +44,7 @@ import org.robolectric.annotation.Config
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.Clock
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -139,7 +140,7 @@ class AddTransactionViewModelTest {
     }
 
     @Test
-    fun `add transaction screen hides transfer tab and account selectors while keeping expense and income controls`() {
+    fun `add transaction screen exposes transfer type while keeping expense and income controls`() {
         val expenseCategory = Category(
             id = 1L,
             name = "Groceries",
@@ -176,11 +177,12 @@ class AddTransactionViewModelTest {
         }
 
         composeTestRule.onNodeWithTag("account_selector").assertDoesNotExist()
-        composeTestRule.onNodeWithTag("destination_account_selector").assertDoesNotExist()
-        composeTestRule.onNodeWithTag("type_tab_transfer").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("transfer_source_account_selector").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("transfer_destination_account_selector").assertDoesNotExist()
 
         composeTestRule.onNodeWithTag("type_tab_expense").assertIsDisplayed()
         composeTestRule.onNodeWithTag("type_tab_income").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("type_tab_transfer").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("amount_input_field").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("category_selector").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("note_input_field").performScrollTo().assertIsDisplayed()
@@ -212,23 +214,49 @@ class AddTransactionViewModelTest {
     }
 
     @Test
-    fun `switching to transfer is rejected and preserves current transaction type and category`() = runTest(testDispatcher) {
-        insertDefaultAccount()
-        val groceriesId = categoryRepository.insertCategory(
-            Category(name = "Groceries", type = CategoryType.EXPENSE, iconName = "shopping_cart", colorHex = "#10B981")
+    fun `switching to transfer selects distinct same-currency source and destination accounts`() = runTest(testDispatcher) {
+        val sourceId = accountRepository.insertAccount(
+            Account(name = "Cash", type = AccountType.CASH, initialBalance = Money(0L, "USD"))
+        )
+        val destinationId = accountRepository.insertAccount(
+            Account(name = "Bank", type = AccountType.BANK, initialBalance = Money(0L, "USD"))
         )
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-
         viewModel.onTransactionTypeChanged(TransactionType.TRANSFER)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(TransactionType.EXPENSE, state.transactionType)
-        assertEquals(groceriesId, state.selectedCategoryId)
-        assertEquals(1, state.categories.size)
-        assertNotNull(state.error)
+        assertEquals(TransactionType.TRANSFER, state.transactionType)
+        assertEquals(sourceId, state.selectedTransferSourceAccountId)
+        assertEquals(destinationId, state.selectedTransferDestinationAccountId)
+        assertTrue(state.categories.isEmpty())
+        assertNull(state.error)
+    }
+
+    @Test
+    fun `saving transfer persists source and destination with no category`() = runTest(testDispatcher) {
+        val sourceId = accountRepository.insertAccount(
+            Account(name = "Cash", type = AccountType.CASH, initialBalance = Money(0L, "USD"))
+        )
+        val destinationId = accountRepository.insertAccount(
+            Account(name = "Bank", type = AccountType.BANK, initialBalance = Money(0L, "USD"))
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onTransactionTypeChanged(TransactionType.TRANSFER)
+        viewModel.onAmountChanged("25.00")
+        viewModel.saveTransaction()
+        advanceUntilIdle()
+
+        val saved = transactionRepository.getRecentTransactions(1).single()
+        assertEquals(TransactionType.TRANSFER, saved.type)
+        assertEquals(sourceId, saved.accountId)
+        assertEquals(destinationId, saved.destinationAccountId)
+        assertNull(saved.categoryId)
+        assertTrue(viewModel.uiState.value.isSavedSuccessfully)
     }
 
     @Test
@@ -776,11 +804,16 @@ class AddTransactionViewModelTest {
     }
 
     @Test
-    fun `populateFromCandidate resolves date to start of day instant`() = runTest(testDispatcher) {
+    fun `populateFromCandidate preserves current local time when changing date`() = runTest(testDispatcher) {
         val testDate = LocalDate.of(2026, 11, 5)
-        val expectedInstant = testDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
-
-        val viewModel = createViewModel()
+        val fixedNow = testDate.atTime(18, 1).atZone(ZoneId.systemDefault()).toInstant()
+        val expectedInstant = fixedNow
+        val viewModel = AddTransactionViewModel(
+            observeActiveAccountsUseCase,
+            observeCategoriesByTypeUseCase,
+            createTransactionUseCase,
+            clock = Clock.fixed(fixedNow, ZoneId.systemDefault())
+        )
         advanceUntilIdle()
 
         val candidate = TransactionCandidate(

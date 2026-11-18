@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -38,6 +39,10 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +79,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.util.TransactionTimestampPolicy
 import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.PrimaryButton
@@ -110,6 +116,8 @@ fun EditTransactionScreen(
         onCategorySelected = viewModel::onCategorySelected,
         onNoteChanged = viewModel::onNoteChanged,
         onTransactionTimeChanged = viewModel::onTransactionTimeChanged,
+        onDateSelected = viewModel::onDatePickerDateSelected,
+        onTimeSelected = viewModel::onTimeSelected,
         onDismissError = viewModel::onDismissError,
         onSaveTransaction = { viewModel.saveTransaction() },
         modifier = modifier
@@ -128,10 +136,13 @@ fun EditTransactionScreenContent(
     onTransactionTimeChanged: (Instant) -> Unit,
     onDismissError: () -> Unit,
     onSaveTransaction: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDateSelected: ((Long) -> Unit)? = null,
+    onTimeSelected: ((Int, Int) -> Unit)? = null
 ) {
     val scrollState = rememberScrollState()
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -220,6 +231,7 @@ fun EditTransactionScreenContent(
                                 is AddTransactionError.AccountArchived -> stringResource(R.string.error_account_archived)
                                 is AddTransactionError.CategoryArchived -> stringResource(R.string.error_category_archived)
                                 is AddTransactionError.IncompatibleCategory -> stringResource(R.string.error_incompatible_category)
+                                is AddTransactionError.InvalidTransactionTime -> stringResource(R.string.error_transaction_time_invalid)
                                 is AddTransactionError.Unknown -> err.message ?: stringResource(R.string.error_unknown)
                             }
 
@@ -254,9 +266,12 @@ fun EditTransactionScreenContent(
                     }
 
                     if (uiState.isReadOnlyTransfer) {
+                        val localDateTime = uiState.transactionTime.atZone(ZoneId.systemDefault())
                         val formattedDate = remember(uiState.transactionTime) {
-                            val localDate = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalDate()
-                            localDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                            localDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                        }
+                        val formattedTime = remember(uiState.transactionTime) {
+                            localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
                         }
 
                         ExpenseTrackerCard(
@@ -523,9 +538,12 @@ fun EditTransactionScreenContent(
 
                         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
 
+                        val localDateTime = uiState.transactionTime.atZone(ZoneId.systemDefault())
                         val formattedDate = remember(uiState.transactionTime) {
-                            val localDate = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalDate()
-                            localDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                            localDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                        }
+                        val formattedTime = remember(uiState.transactionTime) {
+                            localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
                         }
 
                         ExpenseTrackerCard(
@@ -563,6 +581,14 @@ fun EditTransactionScreenContent(
                                         color = MaterialTheme.colorScheme.onBackground
                                     )
                                 }
+                                TextButton(
+                                    onClick = { showTimePicker = true },
+                                    modifier = Modifier.testTag("time_picker_button")
+                                ) {
+                                    Icon(Icons.Default.AccessTime, contentDescription = null)
+                                    Spacer(Modifier.width(ExpenseTrackerSpacing.xs))
+                                    Text(formattedTime)
+                                }
                             }
                         }
                     }
@@ -591,8 +617,22 @@ fun EditTransactionScreenContent(
 
     // Material 3 DatePickerDialog
     if (showDatePicker) {
-        val initialMillis = uiState.transactionTime.toEpochMilli()
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        val zoneId = ZoneId.systemDefault()
+        val now = Instant.now()
+        val today = now.atZone(zoneId).toLocalDate()
+        val selectedDate = uiState.transactionTime.atZone(zoneId).toLocalDate()
+        val initialMillis = TransactionTimestampPolicy.pickerUtcMillisForDate(
+            selectedDate.coerceAtLeast(TransactionTimestampPolicy.EARLIEST_DATE)
+        )
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialMillis,
+            yearRange = TransactionTimestampPolicy.EARLIEST_DATE.year..today.year,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                    TransactionTimestampPolicy.isSelectablePickerDate(utcTimeMillis, now, zoneId)
+                override fun isSelectableYear(year: Int): Boolean = year in TransactionTimestampPolicy.EARLIEST_DATE.year..today.year
+            }
+        )
 
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -601,8 +641,13 @@ fun EditTransactionScreenContent(
                     onClick = {
                         val selectedMillis = datePickerState.selectedDateMillis
                         if (selectedMillis != null) {
-                            val selectedInstant = Instant.ofEpochMilli(selectedMillis)
-                            onTransactionTimeChanged(selectedInstant)
+                            val onDate = onDateSelected
+                            if (onDate != null) onDate(selectedMillis) else {
+                                val date = TransactionTimestampPolicy.dateFromPickerUtcMillis(selectedMillis)
+                                val current = uiState.transactionTime.atZone(ZoneId.systemDefault())
+                                val selected = date.atTime(current.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant()
+                                onTransactionTimeChanged(selected)
+                            }
                         }
                         showDatePicker = false
                     }
@@ -625,6 +670,36 @@ fun EditTransactionScreenContent(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showTimePicker) {
+        val localTime = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalTime()
+        val timePickerState = rememberTimePickerState(
+            initialHour = localTime.hour,
+            initialMinute = localTime.minute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text(stringResource(R.string.time_picker_dialog_title)) },
+            text = { TimePicker(state = timePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val onTime = onTimeSelected
+                    if (onTime != null) onTime(timePickerState.hour, timePickerState.minute)
+                    else {
+                        val localDate = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalDate()
+                        onTransactionTimeChanged(localDate.atTime(timePickerState.hour, timePickerState.minute).atZone(ZoneId.systemDefault()).toInstant())
+                    }
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 }
 

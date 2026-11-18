@@ -323,23 +323,16 @@ class FirestoreCloudBackupRepository internal constructor(
         userId: String,
         snapshotId: String
     ): Result<Unit> {
-        val path = "users/$userId/backup_manifests/$PRIMARY_SNAPSHOT_ID"
+        val path = "users/$userId/backup_manifests/$snapshotId"
         return try {
             val uid = requireAuthenticatedUid()
             requireMatchingUid(uid, userId)
-            val primaryDto = gateway.getManifest(uid, PRIMARY_SNAPSHOT_ID)
-            val generationId = primaryDto?.generationId
-
-            gateway.deleteSnapshotDocuments(uid, PRIMARY_SNAPSHOT_ID)
-            if (!generationId.isNullOrBlank()) {
-                gateway.deleteSnapshotDocuments(uid, generationId)
+            if (snapshotId == PRIMARY_SNAPSHOT_ID) {
+                throw CloudBackupRemoteException.InvalidSnapshot(
+                    "Deleting the primary restore point is prohibited to protect user data."
+                )
             }
-            val allManifests = gateway.listAllManifests(uid)
-            for (dto in allManifests) {
-                if (dto.snapshotId.startsWith("gen_")) {
-                    gateway.deleteSnapshotDocuments(uid, dto.snapshotId)
-                }
-            }
+            gateway.deleteSnapshotDocuments(uid, snapshotId)
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e

@@ -12,6 +12,8 @@ import com.suguru.expensetracker.domain.usecase.transaction.CreateTransactionUse
 import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.domain.parser.ParseWarning
 import com.suguru.expensetracker.domain.parser.TransactionCandidate
+import com.suguru.expensetracker.domain.util.TransactionTimestampError
+import com.suguru.expensetracker.domain.util.TransactionTimestampPolicy
 import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 
@@ -41,10 +44,11 @@ class AddTransactionViewModel(
     private val observeActiveAccountsUseCase: ObserveActiveAccountsUseCase,
     private val observeCategoriesByTypeUseCase: ObserveCategoriesByTypeUseCase,
     private val createTransactionUseCase: CreateTransactionUseCase,
-    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null,
+    private val clock: Clock = Clock.systemDefaultZone()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(AddTransactionUiState())
+    private val _uiState = MutableStateFlow(AddTransactionUiState(transactionTime = clock.instant()))
     val uiState: StateFlow<AddTransactionUiState> = _uiState.asStateFlow()
 
     init {
@@ -57,7 +61,25 @@ class AddTransactionViewModel(
             observeActiveAccountsUseCase().collect { accounts ->
                 val defaultAccount = accounts.firstOrNull { it.internalKey == INTERNAL_DEFAULT_ACCOUNT_KEY }
                 _uiState.update { state ->
-                    state.copy(defaultAccount = defaultAccount)
+                    val transferAccounts = accounts.filter { it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY }
+                    val sourceId = state.selectedTransferSourceAccountId
+                        ?.takeIf { id -> transferAccounts.any { it.id == id } }
+                        ?: transferAccounts.firstOrNull()?.id
+                    val source = accounts.firstOrNull { it.id == sourceId }
+                    val destinationId = state.selectedTransferDestinationAccountId
+                        ?.takeIf { id -> transferAccounts.any { candidate ->
+                            candidate.id == id && candidate.id != sourceId &&
+                                candidate.initialBalance.currencyCode == source?.initialBalance?.currencyCode
+                        } }
+                        ?: transferAccounts.firstOrNull { candidate ->
+                            candidate.id != sourceId && candidate.initialBalance.currencyCode == source?.initialBalance?.currencyCode
+                        }?.id
+                    state.copy(
+                        defaultAccount = defaultAccount,
+                        activeAccounts = accounts,
+                        selectedTransferSourceAccountId = sourceId,
+                        selectedTransferDestinationAccountId = destinationId
+                    )
                 }
             }
         }
@@ -112,15 +134,18 @@ class AddTransactionViewModel(
             _uiState.update { state ->
                 AddTransactionUiState(
                     defaultAccount = state.defaultAccount,
+                    activeAccounts = state.activeAccounts,
+                    selectedTransferSourceAccountId = state.selectedTransferSourceAccountId,
+                    selectedTransferDestinationAccountId = state.selectedTransferDestinationAccountId,
                     categories = state.categories,
                     selectedCategoryId = state.categories.firstOrNull()?.id,
                     transactionType = TransactionType.EXPENSE,
                     amount = "",
                     note = "",
-                    transactionTime = Instant.now(),
+                    transactionTime = clock.instant(),
                     isAiAssisted = false,
                     candidateSource = null,
-                    error = AddTransactionError.Unknown(TRANSFER_NOT_SUPPORTED_MESSAGE),
+                    error = AddTransactionError.Unknown(AI_TRANSFER_DRAFT_MESSAGE),
                     isSavedSuccessfully = false
                 )
             }
@@ -152,9 +177,14 @@ class AddTransactionViewModel(
         }
 
         val resolvedInstant = try {
-            candidate.date.atStartOfDay(ZoneId.systemDefault()).toInstant()
+            TransactionTimestampPolicy.selectDate(
+                current = clock.instant(),
+                pickerUtcMillis = TransactionTimestampPolicy.pickerUtcMillisForDate(candidate.date),
+                now = clock.instant(),
+                zoneId = clock.zone
+            )
         } catch (_: Exception) {
-            Instant.now()
+            clock.instant()
         }
 
         _uiState.update { state ->
@@ -203,12 +233,15 @@ class AddTransactionViewModel(
         _uiState.update { state ->
             AddTransactionUiState(
                 defaultAccount = state.defaultAccount,
+                activeAccounts = state.activeAccounts,
+                selectedTransferSourceAccountId = state.selectedTransferSourceAccountId,
+                selectedTransferDestinationAccountId = state.selectedTransferDestinationAccountId,
                 categories = state.categories,
                 selectedCategoryId = state.categories.firstOrNull()?.id,
                 transactionType = TransactionType.EXPENSE,
                 amount = "",
                 note = "",
-                transactionTime = Instant.now(),
+                transactionTime = clock.instant(),
                 isAiAssisted = false,
                 candidateSource = null
             )
@@ -217,6 +250,10 @@ class AddTransactionViewModel(
 
     private fun matchCategory(suggestedName: String?, categories: List<com.suguru.expensetracker.domain.model.Category>): MatchResult<com.suguru.expensetracker.domain.model.Category> {
         if (suggestedName.isNullOrBlank() || categories.isEmpty()) return MatchResult.None
+        val resolved = com.suguru.expensetracker.domain.ai.AiCategoryNormalizer.resolve(suggestedName, categories)
+        if (resolved != null) {
+            return MatchResult.Single(resolved)
+        }
         val query = suggestedName.trim()
         val exactMatches = categories.filter { it.name.trim().equals(query, ignoreCase = true) }
         if (exactMatches.size == 1) return MatchResult.Single(exactMatches.first())
@@ -232,15 +269,54 @@ class AddTransactionViewModel(
     }
 
     fun onTransactionTypeChanged(type: TransactionType) {
-        if (type == TransactionType.TRANSFER) {
-            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_NOT_SUPPORTED_MESSAGE)) }
-            return
-        }
         _uiState.update { state ->
+            if (type != TransactionType.TRANSFER) {
+                state.copy(transactionType = type, error = null)
+            } else {
+                val source = state.transferSourceAccount
+                    ?: state.activeAccounts.firstOrNull { it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY }
+                val destination = state.transferDestinationAccount?.takeIf {
+                    it.id != source?.id && it.initialBalance.currencyCode == source?.initialBalance?.currencyCode
+                } ?: state.activeAccounts.firstOrNull {
+                    it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY &&
+                        it.id != source?.id && it.initialBalance.currencyCode == source?.initialBalance?.currencyCode
+                }
+                state.copy(
+                    transactionType = type,
+                    selectedTransferSourceAccountId = source?.id,
+                    selectedTransferDestinationAccountId = destination?.id,
+                    selectedCategoryId = null,
+                    error = null
+                )
+            }
+        }
+    }
+
+    fun onTransferSourceSelected(accountId: Long) {
+        _uiState.update { state ->
+            val source = state.activeAccounts.firstOrNull {
+                it.id == accountId && it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY
+            } ?: return@update state
+            val destinationId = state.transferDestinationAccount
+                ?.takeIf { it.id != source.id && it.initialBalance.currencyCode == source.initialBalance.currencyCode }
+                ?.id ?: state.activeAccounts.firstOrNull {
+                    it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY &&
+                        it.id != source.id && it.initialBalance.currencyCode == source.initialBalance.currencyCode
+                }?.id
             state.copy(
-                transactionType = type,
+                selectedTransferSourceAccountId = source.id,
+                selectedTransferDestinationAccountId = destinationId,
                 error = null
             )
+        }
+    }
+
+    fun onTransferDestinationSelected(accountId: Long) {
+        _uiState.update { state ->
+            val destination = state.activeAccounts.firstOrNull {
+                it.id == accountId && it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY
+            } ?: return@update state
+            state.copy(selectedTransferDestinationAccountId = destination.id, error = null)
         }
     }
 
@@ -264,6 +340,26 @@ class AddTransactionViewModel(
         _uiState.update { it.copy(transactionTime = time) }
     }
 
+    fun onDatePickerDateSelected(utcMillis: Long) {
+        val current = _uiState.value.transactionTime
+        try {
+            val selected = TransactionTimestampPolicy.selectDate(current, utcMillis, clock.instant(), clock.zone)
+            _uiState.update { it.copy(transactionTime = selected, error = null) }
+        } catch (error: IllegalArgumentException) {
+            _uiState.update { it.copy(error = AddTransactionError.InvalidTransactionTime) }
+        }
+    }
+
+    fun onTimeSelected(hour: Int, minute: Int) {
+        val current = _uiState.value.transactionTime
+        try {
+            val selected = TransactionTimestampPolicy.selectTime(current, hour, minute, clock.instant(), clock.zone)
+            _uiState.update { it.copy(transactionTime = selected, error = null) }
+        } catch (error: IllegalArgumentException) {
+            _uiState.update { it.copy(error = AddTransactionError.InvalidTransactionTime) }
+        }
+    }
+
     fun onDismissError() {
         _uiState.update { it.copy(error = null) }
     }
@@ -272,20 +368,24 @@ class AddTransactionViewModel(
         val state = _uiState.value
         if (state.isSaving) return
 
-        if (state.transactionType == TransactionType.TRANSFER) {
-            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_NOT_SUPPORTED_MESSAGE)) }
-            return
+        when (TransactionTimestampPolicy.validationError(state.transactionTime, clock)) {
+            TransactionTimestampError.BEFORE_MINIMUM_DATE, TransactionTimestampError.IN_FUTURE -> {
+                _uiState.update { it.copy(error = AddTransactionError.InvalidTransactionTime) }
+                return
+            }
+            null -> Unit
         }
 
-        // 1. Validate internal default account existence
-        val defaultAccount = state.defaultAccount
-        if (defaultAccount == null) {
+        val isTransfer = state.transactionType == TransactionType.TRANSFER
+        val sourceAccount = if (isTransfer) state.transferSourceAccount else state.defaultAccount
+        val destinationAccount = if (isTransfer) state.transferDestinationAccount else null
+        if (sourceAccount == null || (isTransfer && destinationAccount == null)) {
             _uiState.update { it.copy(error = AddTransactionError.AccountRequired) }
             return
         }
 
-        // 2. Validate Amount
-        val parseResult = MoneyParser.parse(state.amount, defaultAccount.initialBalance.currencyCode)
+        // Expenses and income use the internal ledger currency; transfers use their source currency.
+        val parseResult = MoneyParser.parse(state.amount, sourceAccount.initialBalance.currencyCode)
         if (parseResult.isFailure) {
             _uiState.update { it.copy(error = AddTransactionError.InvalidAmount) }
             return
@@ -297,19 +397,18 @@ class AddTransactionViewModel(
             return
         }
 
-        // 3. Validate Category
-        if (state.selectedCategoryId == null) {
+        // Transfers have no category; expense and income require one.
+        if (!isTransfer && state.selectedCategoryId == null) {
             _uiState.update { it.copy(error = AddTransactionError.CategoryRequired) }
             return
         }
 
-        // 4. Construct domain transaction using the internal default account
         val transaction = Transaction(
             type = state.transactionType,
             amount = money,
-            accountId = defaultAccount.id,
-            destinationAccountId = null,
-            categoryId = state.selectedCategoryId,
+            accountId = sourceAccount.id,
+            destinationAccountId = destinationAccount?.id,
+            categoryId = if (isTransfer) null else state.selectedCategoryId,
             note = state.note.trim().ifEmpty { null },
             transactionTime = state.transactionTime
         )
@@ -319,7 +418,8 @@ class AddTransactionViewModel(
         viewModelScope.launch {
             try {
                 createTransactionUseCase(transaction)
-                widgetRefreshCoordinator?.refreshAccountBalanceWidgets(defaultAccount.id)
+                widgetRefreshCoordinator?.refreshAccountBalanceWidgets(sourceAccount.id)
+                destinationAccount?.let { widgetRefreshCoordinator?.refreshAccountBalanceWidgets(it.id) }
                 _uiState.update { it.copy(isSaving = false, isSavedSuccessfully = true, error = null) }
                 onSuccess()
             } catch (e: DomainException) {
@@ -332,7 +432,6 @@ class AddTransactionViewModel(
 
     private companion object {
         const val INTERNAL_DEFAULT_ACCOUNT_KEY = "default"
-        const val TRANSFER_NOT_SUPPORTED_MESSAGE =
-            "New transfer transactions are not supported. Only expenses and incomes can be created."
+        const val AI_TRANSFER_DRAFT_MESSAGE = "AI transfer drafts need manual account selection."
     }
 }

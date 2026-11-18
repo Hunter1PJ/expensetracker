@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -39,6 +40,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -82,7 +84,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.WorkspacePremium
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
@@ -316,6 +319,15 @@ fun SettingsScreen(
                                                 stringResource(messageResource)
                                             }
                                         }
+                                        is KeyVerificationState.TemporaryFailure -> {
+                                            val error = kvs.error
+                                            val messageResource = settingsErrorMessageResource(error)
+                                            if (error is AiError.ServerError) {
+                                                stringResource(messageResource, error.statusCode)
+                                            } else {
+                                                stringResource(messageResource)
+                                            }
+                                        }
                                     }
                                     "${state.maskedApiKey ?: "••••••••"} • $statusNote"
                                 } else {
@@ -326,7 +338,12 @@ fun SettingsScreen(
                                     title = stringResource(R.string.title_gemini_api_key),
                                     subtitle = keySubtitle,
                                     icon = Icons.Default.Key,
-                                    iconTint = if (state.isAiConfigured) ExpenseTrackerTheme.extendedColors.financialPositive else ExpenseTrackerTheme.extendedColors.accentViolet,
+                                    iconTint = when {
+                                        state.keyVerificationState is KeyVerificationState.Invalid &&
+                                            state.keyVerificationState.error is AiError.InvalidApiKey -> ExpenseTrackerTheme.extendedColors.financialDanger
+                                        state.isAiConfigured -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                        else -> ExpenseTrackerTheme.extendedColors.accentViolet
+                                    },
                                     trailingText = if (state.isAiConfigured) "Manage" else "Set Up",
                                     onClick = {
                                         apiKeyInput = ""
@@ -828,11 +845,23 @@ fun SettingsScreen(
                                 showApiKeyDialog = false
                             },
                             title = {
-                                Text(
-                                    text = stringResource(R.string.dialog_api_key_title),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.dialog_api_key_title),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    IconButton(
+                                        onClick = { showApiKeyDialog = false },
+                                        modifier = Modifier.testTag("close_api_key_dialog_button")
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close")
+                                    }
+                                }
                             },
                             text = {
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
@@ -855,33 +884,17 @@ fun SettingsScreen(
                                     )
 
                                     if (state.isAiConfigured) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                        TextButton(
+                                            onClick = {
+                                                viewModel.deleteGeminiApiKey()
+                                                showApiKeyDialog = false
+                                            },
+                                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                                contentColor = ExpenseTrackerTheme.extendedColors.financialDanger
+                                            ),
+                                            modifier = Modifier.testTag("delete_api_key_button")
                                         ) {
-                                            TextButton(
-                                                onClick = {
-                                                    viewModel.verifySavedGeminiApiKey()
-                                                },
-                                                enabled = state.keyVerificationState !is KeyVerificationState.Verifying,
-                                                modifier = Modifier.testTag("verify_api_key_button")
-                                            ) {
-                                                Text(stringResource(R.string.action_test_key))
-                                            }
-
-                                            TextButton(
-                                                onClick = {
-                                                    viewModel.deleteGeminiApiKey()
-                                                    showApiKeyDialog = false
-                                                },
-                                                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                                    contentColor = ExpenseTrackerTheme.extendedColors.financialDanger
-                                                ),
-                                                modifier = Modifier.testTag("delete_api_key_button")
-                                            ) {
-                                                Text(stringResource(R.string.action_delete_key))
-                                            }
+                                            Text(stringResource(R.string.action_delete_key))
                                         }
                                     }
                                 }
@@ -900,57 +913,9 @@ fun SettingsScreen(
                                     Text(stringResource(R.string.action_save_key))
                                 }
                             },
-                            dismissButton = {
-                                TextButton(
-                                    onClick = { showApiKeyDialog = false },
-                                    modifier = Modifier.testTag("cancel_api_key_dialog_button")
-                                ) {
-                                    Text(stringResource(R.string.action_cancel))
-                                }
-                            }
                         )
                     }
 
-                    if (showApiKeyDialog && state.keyVerificationState is KeyVerificationState.Verifying) {
-                        AlertDialog(
-                            onDismissRequest = { viewModel.cancelVerification() },
-                            title = {
-                                Text(
-                                    text = stringResource(R.string.dialog_verify_key_title),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            },
-                            text = {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .testTag("verify_api_key_progress"),
-                                        strokeWidth = 3.dp
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.dialog_verify_key_description),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                    )
-                                }
-                            },
-                            confirmButton = {
-                                TextButton(
-                                    onClick = { viewModel.cancelVerification() },
-                                    modifier = Modifier.testTag("cancel_verify_api_key_button")
-                                ) {
-                                    Text(stringResource(R.string.action_cancel))
-                                }
-                            },
-                            modifier = Modifier.testTag("verify_api_key_progress_dialog")
-                        )
-                    }
                 }
             }
 

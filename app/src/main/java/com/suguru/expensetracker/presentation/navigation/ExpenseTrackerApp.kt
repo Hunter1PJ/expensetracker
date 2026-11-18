@@ -121,6 +121,16 @@ fun ExpenseTrackerApp(
     var currentDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
     var previousDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
 
+    val startupAiInvalidKey by (resolvedContainer?.startupAiInvalidKey
+        ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
+    LaunchedEffect(startupAiInvalidKey, startupState.allowsNavigation) {
+        if (startupAiInvalidKey && startupState.allowsNavigation) {
+            previousDestination = currentDestination
+            currentDestination = NavDestination.Settings
+            resolvedContainer?.consumeStartupAiInvalidKey()
+        }
+    }
+
     LaunchedEffect(resolvedContainer, hasRunStartupCheck) {
         if (resolvedContainer != null && !hasRunStartupCheck) {
             hasRunStartupCheck = true

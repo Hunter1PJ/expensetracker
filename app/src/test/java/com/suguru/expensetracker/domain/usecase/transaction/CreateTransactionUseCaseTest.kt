@@ -256,8 +256,8 @@ class CreateTransactionUseCaseTest {
         createTransactionUseCase(invalidTransaction)
     }
 
-    @Test(expected = DomainException.InvalidTransfer::class)
-    fun createNewTransfer_notSupported_throwsInvalidTransfer() = runBlocking<Unit> {
+    @Test
+    fun createNewTransfer_withValidAccounts_preservesSourceAndDestination() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -270,18 +270,31 @@ class CreateTransactionUseCaseTest {
             null
         )
 
-        // Act & Assert: Try to create a TRANSFER (not supported for new creation)
+        val sourceId = accountRepository.insertAccount(
+            Account(name = "Source", type = AccountType.CASH, initialBalance = Money(0L, "USD"))
+        )
+        val destinationId = accountRepository.insertAccount(
+            Account(name = "Destination", type = AccountType.BANK, initialBalance = Money(0L, "USD"))
+        )
+        getTransactionUseCase = GetTransactionUseCase(transactionRepository)
+
         val transferTransaction = Transaction(
             id = 0L,
             type = TransactionType.TRANSFER,
             amount = Money(10000L, "USD"),
-            accountId = 0L,
-            destinationAccountId = 0L,
+            accountId = sourceId,
+            destinationAccountId = destinationId,
             categoryId = null,
             transactionTime = java.time.Instant.now()
         )
 
-        createTransactionUseCase(transferTransaction)
+        val transferId = createTransactionUseCase(transferTransaction)
+        val savedTransfer = getTransactionUseCase(transferId)
+        assertNotNull(savedTransfer)
+        assertEquals(TransactionType.TRANSFER, savedTransfer?.type)
+        assertEquals(sourceId, savedTransfer?.accountId)
+        assertEquals(destinationId, savedTransfer?.destinationAccountId)
+        assertNull(savedTransfer?.categoryId)
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.suguru.expensetracker.domain.model.ThemeMode
 import com.suguru.expensetracker.domain.model.TimeFormatPreference
 import com.suguru.expensetracker.domain.model.WeekStart
 import com.suguru.expensetracker.domain.repository.SettingsRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,7 @@ sealed interface KeyVerificationState {
     object Verifying : KeyVerificationState
     object Valid : KeyVerificationState
     data class Invalid(val error: AiError) : KeyVerificationState
+    data class TemporaryFailure(val error: AiError) : KeyVerificationState
 }
 
 sealed interface SettingsEvent {
@@ -53,7 +55,8 @@ sealed interface SettingsEvent {
 
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
-    private val aiRepository: AiRepository? = null
+    private val aiRepository: AiRepository? = null,
+    initialInvalidApiKey: Boolean = false
 ) : ViewModel() {
 
     private val _keyVerificationState = MutableStateFlow<KeyVerificationState>(KeyVerificationState.Idle)
@@ -64,6 +67,9 @@ class SettingsViewModel(
     val events = _events.receiveAsFlow()
 
     init {
+        if (initialInvalidApiKey) {
+            _keyVerificationState.value = KeyVerificationState.Invalid(AiError.InvalidApiKey)
+        }
         loadMaskedKey()
     }
 
@@ -73,12 +79,26 @@ class SettingsViewModel(
         }
     }
 
+    private val aiVerificationFlow: Flow<KeyVerificationState> = combine(
+        aiRepository?.isKeyVerified ?: kotlinx.coroutines.flow.flowOf(false),
+        _keyVerificationState
+    ) { isVerified, verifyState ->
+        when {
+            verifyState is KeyVerificationState.Verifying -> KeyVerificationState.Verifying
+            verifyState is KeyVerificationState.Invalid -> verifyState
+            isVerified -> KeyVerificationState.Valid
+            verifyState is KeyVerificationState.TemporaryFailure -> verifyState
+            verifyState is KeyVerificationState.Valid -> KeyVerificationState.Valid
+            else -> KeyVerificationState.Idle
+        }
+    }
+
     val uiState: StateFlow<SettingsUiState> = combine(
         settingsRepository.settings,
-        aiRepository?.isAiFeatureEnabled ?: kotlinx.coroutines.flow.flowOf(true),
+        aiRepository?.isAiFeatureEnabled ?: kotlinx.coroutines.flow.flowOf(false),
         aiRepository?.isAiConfigured ?: kotlinx.coroutines.flow.flowOf(false),
         _maskedKeyFlow,
-        _keyVerificationState
+        aiVerificationFlow
     ) { settings, aiEnabled, aiConfigured, maskedKey, verifyState ->
         SettingsUiState.Success(
             settings = settings,
@@ -153,6 +173,7 @@ class SettingsViewModel(
 
     // AI BYOK Methods
     fun setAiFeatureEnabled(enabled: Boolean) {
+        if (!enabled) cancelVerification()
         viewModelScope.launch {
             aiRepository?.setAiFeatureEnabled(enabled)
         }
@@ -167,6 +188,7 @@ class SettingsViewModel(
                     _maskedKeyFlow.value = aiRepository.getMaskedApiKey()
                     _keyVerificationState.value = KeyVerificationState.Idle
                     _events.send(SettingsEvent.ApiKeySaved)
+                    verifySavedGeminiApiKey()
                 }
                 is AiResult.Failure -> _keyVerificationState.value = KeyVerificationState.Invalid(result.error)
                 null -> Unit
@@ -189,7 +211,13 @@ class SettingsViewModel(
                         _keyVerificationState.value = KeyVerificationState.Valid
                         _events.send(SettingsEvent.ApiKeyVerified)
                     }
-                    is AiResult.Failure -> _keyVerificationState.value = KeyVerificationState.Invalid(result.error)
+                    is AiResult.Failure -> {
+                        _keyVerificationState.value = if (result.error is AiError.InvalidApiKey) {
+                            KeyVerificationState.Invalid(result.error)
+                        } else {
+                            KeyVerificationState.TemporaryFailure(result.error)
+                        }
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 if (verificationJob === currentJob) {

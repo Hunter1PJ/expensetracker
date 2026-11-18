@@ -253,7 +253,8 @@ class UpdateTransactionUseCaseTest {
             transactionRepository,
             accountRepository,
             categoryRepository,
-            null
+            null,
+            java.time.Clock.fixed(java.time.Instant.now().plus(java.time.Duration.ofHours(2)), java.time.ZoneId.systemDefault())
         )
         getTransactionUseCase = GetTransactionUseCase(transactionRepository)
 

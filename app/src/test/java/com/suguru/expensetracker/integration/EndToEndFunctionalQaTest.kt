@@ -298,11 +298,11 @@ class EndToEndFunctionalQaTest {
         assertEquals(0L, defaultAccount.initialBalance.amountInMinorUnits)
         assertEquals(1, database.accountDao().getAccountCount())
 
-        // 3. Ensure 14 default categories are seeded
+        // 3. Ensure built-in categories are seeded
         defaultCategorySeeder.ensureSeeded()
         val categories = database.categoryDao().getAllCategories()
-        assertEquals(14, categories.size)
-        assertEquals(9, categories.count { it.type == CategoryType.EXPENSE })
+        assertEquals(19, categories.size)
+        assertEquals(14, categories.count { it.type == CategoryType.EXPENSE })
         assertEquals(5, categories.count { it.type == CategoryType.INCOME })
         assertTrue(categories.all { it.isSystem && !it.isArchived })
 
@@ -310,7 +310,7 @@ class EndToEndFunctionalQaTest {
         internalDefaultAccountProvisioner.ensureProvisioned()
         defaultCategorySeeder.ensureSeeded()
         assertEquals(1, database.accountDao().getAccountCount())
-        assertEquals(14, database.categoryDao().getAllCategories().size)
+        assertEquals(19, database.categoryDao().getAllCategories().size)
 
         // 5. HomeViewModel loads empty state cleanly without crashing
         val homeViewModel = HomeViewModel(
@@ -1312,7 +1312,7 @@ class EndToEndFunctionalQaTest {
 
             // Verify persisted state retained exactly
             assertEquals(1, db2.accountDao().getAccountCount())
-            assertEquals(14, db2.categoryDao().getAllCategories().size)
+            assertEquals(19, db2.categoryDao().getAllCategories().size)
             val persistedTxs = db2.backupDao().getAllTransactions()
             assertEquals(1, persistedTxs.size)
             assertEquals(85000L, persistedTxs.first().amountInMinorUnits)

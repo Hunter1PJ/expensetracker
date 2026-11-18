@@ -51,12 +51,12 @@ class DefaultCategorySeederTest {
     }
 
     @Test
-    fun freshDatabaseSeedsAllFourteenSystemCategories() = runBlocking {
+    fun freshDatabaseSeedsAllNineteenSystemCategories() = runBlocking {
         seeder.ensureSeeded()
 
         val categories = database.categoryDao().getAllCategories()
-        assertEquals(14, categories.size)
-        assertEquals(9, categories.count { it.type == CategoryType.EXPENSE })
+        assertEquals(19, categories.size)
+        assertEquals(14, categories.count { it.type == CategoryType.EXPENSE })
         assertEquals(5, categories.count { it.type == CategoryType.INCOME })
         assertTrue(categories.all { it.isSystem && !it.isArchived && it.iconName.isNotBlank() && it.colorHex.isNotBlank() })
     }
@@ -198,8 +198,8 @@ class DefaultCategorySeederTest {
         }
 
         val categories = database.categoryDao().getAllCategories()
-        assertEquals(14, categories.size)
-        assertEquals(14, categories.map { it.name to it.type }.toSet().size)
+        assertEquals(19, categories.size)
+        assertEquals(19, categories.map { it.name to it.type }.toSet().size)
     }
 
     @Test
@@ -210,7 +210,7 @@ class DefaultCategorySeederTest {
         seeder.ensureSeeded()
 
         val categories = database.categoryDao().getAllCategories()
-        assertEquals(14, categories.size)
+        assertEquals(19, categories.size)
         assertEquals(existingCustom.copy(id = existingId), database.categoryDao().getCategoryById(existingId))
         assertEquals(1, categories.count { it.name == "Food" && it.type == CategoryType.EXPENSE })
     }
@@ -245,7 +245,8 @@ class DefaultCategorySeederTest {
     private companion object {
         val EXPENSE_NAMES = setOf(
             "Groceries", "Food", "Transport", "Study", "Shopping",
-            "Health", "Entertainment", "Bills", "Other"
+            "Health", "Entertainment", "Bills", "Housing",
+            "Personal Care", "Subscriptions", "Travel", "Gifts & Donations", "Other"
         )
         val INCOME_NAMES = setOf("Salary", "Freelance", "Business", "Gift", "Other")
     }

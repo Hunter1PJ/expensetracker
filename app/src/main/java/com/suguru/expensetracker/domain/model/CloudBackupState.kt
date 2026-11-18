@@ -10,6 +10,7 @@ package com.suguru.expensetracker.domain.model
  */
 data class CloudBackupState(
     val lastSuccessfulBackupAtEpochMillis: Long? = null,
+    val lastSuccessfulRestoreAtEpochMillis: Long? = null,
     val lastSuccessfulSnapshotId: String? = null,
     val pendingSnapshotId: String? = null,
     val pendingSinceEpochMillis: Long? = null,
@@ -21,6 +22,11 @@ data class CloudBackupState(
         if (lastSuccessfulBackupAtEpochMillis != null) {
             require(lastSuccessfulBackupAtEpochMillis >= 0L) {
                 "lastSuccessfulBackupAtEpochMillis must be non-negative, was $lastSuccessfulBackupAtEpochMillis."
+            }
+        }
+        if (lastSuccessfulRestoreAtEpochMillis != null) {
+            require(lastSuccessfulRestoreAtEpochMillis >= 0L) {
+                "lastSuccessfulRestoreAtEpochMillis must be non-negative, was $lastSuccessfulRestoreAtEpochMillis."
             }
         }
         if (lastSuccessfulSnapshotId != null) {

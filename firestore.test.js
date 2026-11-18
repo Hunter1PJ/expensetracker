@@ -189,6 +189,8 @@ test("Authenticated owner: generation lifecycle and primary promotion lifecycle 
     completedAt: completed,
   };
   await assertSucceeds(primaryRef.set(validPrimaryCreatePayload(ALICE_UID, genId, completedGenDoc)));
+  await assertSucceeds(primaryRef.get());
+  await assertFails(primaryRef.delete());
 
   // 5. Subsequent generation upload and primary promotion
   const genId2 = "gen_1763200000_02";
@@ -238,6 +240,11 @@ test("Authenticated owner: generation lifecycle and primary promotion lifecycle 
       generationId: genId2,
     })
   );
+
+  // The previous generation is now obsolete; owner explicitly cleans its chunks and manifest.
+  await assertSucceeds(genRef.collection("chunks").doc("chunk_0").delete());
+  await assertSucceeds(genRef.collection("chunks").doc("chunk_1").delete());
+  await assertSucceeds(genRef.delete());
 
   // 6. Terminal state locking: generation COMPLETE cannot be mutated
   await assertFails(
@@ -332,6 +339,12 @@ test("Authenticated user: cannot read, list, create, update, or delete another u
       .collection("chunks")
       .doc("chunk_0")
       .set(validChunkPayload(adminDb, BOB_UID, "gen_bob_1", 0, 2));
+    await adminDb
+      .collection("users")
+      .doc(BOB_UID)
+      .collection("backup_manifests")
+      .doc("primary_restore_point")
+      .set({ userId: BOB_UID, status: "COMPLETE", generationId: "gen_bob_1" });
   });
 
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
@@ -342,6 +355,14 @@ test("Authenticated user: cannot read, list, create, update, or delete another u
     .doc("gen_bob_1");
 
   await assertFails(bobGenAsAlice.get());
+  const bobPrimaryAsAlice = aliceDb
+    .collection("users")
+    .doc(BOB_UID)
+    .collection("backup_manifests")
+    .doc("primary_restore_point");
+  await assertFails(bobPrimaryAsAlice.get());
+  await assertFails(bobPrimaryAsAlice.update({ status: "FAILED" }));
+  await assertFails(bobPrimaryAsAlice.delete());
   await assertFails(
     aliceDb.collection("users").doc(BOB_UID).collection("backup_manifests").get()
   );
@@ -446,5 +467,10 @@ test("Negative security bounds: rejects invalid snapshot IDs, unpromoted referen
     manifests.doc("primary_restore_point").update({
       createdAt: new Date(Date.now() - 100),
     })
+  );
+
+  // Primary restore point deletion is prohibited by rules
+  await assertFails(
+    manifests.doc("primary_restore_point").delete()
   );
 });

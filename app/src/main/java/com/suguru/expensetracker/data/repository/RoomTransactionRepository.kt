@@ -64,6 +64,12 @@ class RoomTransactionRepository(
         return transactionDao.getTransactionById(id)?.toDomain()
     }
 
+    override fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>> {
+        return transactionDao.observeExpenseCategoryUsageCounts().map { counts ->
+            counts.associate { it.categoryId to it.count }
+        }
+    }
+
     override suspend fun insertTransaction(transaction: Transaction): Long {
         val id = transactionDao.insertTransaction(transaction.toEntity())
         onDataMutated()

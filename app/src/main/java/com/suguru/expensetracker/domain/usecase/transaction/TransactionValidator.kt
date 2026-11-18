@@ -6,12 +6,26 @@ import com.suguru.expensetracker.domain.model.Transaction
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.repository.AccountRepository
 import com.suguru.expensetracker.domain.repository.CategoryRepository
+import com.suguru.expensetracker.domain.util.TransactionTimestampError
+import com.suguru.expensetracker.domain.util.TransactionTimestampPolicy
+import java.time.Clock
 
 internal class TransactionValidator(
     private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val clock: Clock = Clock.systemDefaultZone()
 ) {
     suspend fun validate(transaction: Transaction) {
+        when (TransactionTimestampPolicy.validationError(transaction.transactionTime, clock)) {
+            TransactionTimestampError.BEFORE_MINIMUM_DATE -> throw DomainException.InvalidTransactionTime(
+                "Transaction date must be January 1, 1986 or later."
+            )
+            TransactionTimestampError.IN_FUTURE -> throw DomainException.InvalidTransactionTime(
+                "Transaction date and time cannot be in the future."
+            )
+            null -> Unit
+        }
+
         if (transaction.amount.amountInMinorUnits <= 0L) {
             throw DomainException.InvalidAmount("Transaction amount must be strictly positive")
         }

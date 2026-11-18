@@ -232,6 +232,7 @@ class AccountBalanceWidgetTest {
     }
 
     class FakeTransactionRepository : com.suguru.expensetracker.domain.repository.TransactionRepository {
+        override fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>> = kotlinx.coroutines.flow.flowOf(emptyMap())
         override fun observeAllTransactions(): Flow<List<Transaction>> = MutableStateFlow(emptyList())
         override fun observeRecentTransactions(limit: Int): Flow<List<Transaction>> = MutableStateFlow(emptyList())
         override suspend fun getRecentTransactions(limit: Int): List<Transaction> = emptyList()

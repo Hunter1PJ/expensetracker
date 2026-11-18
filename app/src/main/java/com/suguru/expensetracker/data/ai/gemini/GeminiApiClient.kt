@@ -115,7 +115,16 @@ class GeminiApiClient(
                     AiResult.Failure(AiError.ServerError(400, "Bad request to Gemini API"))
                 }
             }
-            401, 403 -> AiResult.Failure(AiError.InvalidApiKey)
+            401 -> AiResult.Failure(AiError.InvalidApiKey)
+            403 -> {
+                if (responseBody.contains("API_KEY_INVALID", ignoreCase = true) ||
+                    responseBody.contains("API key not valid", ignoreCase = true) ||
+                    responseBody.contains("invalid API key", ignoreCase = true)) {
+                    AiResult.Failure(AiError.InvalidApiKey)
+                } else {
+                    AiResult.Failure(AiError.ServerError(403, "Gemini rejected the request for this API configuration"))
+                }
+            }
             429 -> AiResult.Failure(AiError.RateLimitExceeded(response.header("Retry-After")?.toLongOrNull()))
             in 500..599 -> AiResult.Failure(AiError.ServerError(response.code, "Gemini service temporarily unavailable"))
             else -> AiResult.Failure(AiError.ServerError(response.code, "HTTP ${response.code} error received"))

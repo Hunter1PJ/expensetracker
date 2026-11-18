@@ -30,14 +30,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,8 +80,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.util.TransactionTimestampPolicy
 import com.suguru.expensetracker.presentation.components.EmptyState
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.SectionHeader
@@ -111,8 +120,12 @@ fun AddTransactionScreen(
         onCategorySelected = viewModel::onCategorySelected,
         onNoteChanged = viewModel::onNoteChanged,
         onTransactionTimeChanged = viewModel::onTransactionTimeChanged,
+        onDateSelected = viewModel::onDatePickerDateSelected,
+        onTimeSelected = viewModel::onTimeSelected,
         onDismissError = viewModel::onDismissError,
         onSaveTransaction = { viewModel.saveTransaction() },
+        onTransferSourceSelected = viewModel::onTransferSourceSelected,
+        onTransferDestinationSelected = viewModel::onTransferDestinationSelected,
         modifier = modifier
     )
 }
@@ -129,10 +142,15 @@ fun AddTransactionScreenContent(
     onTransactionTimeChanged: (Instant) -> Unit,
     onDismissError: () -> Unit,
     onSaveTransaction: () -> Unit,
-    modifier: Modifier = Modifier
+    onTransferSourceSelected: (Long) -> Unit = {},
+    onTransferDestinationSelected: (Long) -> Unit = {},
+    modifier: Modifier = Modifier,
+    onDateSelected: ((Long) -> Unit)? = null,
+    onTimeSelected: ((Int, Int) -> Unit)? = null
 ) {
     val scrollState = rememberScrollState()
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier
@@ -308,6 +326,7 @@ fun AddTransactionScreenContent(
                         is AddTransactionError.AccountArchived -> stringResource(R.string.error_account_archived)
                         is AddTransactionError.CategoryArchived -> stringResource(R.string.error_category_archived)
                         is AddTransactionError.IncompatibleCategory -> stringResource(R.string.error_incompatible_category)
+                        is AddTransactionError.InvalidTransactionTime -> stringResource(R.string.error_transaction_time_invalid)
                         is AddTransactionError.Unknown -> err.message ?: stringResource(R.string.error_unknown)
                     }
 
@@ -350,7 +369,8 @@ fun AddTransactionScreenContent(
             ) {
                 val types = listOf(
                     TransactionType.EXPENSE to stringResource(R.string.type_expense),
-                    TransactionType.INCOME to stringResource(R.string.type_income)
+                    TransactionType.INCOME to stringResource(R.string.type_income),
+                    TransactionType.TRANSFER to stringResource(R.string.type_transfer)
                 )
 
                 types.forEachIndexed { index, (type, label) ->
@@ -447,8 +467,41 @@ fun AddTransactionScreenContent(
                 }
             }
 
-            // Check if internal default account is available
-            if (!uiState.hasDefaultAccount) {
+            // Transfers use explicitly selected active source and destination accounts.
+            if (uiState.transactionType == TransactionType.TRANSFER) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 540.dp),
+                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                ) {
+                    SectionHeader(title = stringResource(R.string.from_account_label))
+                    TransferAccountSelector(
+                        selectedAccount = uiState.transferSourceAccount,
+                        accounts = uiState.activeAccounts.filter { it.internalKey != "default" },
+                        onAccountSelected = onTransferSourceSelected,
+                        testTag = "transfer_source_account_selector"
+                    )
+                    SectionHeader(title = stringResource(R.string.to_account_label))
+                    TransferAccountSelector(
+                        selectedAccount = uiState.transferDestinationAccount,
+                        accounts = uiState.activeAccounts.filter { account ->
+                            account.internalKey != "default" &&
+                                account.id != uiState.transferSourceAccount?.id &&
+                                account.initialBalance.currencyCode == uiState.transferSourceAccount?.initialBalance?.currencyCode
+                        },
+                        onAccountSelected = onTransferDestinationSelected,
+                        testTag = "transfer_destination_account_selector"
+                    )
+                    if (uiState.activeAccounts.count { it.internalKey != "default" } < 2) {
+                        Text(
+                            text = stringResource(R.string.transfer_requires_two_accounts),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+                    }
+                }
+            } else if (!uiState.hasDefaultAccount) {
                 EmptyState(
                     title = stringResource(R.string.no_accounts_title),
                     description = stringResource(R.string.no_accounts_desc),
@@ -537,9 +590,12 @@ fun AddTransactionScreenContent(
 
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
 
+                    val localDateTime = uiState.transactionTime.atZone(ZoneId.systemDefault())
                     val formattedDate = remember(uiState.transactionTime) {
-                        val localDate = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalDate()
-                        localDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                        localDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                    }
+                    val formattedTime = remember(uiState.transactionTime) {
+                        localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
                     }
 
                     ExpenseTrackerCard(
@@ -577,6 +633,14 @@ fun AddTransactionScreenContent(
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                             }
+                            TextButton(
+                                onClick = { showTimePicker = true },
+                                modifier = Modifier.testTag("time_picker_button")
+                            ) {
+                                Icon(Icons.Default.AccessTime, contentDescription = null)
+                                Spacer(Modifier.width(ExpenseTrackerSpacing.xs))
+                                Text(formattedTime)
+                            }
                         }
                     }
                 }
@@ -586,7 +650,7 @@ fun AddTransactionScreenContent(
                 // 8. Save Button
                 Button(
                     onClick = onSaveTransaction,
-                    enabled = !uiState.isSaving && uiState.hasDefaultAccount,
+                    enabled = !uiState.isSaving && uiState.canSave,
                     shape = ExpenseTrackerRadius.button,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -625,8 +689,22 @@ fun AddTransactionScreenContent(
 
     // Material 3 DatePickerDialog
     if (showDatePicker) {
-        val initialMillis = uiState.transactionTime.toEpochMilli()
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        val zoneId = ZoneId.systemDefault()
+        val now = Instant.now()
+        val today = now.atZone(zoneId).toLocalDate()
+        val selectedDate = uiState.transactionTime.atZone(zoneId).toLocalDate()
+        val initialMillis = TransactionTimestampPolicy.pickerUtcMillisForDate(
+            selectedDate.coerceAtLeast(TransactionTimestampPolicy.EARLIEST_DATE)
+        )
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialMillis,
+            yearRange = TransactionTimestampPolicy.EARLIEST_DATE.year..today.year,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                    TransactionTimestampPolicy.isSelectablePickerDate(utcTimeMillis, now, zoneId)
+                override fun isSelectableYear(year: Int): Boolean = year in TransactionTimestampPolicy.EARLIEST_DATE.year..today.year
+            }
+        )
 
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -635,8 +713,13 @@ fun AddTransactionScreenContent(
                     onClick = {
                         val selectedMillis = datePickerState.selectedDateMillis
                         if (selectedMillis != null) {
-                            val selectedInstant = Instant.ofEpochMilli(selectedMillis)
-                            onTransactionTimeChanged(selectedInstant)
+                            val onDate = onDateSelected
+                            if (onDate != null) onDate(selectedMillis) else {
+                                val date = TransactionTimestampPolicy.dateFromPickerUtcMillis(selectedMillis)
+                                val current = uiState.transactionTime.atZone(ZoneId.systemDefault())
+                                val selected = date.atTime(current.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant()
+                                onTransactionTimeChanged(selected)
+                            }
                         }
                         showDatePicker = false
                     }
@@ -652,6 +735,36 @@ fun AddTransactionScreenContent(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showTimePicker) {
+        val localTime = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalTime()
+        val timePickerState = rememberTimePickerState(
+            initialHour = localTime.hour,
+            initialMinute = localTime.minute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text(stringResource(R.string.time_picker_dialog_title)) },
+            text = { TimePicker(state = timePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val onTime = onTimeSelected
+                    if (onTime != null) onTime(timePickerState.hour, timePickerState.minute)
+                    else {
+                        val localDate = uiState.transactionTime.atZone(ZoneId.systemDefault()).toLocalDate()
+                        onTransactionTimeChanged(localDate.atTime(timePickerState.hour, timePickerState.minute).atZone(ZoneId.systemDefault()).toInstant())
+                    }
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 }
 
@@ -709,6 +822,38 @@ private fun CategoryChip(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransferAccountSelector(
+    selectedAccount: Account?,
+    accounts: List<Account>,
+    onAccountSelected: (Long) -> Unit,
+    testTag: String
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth().testTag(testTag)
+        ) {
+            Text(selectedAccount?.name ?: stringResource(R.string.account_label))
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            accounts.forEach { account ->
+                DropdownMenuItem(
+                    text = { Text(account.name) },
+                    onClick = {
+                        onAccountSelected(account.id)
+                        expanded = false
+                    }
                 )
             }
         }

@@ -355,6 +355,7 @@ class BudgetProgressWidgetTest {
 
     class FakeTransactionRepository : com.suguru.expensetracker.domain.repository.TransactionRepository {
         private val transactions = MutableStateFlow<Map<Long, Transaction>>(emptyMap())
+        override fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>> = kotlinx.coroutines.flow.flowOf(emptyMap())
         override fun observeAllTransactions(): Flow<List<Transaction>> = transactions.map { it.values.toList() }
         override fun observeRecentTransactions(limit: Int): Flow<List<Transaction>> = transactions.map { it.values.take(limit) }
         override suspend fun getRecentTransactions(limit: Int): List<Transaction> = transactions.value.values.take(limit)

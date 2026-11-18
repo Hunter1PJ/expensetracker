@@ -17,6 +17,7 @@ sealed interface AddTransactionError {
     data object AccountArchived : AddTransactionError
     data object CategoryArchived : AddTransactionError
     data object IncompatibleCategory : AddTransactionError
+    data object InvalidTransactionTime : AddTransactionError
     data class Unknown(val message: String? = null) : AddTransactionError
 
     companion object {
@@ -30,6 +31,7 @@ sealed interface AddTransactionError {
                 is DomainException.CategoryNotFound -> CategoryRequired
                 is DomainException.CategoryArchived -> CategoryArchived
                 is DomainException.IncompatibleCategoryType -> IncompatibleCategory
+                is DomainException.InvalidTransactionTime -> InvalidTransactionTime
                 is DomainException.InvalidTransfer -> {
                     val msg = exception.message ?: ""
                     when {

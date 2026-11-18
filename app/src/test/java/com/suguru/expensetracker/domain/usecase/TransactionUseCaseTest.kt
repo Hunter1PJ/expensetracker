@@ -261,8 +261,8 @@ class TransactionUseCaseTest {
 
     // --- TRANSFER TESTS ---
 
-    @Test(expected = DomainException.InvalidTransfer::class)
-    fun createTransfer_validSameCurrency_throwsInvalidTransfer() {
+    @Test
+    fun createTransfer_validSameCurrency_preservesBothAccounts() {
         runBlocking {
             val tx = Transaction(
                 type = TransactionType.TRANSFER,
@@ -272,7 +272,13 @@ class TransactionUseCaseTest {
                 categoryId = null,
                 transactionTime = Instant.now()
             )
-            createTransactionUseCase(tx)
+            val id = createTransactionUseCase(tx)
+            val saved = getTransactionUseCase(id)
+            assertNotNull(saved)
+            assertEquals(TransactionType.TRANSFER, saved?.type)
+            assertEquals(usdAccountId, saved?.accountId)
+            assertEquals(secondUsdAccountId, saved?.destinationAccountId)
+            assertNull(saved?.categoryId)
         }
     }
 
@@ -321,8 +327,8 @@ class TransactionUseCaseTest {
         }
     }
 
-    @Test(expected = DomainException.InvalidTransfer::class)
-    fun createTransfer_withArchivedDestination_throwsInvalidTransfer() {
+    @Test(expected = DomainException.AccountArchived::class)
+    fun createTransfer_withArchivedDestination_throwsAccountArchived() {
         runBlocking {
             val tx = Transaction(
                 type = TransactionType.TRANSFER,

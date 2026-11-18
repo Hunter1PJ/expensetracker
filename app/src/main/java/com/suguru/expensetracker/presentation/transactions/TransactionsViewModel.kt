@@ -101,7 +101,10 @@ class TransactionsViewModel(
         }
 
         // Sort descending (newest first)
-        val sortedTransactions = filteredTransactions.sortedByDescending { it.transactionTime }
+        val sortedTransactions = filteredTransactions.sortedWith(
+            compareByDescending<com.suguru.expensetracker.domain.model.Transaction> { it.transactionTime }
+                .thenByDescending { it.id }
+        )
 
         // Group by LocalDate
         val groupedMap = sortedTransactions.groupBy { tx ->

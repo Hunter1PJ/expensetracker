@@ -12,11 +12,13 @@ import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.parser.CandidateSource
 import com.suguru.expensetracker.domain.parser.ParseConfidence
 import com.suguru.expensetracker.domain.parser.ParseWarning
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,7 +40,7 @@ class AiRepositoryImplTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
-    private lateinit var testScope: TestScope
+    private lateinit var dataStoreScope: CoroutineScope
 
     private lateinit var fakeStorage: FakeSecureKeyStorage
     private lateinit var fakeProvider: FakeAiProvider
@@ -75,10 +77,10 @@ class AiRepositoryImplTest {
 
     @Before
     fun setup() {
-        testScope = TestScope(UnconfinedTestDispatcher())
+        dataStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
         val testDataStoreFile = tempFolder.root.resolve("test_settings.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(
-            scope = testScope,
+            scope = dataStoreScope,
             produceFile = { testDataStoreFile }
         )
         fakeStorage = FakeSecureKeyStorage()
@@ -91,11 +93,14 @@ class AiRepositoryImplTest {
             todayProvider = { LocalDate.of(2026, 11, 12) },
             isOnline = { isOnline }
         )
+        runBlocking {
+            assertFalse(repository.isAiFeatureEnabled.first())
+        }
     }
 
     @After
     fun tearDown() {
-        testScope.cancel()
+        runBlocking { dataStoreScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin() }
     }
 
     @Test
@@ -110,6 +115,40 @@ class AiRepositoryImplTest {
         repository.deleteApiKey()
         assertFalse(repository.isAiConfigured.first())
         assertNull(repository.getMaskedApiKey())
+    }
+
+    @Test
+    fun temporaryVerificationFailurePreservesPreviouslyVerifiedKey() = runTest {
+        repository.saveApiKey("saved_key")
+        fakeProvider.mockValidationResult = AiResult.Success(true)
+        assertEquals(AiResult.Success(true), repository.validateConfiguredKey())
+        assertTrue(repository.isKeyVerified.first())
+
+        fakeProvider.mockValidationResult = AiResult.Failure(AiError.NetworkError("offline"))
+        assertEquals(AiResult.Failure(AiError.NetworkError("offline")), repository.validateConfiguredKey())
+        assertTrue(repository.isKeyVerified.first())
+    }
+
+    @Test
+    fun invalidVerificationClearsVerifiedStateAndBlocksFurtherGeminiCalls() = runTest {
+        repository.setAiFeatureEnabled(true)
+        repository.saveApiKey("saved_key")
+        fakeProvider.mockValidationResult = AiResult.Success(true)
+        repository.validateConfiguredKey()
+        assertTrue(repository.isKeyVerified.first())
+
+        fakeProvider.mockValidationResult = AiResult.Failure(AiError.InvalidApiKey)
+        assertEquals(AiResult.Failure(AiError.InvalidApiKey), repository.validateConfiguredKey())
+        assertFalse(repository.isKeyVerified.first())
+
+        fakeProvider.mockResult = AiResult.Success(
+            ExtractedFinancialPayload(items = listOf(ExtractedFinancialItem(
+                transactionType = "EXPENSE", rawAmount = "50", description = "Lunch"
+            )))
+        )
+        val result = repository.extractTransactions("paid 50 dollars")
+        assertTrue(result is AiResult.Success)
+        assertEquals(0, fakeProvider.callCount)
     }
 
     @Test
@@ -136,6 +175,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_whenDeviceOffline_usesOfflineParser() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         isOnline = false
 
@@ -148,6 +188,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_whenConfiguredAndOnline_usesGemini() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(
             ExtractedFinancialPayload(
@@ -164,6 +205,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_networkTimeoutRateLimitServerAndMalformed_failuresFallbackOffline() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         val failures = listOf(
             AiError.NetworkError("ignored backend detail"),
@@ -185,6 +227,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_invalidKey_fallsBackWithActionableWarning() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("invalid_key")
         fakeProvider.mockResult = AiResult.Failure(AiError.InvalidApiKey)
 
@@ -198,6 +241,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_timeoutAndUnexpectedNetworkExceptions_fallbackOffline() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         listOf(SocketTimeoutException("private detail"), IOException("private detail")).forEach { exception ->
             fakeProvider.thrownException = exception
@@ -209,6 +253,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_emptyGeminiPayload_fallsBackOffline() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(ExtractedFinancialPayload(emptyList()))
 
@@ -240,6 +285,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_validExpense_convertsSafelyToCandidate() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(
             ExtractedFinancialPayload(
@@ -275,6 +321,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_missingAmount_keepsAmountNullAndFlagsWarning() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(
             ExtractedFinancialPayload(
@@ -300,6 +347,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_incompleteTransfer_flagsWarning() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(
             ExtractedFinancialPayload(
@@ -327,6 +375,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_ambiguousCurrency_flagsWarning() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(
             ExtractedFinancialPayload(
@@ -351,6 +400,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_shorthandAmountFromAi_parsesMinorUnitsSafely() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(
             ExtractedFinancialPayload(
@@ -382,6 +432,7 @@ class AiRepositoryImplTest {
 
     @Test
     fun extractTransactions_physicalMeasurementInRawAmount_flagsMissingOrInvalidAmount() = runTest {
+        repository.setAiFeatureEnabled(true)
         fakeStorage.saveKey("valid_key")
         fakeProvider.mockResult = AiResult.Success(
             ExtractedFinancialPayload(

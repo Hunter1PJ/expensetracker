@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
+import com.suguru.expensetracker.data.remote.firestore.FirestoreCloudBackupRepository
 import com.suguru.expensetracker.domain.error.CloudBackupRemoteException
 import com.suguru.expensetracker.domain.model.BackupContentFingerprint
 import com.suguru.expensetracker.domain.model.BackupRestoreOutcome
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -71,6 +73,7 @@ class CloudBackupViewModel(
     private val backupRepository: BackupRepository,
     private val cloudBackupStateStore: CloudBackupStateStore,
     private val cloudBackupFingerprintStore: CloudBackupFingerprintStore,
+    private val autoBackupPreferenceStore: com.suguru.expensetracker.domain.repository.AutoBackupPreferenceStore? = null,
     private val orchestrator: com.suguru.expensetracker.data.backup.AutomaticCloudBackupOrchestrator? = null,
     private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null,
     private val onPendingSettingsRecovery: suspend () -> InternalDefaultAccountProvisioningResult? = { null },
@@ -81,7 +84,36 @@ class CloudBackupViewModel(
     private val chunker = CloudBackupPayloadChunker()
 
     val syncStatus: StateFlow<com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus> =
-        orchestrator?.syncStatus ?: MutableStateFlow(com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Idle)
+        if (orchestrator == null) {
+            MutableStateFlow(com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Idle)
+        } else {
+            combine(orchestrator.syncStatus, orchestrator.syncStatusUid) { status, uid ->
+                if (uid == currentUserId) status
+                else com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Idle
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Idle
+            )
+        }
+
+    val isAutoBackupEnabled: StateFlow<Boolean> = (autoBackupPreferenceStore?.observeAutoBackupEnabled(currentUserId)
+        ?: kotlinx.coroutines.flow.flowOf(true))
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = true
+        )
+
+    fun setAutoBackupEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            autoBackupPreferenceStore?.setAutoBackupEnabled(currentUserId, enabled)
+            if (enabled && orchestrator != null) {
+                // When enabled, evaluate or schedule pending backup safely
+                orchestrator.onLocalDataMutated()
+            }
+        }
+    }
 
     fun resolveConflictRestore(manifest: CloudBackupManifest) {
         if (_actionState.value.isBusy || orchestrator == null) return
@@ -145,7 +177,7 @@ class CloudBackupViewModel(
                         successMessage = null
                     )
                 }
-                when (val res = orchestrator.performBackup(currentUserId)) {
+                when (val res = orchestrator.performBackup(currentUserId, explicitManual = true)) {
                     is com.suguru.expensetracker.data.backup.BackupExecutionResult.Success -> {
                         _actionState.update {
                             it.copy(isBusy = false, busyMessage = null, successMessage = "Cloud backup completed successfully.")
@@ -237,7 +269,7 @@ class CloudBackupViewModel(
                         ?: System.currentTimeMillis()
                     cloudBackupStateStore.setState(
                         currentUserId,
-                        CloudBackupState(
+                        previousState.copy(
                             lastSuccessfulBackupAtEpochMillis = successEpochMillis,
                             lastSuccessfulSnapshotId = committedManifest.snapshotId,
                             pendingSnapshotId = null,
@@ -357,6 +389,12 @@ class CloudBackupViewModel(
     }
 
     fun deleteSnapshot(snapshotId: String) {
+        if (snapshotId == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID) {
+            _actionState.update {
+                it.copy(errorMessage = "Deleting the primary restore point is prohibited.")
+            }
+            return
+        }
         if (_actionState.value.isBusy) return
         viewModelScope.launch {
             _actionState.update {
@@ -414,8 +452,7 @@ class CloudBackupViewModel(
         cloudBackupStateStore.setState(
             currentUserId,
             previous.copy(
-                lastSuccessfulBackupAtEpochMillis = manifest.completedAt?.toEpochMilli()
-                    ?: previous.lastSuccessfulBackupAtEpochMillis,
+                lastSuccessfulRestoreAtEpochMillis = System.currentTimeMillis(),
                 lastSuccessfulSnapshotId = manifest.snapshotId,
                 pendingSnapshotId = null,
                 pendingSinceEpochMillis = null,

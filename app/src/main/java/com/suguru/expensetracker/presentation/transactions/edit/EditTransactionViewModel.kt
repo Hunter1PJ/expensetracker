@@ -13,6 +13,8 @@ import com.suguru.expensetracker.domain.usecase.category.ObserveCategoriesByType
 import com.suguru.expensetracker.domain.usecase.transaction.GetTransactionUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.UpdateTransactionUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
+import com.suguru.expensetracker.domain.util.TransactionTimestampError
+import com.suguru.expensetracker.domain.util.TransactionTimestampPolicy
 import com.suguru.expensetracker.presentation.transactions.add.AddTransactionError
 import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.Instant
 
 /**
@@ -39,7 +42,8 @@ class EditTransactionViewModel(
     private val observeCategoriesByTypeUseCase: ObserveCategoriesByTypeUseCase,
     private val getAccountUseCase: GetAccountUseCase,
     private val getCategoryUseCase: GetCategoryUseCase,
-    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null
+    private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null,
+    private val clock: Clock = Clock.systemDefaultZone()
 ) : ViewModel() {
 
     private companion object {
@@ -220,6 +224,28 @@ class EditTransactionViewModel(
         _uiState.update { it.copy(transactionTime = time) }
     }
 
+    fun onDatePickerDateSelected(utcMillis: Long) {
+        if (_uiState.value.isReadOnlyTransfer) return
+        val current = _uiState.value.transactionTime
+        try {
+            val selected = TransactionTimestampPolicy.selectDate(current, utcMillis, clock.instant(), clock.zone)
+            _uiState.update { it.copy(transactionTime = selected, error = null) }
+        } catch (error: IllegalArgumentException) {
+            _uiState.update { it.copy(error = AddTransactionError.InvalidTransactionTime) }
+        }
+    }
+
+    fun onTimeSelected(hour: Int, minute: Int) {
+        if (_uiState.value.isReadOnlyTransfer) return
+        val current = _uiState.value.transactionTime
+        try {
+            val selected = TransactionTimestampPolicy.selectTime(current, hour, minute, clock.instant(), clock.zone)
+            _uiState.update { it.copy(transactionTime = selected, error = null) }
+        } catch (error: IllegalArgumentException) {
+            _uiState.update { it.copy(error = AddTransactionError.InvalidTransactionTime) }
+        }
+    }
+
     fun onDismissError() {
         _uiState.update { it.copy(error = null) }
     }
@@ -240,6 +266,14 @@ class EditTransactionViewModel(
         ) {
             _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_READ_ONLY_MESSAGE)) }
             return
+        }
+
+        when (TransactionTimestampPolicy.validationError(state.transactionTime, clock)) {
+            TransactionTimestampError.BEFORE_MINIMUM_DATE, TransactionTimestampError.IN_FUTURE -> {
+                _uiState.update { it.copy(error = AddTransactionError.InvalidTransactionTime) }
+                return
+            }
+            null -> Unit
         }
 
         // 1. Validate Amount using the persisted transaction currency

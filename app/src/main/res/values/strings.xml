@@ -75,6 +75,7 @@
     <string name="account_label">Account</string>
     <string name="from_account_label">From Account</string>
     <string name="to_account_label">To Account</string>
+    <string name="transfer_requires_two_accounts">A transfer needs two active accounts with the same currency.</string>
     <string name="category_label">Category</string>
     <string name="note_label">Note</string>
     <string name="note_hint">Add a note (optional)</string>
@@ -99,6 +100,8 @@
     <string name="error_category_archived">The selected category is archived.</string>
     <string name="error_incompatible_category">Selected category is incompatible with transaction type.</string>
     <string name="error_unknown">An error occurred while saving the transaction.</string>
+    <string name="error_transaction_time_invalid">Choose a date from January 1, 1986 through the current date and time.</string>
+    <string name="time_picker_dialog_title">Select Time</string>
     <string name="date_picker_dialog_title">Select Date</string>
 
     <!-- Settings & Management -->
@@ -283,13 +286,13 @@
     <string name="action_save_key">Save Key</string>
     <string name="action_delete_key">Delete Key</string>
     <string name="action_test_key">Verify Key</string>
-    <string name="ai_settings_key_saved">API key successfully saved. Now verify your key to enable Gemini AI.</string>
+    <string name="ai_settings_key_saved">API key saved. Verifying it automatically…</string>
     <string name="dialog_verify_key_title">Verifying API key</string>
     <string name="dialog_verify_key_description">Connecting securely to Gemini. This may take a few seconds.</string>
-    <string name="key_status_verified">Valid &amp; Ready</string>
-    <string name="key_status_unverified">Saved (Tap to verify)</string>
-    <string name="key_status_verifying">Checking key validity…</string>
-    <string name="key_status_invalid">Invalid API key or unauthorized</string>
+    <string name="key_status_verified">Verified</string>
+    <string name="key_status_unverified">Saved • not verified yet</string>
+    <string name="key_status_verifying">Verifying…</string>
+    <string name="key_status_invalid">Saved Gemini API key is invalid or no longer accepted. Replace it to use AI.</string>
     <string name="home_ai_unconfigured_title">AI Transaction Assistant</string>
     <string name="home_ai_unconfigured_desc">Transactions can still be parsed offline. Add a Gemini key in Settings to enable AI extraction.</string>
     <string name="home_ai_action_configure">Configure in Settings</string>
@@ -322,7 +325,7 @@
     <string name="ai_error_server">Gemini is temporarily unavailable, and offline parsing found no transaction.</string>
     <string name="ai_error_malformed">Gemini returned unusable data, and offline parsing found no transaction.</string>
     <string name="ai_error_generic">Transaction extraction failed. Review the text and try again.</string>
-    <string name="ai_settings_error_invalid_key">Gemini rejected this key. Check it and try again.</string>
+    <string name="ai_settings_error_invalid_key">The saved Gemini API key is invalid or no longer accepted. Replace it to use AI.</string>
     <string name="ai_settings_error_missing_key">Enter a Gemini API key to continue.</string>
     <string name="ai_settings_error_timeout">Key verification timed out. Check your connection and try again.</string>
     <string name="ai_settings_error_network">Could not reach Gemini. Check your connection and try again.</string>

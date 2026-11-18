@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.suguru.expensetracker.data.ai.AiRepositoryImpl
+import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabase
 import com.suguru.expensetracker.data.repository.RoomAccountRepository
 import com.suguru.expensetracker.data.repository.RoomCategoryRepository
@@ -18,11 +19,17 @@ import com.suguru.expensetracker.domain.ai.ExtractedFinancialPayload
 import com.suguru.expensetracker.domain.error.DomainException
 import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.AccountType
+import com.suguru.expensetracker.domain.model.AppSettings
+import com.suguru.expensetracker.domain.model.DateFormatPreference
+import com.suguru.expensetracker.domain.model.ThemeMode
+import com.suguru.expensetracker.domain.model.TimeFormatPreference
+import com.suguru.expensetracker.domain.model.WeekStart
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.CategoryType
 import com.suguru.expensetracker.domain.model.Money
 import com.suguru.expensetracker.domain.model.Transaction
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.repository.SettingsRepository
 import com.suguru.expensetracker.domain.usecase.transaction.CreateTransactionUseCase
 import java.io.File
 import java.time.Instant
@@ -30,6 +37,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -59,7 +69,8 @@ class TransactionPersistenceIntegrationTest {
         createTransaction = CreateTransactionUseCase(
             transactionRepository,
             accountRepository,
-            categoryRepository
+            categoryRepository,
+            InternalDefaultAccountProvisioner(database, TestSettingsRepository)
         )
     }
 
@@ -91,7 +102,11 @@ class TransactionPersistenceIntegrationTest {
         assertEquals(2599L, stored!!.amount.amountInMinorUnits)
         assertEquals("USD", stored.amount.currencyCode)
         assertEquals(TransactionType.EXPENSE, stored.type)
-        assertEquals(accountId, stored.accountId)
+        assertEquals(Instant.parse("2026-11-12T12:00:00Z"), stored.transactionTime)
+        val internalDefaultAccountId = accountRepository.observeActiveAccounts().first()
+            .single { it.internalKey == "default" }.id
+        assertEquals(internalDefaultAccountId, stored.accountId)
+        assertTrue(stored.accountId != accountId)
         assertEquals(categoryId, stored.categoryId)
         assertNotNull(accountRepository.getAccountById(stored.accountId))
         assertNotNull(categoryRepository.getCategoryById(stored.categoryId!!))
@@ -116,8 +131,12 @@ class TransactionPersistenceIntegrationTest {
         val storedTransfer = transactionRepository.getTransactionById(transferId)!!
 
         assertEquals(TransactionType.TRANSFER, storedTransfer.type)
+        assertEquals(Money(5000, "USD"), storedTransfer.amount)
+        assertEquals(Instant.parse("2026-11-12T12:00:00Z"), storedTransfer.transactionTime)
         assertEquals(sourceId, storedTransfer.accountId)
         assertEquals(destinationId, storedTransfer.destinationAccountId)
+        assertNotNull(accountRepository.getAccountById(storedTransfer.accountId))
+        assertNotNull(accountRepository.getAccountById(storedTransfer.destinationAccountId!!))
 
         try {
             createTransaction(
@@ -171,6 +190,31 @@ class TransactionPersistenceIntegrationTest {
         destinationAccountId = destinationAccountId,
         transactionTime = Instant.parse("2026-11-12T12:00:00Z")
     )
+
+    private object TestSettingsRepository : SettingsRepository {
+        override val settings: Flow<AppSettings> = flowOf(
+            AppSettings(
+                themeMode = ThemeMode.SYSTEM,
+                preferredCurrencyCode = "USD",
+                weekStart = WeekStart.MONDAY,
+                dateFormat = DateFormatPreference.SYSTEM_DEFAULT,
+                timeFormat = TimeFormatPreference.SYSTEM_DEFAULT,
+                showCurrencyCode = true,
+                confirmBeforeDelete = true
+            )
+        )
+        override val lastBackupAt: Flow<String?> = flowOf(null)
+        override val lastBackupFileName: Flow<String?> = flowOf(null)
+        override suspend fun restoreSettings(value: AppSettings) = Unit
+        override suspend fun setThemeMode(value: ThemeMode) = Unit
+        override suspend fun setPreferredCurrency(value: String?) = Unit
+        override suspend fun setWeekStart(value: WeekStart) = Unit
+        override suspend fun setDateFormat(value: DateFormatPreference) = Unit
+        override suspend fun setTimeFormat(value: TimeFormatPreference) = Unit
+        override suspend fun setShowCurrencyCode(value: Boolean) = Unit
+        override suspend fun setConfirmBeforeDelete(value: Boolean) = Unit
+        override suspend fun setLastBackupMetadata(at: String?, fileName: String?) = Unit
+    }
 
     private object EmptySecureKeyStorage : SecureKeyStorage {
         override fun saveKey(key: String) = Unit

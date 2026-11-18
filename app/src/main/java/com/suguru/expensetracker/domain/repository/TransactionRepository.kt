@@ -19,6 +19,7 @@ interface TransactionRepository {
     suspend fun getTransactionsBetween(startTime: Instant, endTime: Instant): List<Transaction>
     fun observeTransactionById(id: Long): Flow<Transaction?>
     suspend fun getTransactionById(id: Long): Transaction?
+    fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>>
     suspend fun insertTransaction(transaction: Transaction): Long
     suspend fun insertTransactions(transactions: List<Transaction>): List<Long>
     suspend fun updateTransaction(transaction: Transaction)

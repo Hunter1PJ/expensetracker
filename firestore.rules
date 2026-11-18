@@ -229,7 +229,7 @@ service cloud.firestore {
                        ((isGenerationId(snapshotId) && isValidGenerationUpdate(incoming(), existing())) ||
                         (isPrimaryId(snapshotId) && isValidPrimaryUpdate(database, userId, incoming(), existing())));
 
-      allow delete: if isOwner(userId) && (isGenerationId(snapshotId) || isPrimaryId(snapshotId));
+      allow delete: if isOwner(userId) && isGenerationId(snapshotId);
 
       match /chunks/{chunkId} {
         allow get: if isOwner(userId) && isGenerationId(snapshotId) && isValidId(chunkId);

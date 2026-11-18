@@ -92,6 +92,7 @@ class DataStoreCloudBackupStateStoreTest {
         // Update state when upload succeeds (clearing pending and failure fields)
         val completedState = CloudBackupState(
             lastSuccessfulBackupAtEpochMillis = 1_763_200_050_000L,
+            lastSuccessfulRestoreAtEpochMillis = 1_763_200_055_000L,
             lastSuccessfulSnapshotId = "snap_pending_01",
             lastAttemptAtEpochMillis = 1_763_200_050_000L
         )
@@ -109,6 +110,7 @@ class DataStoreCloudBackupStateStoreTest {
 
         assertEquals(completedState, store.getState(uid))
         assertEquals(completedState, store.observeState(uid).first())
+        assertNull(store.getState("different_firebase_uid").lastSuccessfulRestoreAtEpochMillis)
     }
 
     @Test

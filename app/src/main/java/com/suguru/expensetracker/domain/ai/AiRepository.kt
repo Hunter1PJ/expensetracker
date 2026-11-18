@@ -13,6 +13,14 @@ interface AiRepository {
     val isAiConfigured: Flow<Boolean>
 
     /**
+     * Observes whether the currently saved API key has been verified.
+     */
+    val isKeyVerified: Flow<Boolean>
+
+    /** Whether the currently saved API key has received a definitive provider rejection. */
+    val isKeyInvalid: Flow<Boolean>
+
+    /**
      * Observes whether the user has chosen to show the AI features in the UI.
      */
     val isAiFeatureEnabled: Flow<Boolean>

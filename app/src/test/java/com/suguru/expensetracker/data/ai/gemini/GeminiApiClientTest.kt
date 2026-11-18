@@ -65,11 +65,22 @@ class GeminiApiClientTest {
     }
 
     @Test
-    fun classifiesHttp403AsInvalidKey() = runTest {
-        val result = clientWithResponse(403, "{}")
+    fun classifiesDefinitiveHttp403KeyRejectionAsInvalidKey() = runTest {
+        val result = clientWithResponse(403, "{\"error\":{\"status\":\"API_KEY_INVALID\"}}")
             .generateContent("fixture-value", AiModelDefaults.GEMINI_MODEL_ID, validationRequest())
 
         assertEquals(AiResult.Failure(AiError.InvalidApiKey), result)
+    }
+
+    @Test
+    fun classifiesOtherHttp403AsTemporaryConfigurationError() = runTest {
+        val result = clientWithResponse(403, "{}")
+            .generateContent("fixture-value", AiModelDefaults.GEMINI_MODEL_ID, validationRequest())
+
+        assertEquals(
+            AiResult.Failure(AiError.ServerError(403, "Gemini rejected the request for this API configuration")),
+            result
+        )
     }
 
     @Test

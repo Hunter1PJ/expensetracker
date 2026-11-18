@@ -18,6 +18,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -85,7 +86,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun verificationPreservesServerStatusInInvalidState() = runTest(testDispatcher) {
+    fun temporaryServerFailureDoesNotMarkTheKeyInvalid() = runTest(testDispatcher) {
         val response = CompletableDeferred<AiResult<Boolean>>()
         aiRepository.validationResponse = response
         val viewModel = createViewModel()
@@ -99,10 +100,10 @@ class SettingsViewModelTest {
         response.complete(AiResult.Failure(AiError.ServerError(404, "safe test message")))
         advanceUntilIdle()
 
-        val state = successState(viewModel).keyVerificationState as KeyVerificationState.Invalid
-        assertEquals(AiError.ServerError(404, "safe test message"), state.error)
-        assertTrue(state.error is AiError.ServerError)
-        assertEquals(404, (state.error as AiError.ServerError).statusCode)
+        assertEquals(
+            KeyVerificationState.TemporaryFailure(AiError.ServerError(404, "safe test message")),
+            successState(viewModel).keyVerificationState
+        )
     }
 
     @Test
@@ -186,7 +187,8 @@ class SettingsViewModelTest {
 
         viewModel.saveGeminiApiKey("replacement-key")
         advanceUntilIdle()
-        assertEquals(KeyVerificationState.Idle, successState(viewModel).keyVerificationState)
+        assertEquals(KeyVerificationState.Valid, successState(viewModel).keyVerificationState)
+        assertEquals(2, aiRepository.validationCallCount)
 
         viewModel.verifySavedGeminiApiKey()
         advanceUntilIdle()
@@ -210,19 +212,33 @@ class SettingsViewModelTest {
 
     private class FakeAiRepository : AiRepository {
         override val isAiConfigured: Flow<Boolean> = flowOf(true)
+        private val verified = MutableStateFlow(false)
+        override val isKeyVerified: Flow<Boolean> = verified
+        override val isKeyInvalid: Flow<Boolean> = flowOf(false)
         override val isAiFeatureEnabled: Flow<Boolean> = flowOf(true)
         var validationResponse = CompletableDeferred<AiResult<Boolean>>()
         var validationCallCount = 0
         var saveResult: AiResult<Unit> = AiResult.Success(Unit)
 
         override suspend fun getMaskedApiKey(): String? = "********"
-        override suspend fun saveApiKey(apiKey: String): AiResult<Unit> = saveResult
-        override suspend fun validateApiKey(apiKey: String): AiResult<Boolean> = validationResponse.await()
+        override suspend fun saveApiKey(apiKey: String): AiResult<Unit> {
+            if (saveResult is AiResult.Success) verified.value = false
+            return saveResult
+        }
+        override suspend fun validateApiKey(apiKey: String): AiResult<Boolean> {
+            val result = validationResponse.await()
+            if (result is AiResult.Success && result.data) verified.value = true
+            return result
+        }
         override suspend fun validateConfiguredKey(): AiResult<Boolean> {
             validationCallCount++
-            return validationResponse.await()
+            val result = validationResponse.await()
+            if (result is AiResult.Success && result.data) verified.value = true
+            return result
         }
-        override suspend fun deleteApiKey() = Unit
+        override suspend fun deleteApiKey() {
+            verified.value = false
+        }
         override suspend fun setAiFeatureEnabled(enabled: Boolean) = Unit
         override suspend fun extractTransactions(
             input: String,

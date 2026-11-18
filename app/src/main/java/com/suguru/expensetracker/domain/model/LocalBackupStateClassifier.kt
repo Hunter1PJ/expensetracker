@@ -55,6 +55,15 @@ object LocalBackupStateClassifier {
         SeededCategorySignature("Other", CategoryType.INCOME.name, "category", "#14B8A6")
     )
 
+    private val SEEDED_SYSTEM_CATEGORY_SIGNATURES_EXTENDED: Set<SeededCategorySignature> =
+        SEEDED_SYSTEM_CATEGORY_SIGNATURES + setOf(
+            SeededCategorySignature("Housing", CategoryType.EXPENSE.name, "home", "#F97316"),
+            SeededCategorySignature("Personal Care", CategoryType.EXPENSE.name, "face", "#D946EF"),
+            SeededCategorySignature("Subscriptions", CategoryType.EXPENSE.name, "subscriptions", "#8B5CF6"),
+            SeededCategorySignature("Travel", CategoryType.EXPENSE.name, "flight", "#0EA5E9"),
+            SeededCategorySignature("Gifts & Donations", CategoryType.EXPENSE.name, "volunteer_activism", "#EC4899")
+        )
+
     private val BASELINE_SETTINGS_NULL_CURRENCY: BackupSettings = AppSettings(
         themeMode = ThemeMode.SYSTEM,
         preferredCurrencyCode = null,
@@ -113,13 +122,14 @@ object LocalBackupStateClassifier {
     }
 
     private fun hasOnlyBaselineSystemCategories(categories: List<BackupCategory>): Boolean {
-        if (categories.size != SEEDED_SYSTEM_CATEGORY_SIGNATURES.size) {
+        if (categories.size != SEEDED_SYSTEM_CATEGORY_SIGNATURES.size &&
+            categories.size != SEEDED_SYSTEM_CATEGORY_SIGNATURES_EXTENDED.size) {
             return false
         }
         if (categories.any { !it.isSystem || it.isArchived }) {
             return false
         }
-        val actualSignatures = categories.mapTo(HashSet(SEEDED_SYSTEM_CATEGORY_SIGNATURES.size)) {
+        val actualSignatures = categories.mapTo(HashSet(categories.size)) {
             SeededCategorySignature(
                 name = it.name,
                 type = it.type,
@@ -127,7 +137,8 @@ object LocalBackupStateClassifier {
                 colorHex = it.colorHex
             )
         }
-        return actualSignatures == SEEDED_SYSTEM_CATEGORY_SIGNATURES
+        return actualSignatures == SEEDED_SYSTEM_CATEGORY_SIGNATURES ||
+            actualSignatures == SEEDED_SYSTEM_CATEGORY_SIGNATURES_EXTENDED
     }
 
     private fun hasBaselineSettings(settings: BackupSettings?): Boolean {

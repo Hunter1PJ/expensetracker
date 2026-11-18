@@ -1,5 +1,8 @@
 package com.suguru.expensetracker.presentation.settings
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,9 +32,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -229,6 +234,8 @@ private fun AuthenticatedCloudBackupCard(
     val localCloudState by viewModel.localCloudState.collectAsStateWithLifecycle()
     val actionState by viewModel.actionState.collectAsStateWithLifecycle()
     val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
+    val isAutoBackupEnabled by viewModel.isAutoBackupEnabled.collectAsStateWithLifecycle()
+    var showSignOutConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(actionState.successMessage) {
         actionState.successMessage?.let { msg ->
@@ -287,12 +294,7 @@ private fun AuthenticatedCloudBackupCard(
                     }
                 }
                 TextButton(
-                    onClick = {
-                        signOutFromGoogle(
-                            credentialManager = credentialManager,
-                            scope = scope
-                        )
-                    },
+                    onClick = { showSignOutConfirmation = true },
                     enabled = !actionState.isBusy,
                     modifier = Modifier.testTag("cloud_backup_signout_button")
                 ) {
@@ -306,65 +308,265 @@ private fun AuthenticatedCloudBackupCard(
                 }
             }
 
-            val lastCloudTime = localCloudState.lastSuccessfulBackupAtEpochMillis
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
-                    .padding(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.sm)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (lastCloudTime != null) {
-                            "Last cloud backup: ${formatInstant(Instant.ofEpochMilli(lastCloudTime))}"
-                        } else {
-                            "No cloud backup recorded on this device yet."
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                    )
-                    localCloudState.lastFailureCode?.let { failureCode ->
-                        Text(
-                            text = "Last failure code: $failureCode",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-
-            if (actionState.isBusy && actionState.busyMessage != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
+                        text = "Automatic Backup & Restore",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = actionState.busyMessage!!,
+                        text = "Automatically back up financial data and restore on new devices",
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
                 }
+                Switch(
+                    checked = isAutoBackupEnabled,
+                    onCheckedChange = { viewModel.setAutoBackupEnabled(it) },
+                    modifier = Modifier.testTag("auto_backup_switch")
+                )
             }
 
-            PrimaryButton(
-                text = if (actionState.isBusy) "Working..." else "Back Up to Cloud",
-                onClick = { viewModel.backUpNow() },
-                enabled = !actionState.isBusy,
-                leadingIcon = Icons.Default.CloudUpload,
-                testTag = "cloud_backup_now_button",
-                modifier = Modifier.fillMaxWidth()
-            )
+            var isOnline by remember(context) {
+                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                val network = cm?.activeNetwork
+                val capabilities = network?.let { cm.getNetworkCapabilities(it) }
+                mutableStateOf(
+                    capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                )
+            }
+            DisposableEffect(context) {
+                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                val callback = object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: android.net.Network) {
+                        isOnline = true
+                    }
+
+                    override fun onLost(network: android.net.Network) {
+                        val activeNetwork = connectivityManager?.activeNetwork
+                        val capabilities = activeNetwork?.let { connectivityManager.getNetworkCapabilities(it) }
+                        isOnline = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+                    }
+                }
+                runCatching { connectivityManager?.registerDefaultNetworkCallback(callback) }
+                onDispose {
+                    runCatching { connectivityManager?.unregisterNetworkCallback(callback) }
+                }
+            }
+
+            if (isAutoBackupEnabled) {
+                val syncFailure = syncStatus as? com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Failure
+                val backupStatusText = when {
+                    syncStatus is com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.BackupInProgress ||
+                        (actionState.isBusy && actionState.busyMessage?.contains("Uploading", ignoreCase = true) == true) -> "Backing up"
+                    localCloudState.lastFailureCode != null ->
+                        if (!isOnline && localCloudState.lastFailureCode == "NETWORK_UNAVAILABLE") "Waiting for internet" else "Backup failed"
+                    localCloudState.pendingSnapshotId != null ->
+                        if (!isOnline) "Waiting for internet" else "Backup pending"
+                    localCloudState.lastSuccessfulBackupAtEpochMillis != null -> "Up to date"
+                    else -> if (!isOnline) "Waiting for internet" else "Backup pending"
+                }
+
+                val hasCompleteSnapshot =
+                    (manifestsState as? CloudSnapshotsUiState.Success)?.manifests
+                        ?.any { it.status == CloudBackupManifestStatus.COMPLETE } == true
+                val snapshotStatusText = when (manifestsState) {
+                    CloudSnapshotsUiState.Loading -> "Checking"
+                    is CloudSnapshotsUiState.Error -> if (!isOnline) "Waiting for internet" else "Unavailable"
+                    is CloudSnapshotsUiState.Success -> if (hasCompleteSnapshot) "Available" else "No cloud snapshot"
+                }
+                val restoreStatusText = when {
+                    syncStatus is com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.RestoreInProgress ||
+                        (actionState.isBusy && actionState.busyMessage?.contains("Restor", ignoreCase = true) == true) -> "Restoring"
+                    actionState.restoreResult is CloudRestoreResult.Failure || syncFailure?.code?.contains("RESTORE") == true -> "Restore failed"
+                    actionState.restoreResult is CloudRestoreResult.Success ||
+                        localCloudState.lastSuccessfulRestoreAtEpochMillis != null -> "Restored successfully"
+                    !isOnline && hasCompleteSnapshot -> "Waiting for internet"
+                    else -> "Not restored on this device"
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
+                        .padding(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.sm)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Cloud Backup:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = backupStatusText,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = when (backupStatusText) {
+                                    "Up to date" -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                    "Backing up" -> MaterialTheme.colorScheme.primary
+                                    "Backup pending", "Waiting for internet" -> ExpenseTrackerTheme.extendedColors.financialWarning
+                                    else -> MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Cloud snapshot:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = snapshotStatusText,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = when (snapshotStatusText) {
+                                    "Available" -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                    "Checking" -> MaterialTheme.colorScheme.primary
+                                    "Waiting for internet" -> ExpenseTrackerTheme.extendedColors.financialWarning
+                                    else -> ExpenseTrackerTheme.extendedColors.textSecondary
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Last restore:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = restoreStatusText,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = when (restoreStatusText) {
+                                    "Restored successfully" -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                    "Restoring" -> MaterialTheme.colorScheme.primary
+                                    "Restore failed" -> MaterialTheme.colorScheme.error
+                                    "Waiting for internet" -> ExpenseTrackerTheme.extendedColors.financialWarning
+                                    else -> ExpenseTrackerTheme.extendedColors.textSecondary
+                                }
+                            )
+                        }
+
+                        localCloudState.lastSuccessfulBackupAtEpochMillis?.let { lastCloudTime ->
+                            Text(
+                                text = "Last cloud backup: ${formatInstant(Instant.ofEpochMilli(lastCloudTime))}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ExpenseTrackerTheme.extendedColors.textSecondary
+                            )
+                        }
+
+                        localCloudState.lastSuccessfulRestoreAtEpochMillis?.let { restoredAt ->
+                            Text(
+                                text = "Last restored: ${formatInstant(Instant.ofEpochMilli(restoredAt))}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ExpenseTrackerTheme.extendedColors.textSecondary
+                            )
+                        }
+
+                        localCloudState.lastFailureCode?.let { failureCode ->
+                            val failureMessage =
+                                (syncStatus as? com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Failure)
+                                    ?.message
+                                    ?.takeIf { it.isNotBlank() }
+                            Text(
+                                text = failureMessage ?: "Last issue: ${failureCode.lowercase().replace('_', ' ')}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            } else {
+                val lastCloudTime = localCloudState.lastSuccessfulBackupAtEpochMillis
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
+                        .padding(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.sm)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = if (lastCloudTime != null) {
+                                "Last cloud backup: ${formatInstant(Instant.ofEpochMilli(lastCloudTime))}"
+                            } else {
+                                "No cloud backup recorded on this device yet."
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+                        localCloudState.lastFailureCode?.let { failureCode ->
+                            val failureMessage =
+                                (syncStatus as? com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Failure)
+                                    ?.message
+                                    ?.takeIf { it.isNotBlank() }
+                            Text(
+                                text = failureMessage ?: "Last issue: ${failureCode.lowercase().replace('_', ' ')}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+
+                if (actionState.isBusy && actionState.busyMessage != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = actionState.busyMessage!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
+                    }
+                }
+
+                PrimaryButton(
+                    text = if (actionState.isBusy) "Working..." else "Backup Now",
+                    onClick = { viewModel.backUpNow() },
+                    enabled = !actionState.isBusy,
+                    leadingIcon = Icons.Default.CloudUpload,
+                    testTag = "cloud_backup_now_button",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             HorizontalDivider(color = ExpenseTrackerTheme.extendedColors.borderSubtle)
 
             Text(
-                text = "Cloud Snapshots",
+                text = "Cloud Information",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -393,12 +595,12 @@ private fun AuthenticatedCloudBackupCard(
                         )
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
-                            state.manifests.take(5).forEach { manifest ->
+                            state.manifests.take(1).forEach { manifest ->
                                 CloudManifestRow(
                                     manifest = manifest,
                                     isBusy = actionState.isBusy,
-                                    onRestore = { viewModel.requestRestoreSnapshot(manifest) },
-                                    onDelete = { viewModel.deleteSnapshot(manifest.snapshotId) }
+                                    isAutoMode = isAutoBackupEnabled,
+                                    onRestore = { viewModel.requestRestoreSnapshot(manifest) }
                                 )
                             }
                         }
@@ -615,14 +817,54 @@ private fun AuthenticatedCloudBackupCard(
             }
         }
     }
+
+    if (showSignOutConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirmation = false },
+            shape = ExpenseTrackerRadius.dialog,
+            containerColor = ExpenseTrackerTheme.extendedColors.surface,
+            title = {
+                Text(
+                    text = "Sign out?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to sign out of your Google account? Your financial data stored on this device will remain available.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                PrimaryButton(
+                    text = "Sign Out",
+                    onClick = {
+                        showSignOutConfirmation = false
+                        signOutFromGoogle(
+                            credentialManager = credentialManager,
+                            scope = scope
+                        )
+                    },
+                    testTag = "confirm_sign_out_button"
+                )
+            },
+            dismissButton = {
+                SecondaryButton(
+                    text = "Cancel",
+                    onClick = { showSignOutConfirmation = false },
+                    testTag = "cancel_sign_out_button"
+                )
+            }
+        )
+    }
 }
 
 @Composable
 private fun CloudManifestRow(
     manifest: CloudBackupManifest,
     isBusy: Boolean,
-    onRestore: () -> Unit,
-    onDelete: () -> Unit
+    isAutoMode: Boolean,
+    onRestore: () -> Unit
 ) {
     val context = LocalContext.current
     val sizeText = remember(manifest.compressedBytes) {
@@ -672,26 +914,13 @@ private fun CloudManifestRow(
                 )
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (manifest.status == CloudBackupManifestStatus.COMPLETE) {
-                TextButton(
-                    onClick = onRestore,
-                    enabled = !isBusy,
-                    modifier = Modifier.testTag("restore_cloud_snapshot_${manifest.snapshotId}")
-                ) {
-                    Text("Restore")
-                }
-            }
-            IconButton(
-                onClick = onDelete,
+        if (!isAutoMode && manifest.status == CloudBackupManifestStatus.COMPLETE) {
+            TextButton(
+                onClick = onRestore,
                 enabled = !isBusy,
-                modifier = Modifier.testTag("delete_cloud_snapshot_${manifest.snapshotId}")
+                modifier = Modifier.testTag("restore_cloud_snapshot_${manifest.snapshotId}")
             ) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete cloud snapshot",
-                    tint = ExpenseTrackerTheme.extendedColors.textMuted
-                )
+                Text("Restore Now")
             }
         }
     }

@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import com.suguru.expensetracker.domain.ai.AiError
 import java.time.Instant
+import java.time.ZoneId
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -152,9 +153,94 @@ class AcceptanceFlowUiTest {
     }
 
     @Test
-    fun keyVerificationShowsProgressDisablesVerifyAndCancelsFromDialog() {
-        val response = CompletableDeferred<AiResult<Boolean>>()
-        val viewModel = SettingsViewModel(FakeSettingsRepository(), FakeAiRepository(response))
+    fun addTransactionTimeRenders24HourValueAndPickerOmitsAmPm() {
+        val localTime = Instant.now().atZone(ZoneId.systemDefault())
+            .withHour(18).withMinute(1).withSecond(0).withNano(0).toInstant()
+        val state = AddTransactionUiState(
+            defaultAccount = Account(
+                id = 1,
+                name = "Internal Default",
+                type = AccountType.CASH,
+                initialBalance = Money(0, "USD"),
+                internalKey = "default"
+            ),
+            transactionTime = localTime
+        )
+
+        composeRule.setContent {
+            ExpenseTrackerTheme {
+                AddTransactionScreenContent(
+                    uiState = state,
+                    onNavigateBack = {},
+                    onTransactionTypeChanged = {},
+                    onAmountChanged = {},
+                    onCategorySelected = {},
+                    onNoteChanged = {},
+                    onTransactionTimeChanged = {},
+                    onDismissError = {},
+                    onSaveTransaction = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("time_picker_button").performScrollTo()
+        composeRule.onNodeWithText("18:01").assertIsDisplayed()
+        composeRule.onNodeWithTag("time_picker_button").performClick()
+        composeRule.onAllNodesWithText("AM").assertCountEquals(0)
+        composeRule.onAllNodesWithText("PM").assertCountEquals(0)
+    }
+
+    @Test
+    fun transferFormShowsDistinctSourceAndDestinationAccountSelectors() {
+        val cash = Account(
+            id = 1,
+            name = "Cash",
+            type = AccountType.CASH,
+            initialBalance = Money(0, "USD")
+        )
+        val bank = Account(
+            id = 2,
+            name = "Bank",
+            type = AccountType.BANK,
+            initialBalance = Money(0, "USD")
+        )
+        var selectedSource: Long? = null
+        var selectedDestination: Long? = null
+
+        composeRule.setContent {
+            ExpenseTrackerTheme {
+                AddTransactionScreenContent(
+                    uiState = AddTransactionUiState(
+                        transactionType = TransactionType.TRANSFER,
+                        activeAccounts = listOf(cash, bank),
+                        selectedTransferSourceAccountId = cash.id,
+                        selectedTransferDestinationAccountId = null
+                    ),
+                    onNavigateBack = {},
+                    onTransactionTypeChanged = {},
+                    onAmountChanged = {},
+                    onCategorySelected = {},
+                    onNoteChanged = {},
+                    onTransactionTimeChanged = {},
+                    onDismissError = {},
+                    onSaveTransaction = {},
+                    onTransferSourceSelected = { selectedSource = it },
+                    onTransferDestinationSelected = { selectedDestination = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("transfer_source_account_selector").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Bank").performClick()
+        assertEquals(bank.id, selectedSource)
+        composeRule.onNodeWithTag("transfer_destination_account_selector").performClick()
+        composeRule.onNodeWithText("Bank").performClick()
+        assertEquals(bank.id, selectedDestination)
+    }
+
+    @Test
+    fun keyEditorUsesCloseActionAndHasNoManualVerifyButton() {
+        val viewModel = SettingsViewModel(FakeSettingsRepository(), FakeAiRepository(CompletableDeferred()))
 
         composeRule.setContent {
             ExpenseTrackerTheme {
@@ -168,19 +254,20 @@ class AcceptanceFlowUiTest {
         }
 
         composeRule.onNodeWithTag("settings_item_gemini_key").performScrollTo().performClick()
-        composeRule.onNodeWithTag("verify_api_key_button").performClick()
-        composeRule.onNodeWithTag("verify_api_key_progress_dialog").assertIsDisplayed()
-        composeRule.onNodeWithTag("verify_api_key_button").assertIsNotEnabled()
-        composeRule.onNodeWithTag("cancel_verify_api_key_button").performClick()
-        composeRule.onAllNodesWithTag("verify_api_key_progress_dialog").assertCountEquals(0)
-        composeRule.onNodeWithTag("verify_api_key_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("close_api_key_dialog_button").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("verify_api_key_button").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("cancel_api_key_dialog_button").assertCountEquals(0)
+        composeRule.onNodeWithTag("gemini_api_key_input").performTextInput("unsaved-key")
+        composeRule.onNodeWithTag("close_api_key_dialog_button").performClick()
+        composeRule.onAllNodesWithTag("save_api_key_button").assertCountEquals(0)
     }
 
     @Test
-    fun savingKeyShowsConfirmationOnlyAfterSuccessfulStorage() {
+    fun savingKeyStartsAutomaticVerificationAndShowsProgress() {
+        val response = CompletableDeferred<AiResult<Boolean>>()
         val viewModel = SettingsViewModel(
             FakeSettingsRepository(),
-            FakeAiRepository(CompletableDeferred(), saveResult = AiResult.Success(Unit))
+            FakeAiRepository(response, saveResult = AiResult.Success(Unit))
         )
 
         composeRule.setContent {
@@ -197,72 +284,17 @@ class AcceptanceFlowUiTest {
         composeRule.onNodeWithTag("settings_item_gemini_key").performScrollTo().performClick()
         composeRule.onNodeWithTag("gemini_api_key_input").performTextInput("test-key")
         composeRule.onNodeWithTag("save_api_key_button").performClick()
-        composeRule.onNodeWithText(
-            "API key successfully saved. Now verify your key to enable Gemini AI."
-        ).assertIsDisplayed()
-    }
-
-    @Test
-    fun failedSaveDoesNotShowSuccessConfirmation() {
-        val viewModel = SettingsViewModel(
-            FakeSettingsRepository(),
-            FakeAiRepository(
-                CompletableDeferred(),
-                saveResult = AiResult.Failure(AiError.ExecutionError("safe test failure"))
-            )
-        )
-
-        composeRule.setContent {
-            ExpenseTrackerTheme {
-                SettingsScreen(
-                    viewModel = viewModel,
-                    onNavigateToCategories = {},
-                    onNavigateToRecurring = {},
-                    onNavigateToDataAndStorage = {}
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("settings_item_gemini_key").performScrollTo().performClick()
-        composeRule.onNodeWithTag("gemini_api_key_input").performTextInput("test-key")
-        composeRule.onNodeWithTag("save_api_key_button").performClick()
-        composeRule.onAllNodesWithText(
-            "API key successfully saved. Now verify your key to enable Gemini AI."
-        ).assertCountEquals(0)
-    }
-
-    @Test
-    fun successfulVerificationClosesManageDialogAndShowsReadyState() {
-        val response = CompletableDeferred<AiResult<Boolean>>()
-        val viewModel = SettingsViewModel(FakeSettingsRepository(), FakeAiRepository(response))
-
-        composeRule.setContent {
-            ExpenseTrackerTheme {
-                SettingsScreen(
-                    viewModel = viewModel,
-                    onNavigateToCategories = {},
-                    onNavigateToRecurring = {},
-                    onNavigateToDataAndStorage = {}
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("settings_item_gemini_key").performScrollTo().performClick()
-        composeRule.onNodeWithTag("verify_api_key_button").performClick()
+        composeRule.onNodeWithText("API key saved. Verifying it automatically…").assertIsDisplayed()
+        composeRule.onNodeWithText("Verifying…", substring = true).assertIsDisplayed()
         composeRule.runOnIdle { response.complete(AiResult.Success(true)) }
         composeRule.waitForIdle()
-
-        composeRule.onAllNodesWithTag("verify_api_key_button").assertCountEquals(0)
-        composeRule.onNodeWithText("Valid & Ready", substring = true).assertIsDisplayed()
-        composeRule.onAllNodesWithText(
-            "Gemini API successfully verified! You can now use AI to manage your transactions."
-        ).assertCountEquals(1)
+        composeRule.onNodeWithText("Verified", substring = true).assertIsDisplayed()
     }
 
     @Test
-    fun failedVerificationKeepsManageDialogOpen() {
-        val response = CompletableDeferred<AiResult<Boolean>>()
-        val viewModel = SettingsViewModel(FakeSettingsRepository(), FakeAiRepository(response))
+    fun closingKeyEditorDoesNotSaveUnsavedReplacement() {
+        val fakeRepository = FakeAiRepository(CompletableDeferred())
+        val viewModel = SettingsViewModel(FakeSettingsRepository(), fakeRepository)
 
         composeRule.setContent {
             ExpenseTrackerTheme {
@@ -276,14 +308,9 @@ class AcceptanceFlowUiTest {
         }
 
         composeRule.onNodeWithTag("settings_item_gemini_key").performScrollTo().performClick()
-        composeRule.onNodeWithTag("verify_api_key_button").performClick()
-        composeRule.runOnIdle { response.complete(AiResult.Failure(AiError.InvalidApiKey)) }
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag("verify_api_key_button").assertIsDisplayed()
-        composeRule.onAllNodesWithText(
-            "Gemini API successfully verified! You can now use AI to manage your transactions."
-        ).assertCountEquals(0)
+        composeRule.onNodeWithTag("gemini_api_key_input").performTextInput("replacement-unsaved")
+        composeRule.onNodeWithTag("close_api_key_dialog_button").performClick()
+        composeRule.runOnIdle { assertEquals(0, fakeRepository.saveCalls) }
     }
 
     private class FakeAiRepository(
@@ -291,9 +318,15 @@ class AcceptanceFlowUiTest {
         private val saveResult: AiResult<Unit> = AiResult.Success(Unit)
     ) : AiRepository {
         override val isAiConfigured: Flow<Boolean> = flowOf(true)
+        override val isKeyVerified: Flow<Boolean> = flowOf(false)
+        override val isKeyInvalid: Flow<Boolean> = flowOf(false)
         override val isAiFeatureEnabled: Flow<Boolean> = flowOf(true)
+        var saveCalls = 0
         override suspend fun getMaskedApiKey(): String = "********"
-        override suspend fun saveApiKey(apiKey: String): AiResult<Unit> = saveResult
+        override suspend fun saveApiKey(apiKey: String): AiResult<Unit> {
+            saveCalls++
+            return saveResult
+        }
         override suspend fun validateApiKey(apiKey: String): AiResult<Boolean> = validationResponse.await()
         override suspend fun validateConfiguredKey(): AiResult<Boolean> = validationResponse.await()
         override suspend fun deleteApiKey() = Unit

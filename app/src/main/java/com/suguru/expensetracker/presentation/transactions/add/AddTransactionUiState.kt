@@ -15,6 +15,9 @@ data class AddTransactionUiState(
     val transactionType: TransactionType = TransactionType.EXPENSE,
     val amount: String = "",
     val defaultAccount: Account? = null,
+    val activeAccounts: List<Account> = emptyList(),
+    val selectedTransferSourceAccountId: Long? = null,
+    val selectedTransferDestinationAccountId: Long? = null,
     val selectedCategoryId: Long? = null,
     val note: String = "",
     val transactionTime: Instant = Instant.now(),
@@ -33,8 +36,27 @@ data class AddTransactionUiState(
     val selectedCategory: Category?
         get() = categories.find { it.id == selectedCategoryId }
 
+    val transferSourceAccount: Account?
+        get() = activeAccounts.find { it.id == selectedTransferSourceAccountId }
+
+    val transferDestinationAccount: Account?
+        get() = activeAccounts.find { it.id == selectedTransferDestinationAccountId }
+
     val currencyCode: String
-        get() = defaultAccount?.initialBalance?.currencyCode ?: "USD"
+        get() = if (transactionType == TransactionType.TRANSFER) {
+            transferSourceAccount?.initialBalance?.currencyCode ?: defaultAccount?.initialBalance?.currencyCode ?: "USD"
+        } else {
+            defaultAccount?.initialBalance?.currencyCode ?: "USD"
+        }
+
+    val canSave: Boolean
+        get() = if (transactionType == TransactionType.TRANSFER) {
+            val source = transferSourceAccount
+            val destination = transferDestinationAccount
+            source != null && destination != null && source.id != destination.id
+        } else {
+            hasDefaultAccount
+        }
 
     val currencySymbol: String
         get() = MoneyParser.getCurrencySymbol(currencyCode)

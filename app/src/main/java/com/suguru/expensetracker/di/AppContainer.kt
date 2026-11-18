@@ -65,6 +65,11 @@ class AppContainer(private val context: Context) {
 
     private val _provisioningState = kotlinx.coroutines.flow.MutableStateFlow<StartupProvisioningState>(StartupProvisioningState.Loading)
     val provisioningState: kotlinx.coroutines.flow.StateFlow<StartupProvisioningState> = _provisioningState
+    private val _startupAiInvalidKey = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val startupAiInvalidKey: kotlinx.coroutines.flow.StateFlow<Boolean> = _startupAiInvalidKey
+
+    fun reportStartupAiInvalidKey() { _startupAiInvalidKey.value = true }
+    fun consumeStartupAiInvalidKey() { _startupAiInvalidKey.value = false }
     private val provisioningMutex = Mutex()
     private val categoryInitializationMutex = Mutex()
     private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -85,6 +90,10 @@ class AppContainer(private val context: Context) {
 
     val cloudBackupFingerprintStore: com.suguru.expensetracker.domain.repository.CloudBackupFingerprintStore by lazy {
         com.suguru.expensetracker.data.repository.DataStoreCloudBackupFingerprintStore(context.dataStore)
+    }
+
+    val autoBackupPreferenceStore: com.suguru.expensetracker.domain.repository.AutoBackupPreferenceStore by lazy {
+        com.suguru.expensetracker.data.repository.DataStoreAutoBackupPreferenceStore(context.dataStore)
     }
 
     val cloudBackupStateStore: com.suguru.expensetracker.domain.repository.CloudBackupStateStore by lazy {
@@ -117,10 +126,14 @@ class AppContainer(private val context: Context) {
             restoreBackupUseCase = restoreBackupUseCase,
             stateStore = cloudBackupStateStore,
             fingerprintStore = cloudBackupFingerprintStore,
+            autoBackupPreferenceStore = autoBackupPreferenceStore,
             internalDefaultAccountProvisioner = internalDefaultAccountProvisioner,
             widgetRefreshCoordinator = widgetRefreshCoordinator,
             onScheduleDebouncedBackup = { uid ->
                 com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.scheduleDebounced(context, uid)
+            },
+            onScheduleAutomaticRestore = { uid ->
+                com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.scheduleAutomaticRestore(context)
             },
             onCancelBackupWork = { uid ->
                 com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.cancelWork(context, uid)
@@ -237,7 +250,7 @@ class AppContainer(private val context: Context) {
     // Category Use Cases
     val observeActiveCategoriesUseCase by lazy { ObserveActiveCategoriesUseCase(categoryRepository) }
     val observeAllCategoriesUseCase by lazy { ObserveAllCategoriesUseCase(categoryRepository) }
-    val observeCategoriesByTypeUseCase by lazy { ObserveCategoriesByTypeUseCase(categoryRepository) }
+    val observeCategoriesByTypeUseCase by lazy { ObserveCategoriesByTypeUseCase(categoryRepository, transactionRepository) }
     val getCategoryUseCase by lazy { GetCategoryUseCase(categoryRepository) }
     val createCategoryUseCase by lazy { CreateCategoryUseCase(categoryRepository) }
     val updateCategoryUseCase by lazy { UpdateCategoryUseCase(categoryRepository) }
@@ -481,10 +494,14 @@ class AppContainer(private val context: Context) {
     }
 
     fun createSettingsViewModel(): com.suguru.expensetracker.presentation.settings.SettingsViewModel {
+        val invalidKeyDetected = _startupAiInvalidKey.value
         return com.suguru.expensetracker.presentation.settings.SettingsViewModel(
             settingsRepository = settingsRepository,
-            aiRepository = aiRepository
-        )
+            aiRepository = aiRepository,
+            initialInvalidApiKey = invalidKeyDetected
+        ).also {
+            if (invalidKeyDetected) consumeStartupAiInvalidKey()
+        }
     }
 
     val backupRepository: com.suguru.expensetracker.domain.repository.BackupRepository by lazy {
@@ -593,6 +610,8 @@ class AppContainer(private val context: Context) {
             backupRepository = backupRepository,
             cloudBackupStateStore = cloudBackupStateStore,
             cloudBackupFingerprintStore = cloudBackupFingerprintStore,
+            autoBackupPreferenceStore = autoBackupPreferenceStore,
+            orchestrator = cloudBackupOrchestrator,
             widgetRefreshCoordinator = widgetRefreshCoordinator,
             onPendingSettingsRecovery = { ensureInternalDefaultAccountProvisioning() }
         )

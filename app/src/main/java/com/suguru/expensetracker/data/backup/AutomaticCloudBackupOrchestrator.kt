@@ -17,6 +17,7 @@ import com.suguru.expensetracker.domain.model.CloudBackupPayloadCodec
 import com.suguru.expensetracker.domain.model.CloudBackupState
 import com.suguru.expensetracker.domain.model.ExpenseTrackerBackup
 import com.suguru.expensetracker.domain.model.LocalBackupStateClassifier
+import com.suguru.expensetracker.domain.repository.AutoBackupPreferenceStore
 import com.suguru.expensetracker.domain.repository.BackupRepository
 import com.suguru.expensetracker.domain.repository.CloudBackupFingerprintStore
 import com.suguru.expensetracker.domain.repository.CloudBackupRemoteRepository
@@ -62,9 +63,11 @@ class AutomaticCloudBackupOrchestrator(
     private val restoreBackupUseCase: RestoreBackupUseCase,
     private val stateStore: CloudBackupStateStore,
     private val fingerprintStore: CloudBackupFingerprintStore,
+    private val autoBackupPreferenceStore: AutoBackupPreferenceStore? = null,
     private val internalDefaultAccountProvisioner: InternalDefaultAccountProvisioner? = null,
     private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null,
     private val onScheduleDebouncedBackup: (uid: String) -> Unit = {},
+    private val onScheduleAutomaticRestore: (uid: String) -> Unit = {},
     private val onCancelBackupWork: (uid: String) -> Unit = {},
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
@@ -74,6 +77,8 @@ class AutomaticCloudBackupOrchestrator(
 
     private val _syncStatus = MutableStateFlow<AutomaticBackupSyncStatus>(AutomaticBackupSyncStatus.Idle)
     val syncStatus: StateFlow<AutomaticBackupSyncStatus> = _syncStatus.asStateFlow()
+    private val _syncStatusUid = MutableStateFlow<String?>(null)
+    val syncStatusUid: StateFlow<String?> = _syncStatusUid.asStateFlow()
 
     fun currentAuthenticatedUid(): String? {
         return try {
@@ -85,11 +90,22 @@ class AutomaticCloudBackupOrchestrator(
 
     suspend fun performBackup(
         expectedUid: String,
-        forceAfterConflictResolution: Boolean = false
+        forceAfterConflictResolution: Boolean = false,
+        explicitManual: Boolean = false
     ): BackupExecutionResult = syncMutex.withLock {
         val authUid = currentAuthenticatedUid()
         if (authUid == null || authUid != expectedUid) {
             return@withLock BackupExecutionResult.PermanentFailure("UID_MISMATCH")
+        }
+
+        _syncStatusUid.value = expectedUid
+        _syncStatus.value = AutomaticBackupSyncStatus.Idle
+
+        // If auto backup is disabled for this UID, do not execute automatic backup
+        if (!forceAfterConflictResolution && !explicitManual &&
+            autoBackupPreferenceStore != null && !autoBackupPreferenceStore.isAutoBackupEnabled(expectedUid)
+        ) {
+            return@withLock BackupExecutionResult.SkippedUnchanged
         }
 
         val attemptEpochMillis = System.currentTimeMillis()
@@ -104,6 +120,7 @@ class AutomaticCloudBackupOrchestrator(
             val prevState = stateStore.getState(expectedUid)
 
             if (lastUploadedFp == contentFingerprint && prevState.pendingSnapshotId == null && !forceAfterConflictResolution) {
+                _syncStatus.value = AutomaticBackupSyncStatus.Idle
                 return@withLock BackupExecutionResult.SkippedUnchanged
             }
 
@@ -120,9 +137,12 @@ class AutomaticCloudBackupOrchestrator(
                                     lastSuccessfulBackupAtEpochMillis = latestRemote.completedAt?.toEpochMilli() ?: attemptEpochMillis,
                                     lastSuccessfulSnapshotId = latestRemote.snapshotId,
                                     pendingSnapshotId = null,
-                                    pendingSinceEpochMillis = null
+                                    pendingSinceEpochMillis = null,
+                                    lastFailureAtEpochMillis = null,
+                                    lastFailureCode = null
                                 )
                             )
+                            _syncStatus.value = AutomaticBackupSyncStatus.Idle
                             return@withLock BackupExecutionResult.SkippedUnchanged
                         } else {
                             _syncStatus.value = AutomaticBackupSyncStatus.Conflict(expectedUid, latestRemote)
@@ -132,11 +152,24 @@ class AutomaticCloudBackupOrchestrator(
                 } else {
                     val error = remoteResult.exceptionOrNull()
                     val failureCode = toFailureCode(error)
-                    if (isPermanentFailure(failureCode)) {
-                        return@withLock BackupExecutionResult.PermanentFailure(failureCode)
-                    } else {
-                        return@withLock BackupExecutionResult.RetryableFailure(failureCode)
-                    }
+                    val failedAt = System.currentTimeMillis()
+                    val permanent = isPermanentFailure(failureCode)
+                    stateStore.setState(
+                        expectedUid,
+                        prevState.copy(
+                            pendingSnapshotId = if (permanent) null else FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID,
+                            pendingSinceEpochMillis = if (permanent) null else failedAt,
+                            lastAttemptAtEpochMillis = attemptEpochMillis,
+                            lastFailureAtEpochMillis = failedAt,
+                            lastFailureCode = failureCode
+                        )
+                    )
+                    _syncStatus.value = AutomaticBackupSyncStatus.Failure(
+                        failureCode,
+                        error?.localizedMessage ?: "Cloud backup could not be checked."
+                    )
+                    return@withLock if (permanent) BackupExecutionResult.PermanentFailure(failureCode)
+                    else BackupExecutionResult.RetryableFailure(failureCode)
                 }
             }
 
@@ -182,21 +215,29 @@ class AutomaticCloudBackupOrchestrator(
                 val committed = uploadResult.getOrThrow()
                 val successEpoch = committed.completedAt?.toEpochMilli() ?: System.currentTimeMillis()
                 fingerprintStore.setLastUploadedFingerprint(expectedUid, contentFingerprint)
-                stateStore.setState(
-                    expectedUid,
-                    CloudBackupState(
-                        lastSuccessfulBackupAtEpochMillis = successEpoch,
-                        lastSuccessfulSnapshotId = committed.snapshotId,
-                        pendingSnapshotId = null,
-                        pendingSinceEpochMillis = null,
-                        lastAttemptAtEpochMillis = attemptEpochMillis,
-                        lastFailureAtEpochMillis = null,
-                        lastFailureCode = null
-                    )
+                fingerprintStore.setLastUploadedFingerprint(expectedUid, committed.contentFingerprint)
+                val currentLocalFingerprint = runCatching {
+                    BackupContentFingerprint.compute(createFullBackupUseCase())
+                }.getOrNull()
+                val currentUidStillMatches = currentAuthenticatedUid() == expectedUid
+                val backupCoversCurrentLocalData = currentUidStillMatches &&
+                    committed.contentFingerprint == contentFingerprint &&
+                    currentLocalFingerprint == committed.contentFingerprint
+                val latestState = stateStore.getState(expectedUid)
+                val successState = latestState.copy(
+                    lastSuccessfulBackupAtEpochMillis = successEpoch,
+                    lastSuccessfulSnapshotId = committed.snapshotId,
+                    pendingSnapshotId = if (backupCoversCurrentLocalData) null else FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID,
+                    pendingSinceEpochMillis = if (backupCoversCurrentLocalData) null else latestState.pendingSinceEpochMillis ?: System.currentTimeMillis(),
+                    lastAttemptAtEpochMillis = attemptEpochMillis,
+                    lastFailureAtEpochMillis = null,
+                    lastFailureCode = null
                 )
-                if (_syncStatus.value is AutomaticBackupSyncStatus.Conflict) {
-                    _syncStatus.value = AutomaticBackupSyncStatus.Idle
+                stateStore.setState(expectedUid, successState)
+                if (!backupCoversCurrentLocalData && currentUidStillMatches) {
+                    onScheduleDebouncedBackup(expectedUid)
                 }
+                _syncStatus.value = AutomaticBackupSyncStatus.Idle
                 return@withLock BackupExecutionResult.Success(committed.snapshotId)
             } else {
                 val error = uploadResult.exceptionOrNull()
@@ -230,6 +271,7 @@ class AutomaticCloudBackupOrchestrator(
                 }
             }
         } catch (e: CancellationException) {
+            _syncStatus.value = AutomaticBackupSyncStatus.Idle
             throw e
         } catch (e: Exception) {
             val failureCode = toFailureCode(e)
@@ -260,6 +302,13 @@ class AutomaticCloudBackupOrchestrator(
     suspend fun evaluateOnLaunchOrSignIn(uid: String) = syncMutex.withLock {
         val authUid = currentAuthenticatedUid()
         if (authUid == null || authUid != uid) return@withLock
+        _syncStatusUid.value = uid
+
+        // Check if auto mode is disabled for this UID
+        if (autoBackupPreferenceStore != null && !autoBackupPreferenceStore.isAutoBackupEnabled(uid)) {
+            _syncStatus.value = AutomaticBackupSyncStatus.Idle
+            return@withLock
+        }
 
         _syncStatus.value = AutomaticBackupSyncStatus.Checking
 
@@ -272,6 +321,8 @@ class AutomaticCloudBackupOrchestrator(
 
             if (LocalBackupStateClassifier.isEffectivelyEmpty(localBackup)) {
                 if (lastFp == null && localState.lastSuccessfulSnapshotId == null) {
+                    // Persist a connected-network opportunity so restore can run after process death.
+                    onScheduleAutomaticRestore(uid)
                     val remoteResult = remoteRepository.getLatestCompleteManifest()
                     if (remoteResult.isSuccess) {
                         val latest = remoteResult.getOrNull()
@@ -283,27 +334,58 @@ class AutomaticCloudBackupOrchestrator(
                                 val compressed = chunker.reassemble(chunks, latest.payloadSha256).getOrThrow()
                                 val jsonBytes = codec.decompress(compressed).getOrThrow()
                                 val restoredBackup = backupRepository.deserializeBackup(jsonBytes.toString(Charsets.UTF_8)).getOrThrow()
+                                val currentUidBeforeCommit = currentAuthenticatedUid()
+                                val currentLocalBackup = backupRepository.createSnapshot()
+                                val stillEligible = currentUidBeforeCommit == uid &&
+                                    (autoBackupPreferenceStore == null || autoBackupPreferenceStore.isAutoBackupEnabled(uid)) &&
+                                    LocalBackupStateClassifier.isEffectivelyEmpty(currentLocalBackup)
+                                if (!stillEligible) {
+                                    _syncStatus.value = AutomaticBackupSyncStatus.Idle
+                                    return@withLock
+                                }
                                 val restoreResult = restoreBackupUseCase(restoredBackup)
                                 if (restoreResult.isSuccess) {
                                     widgetRefreshCoordinator?.refreshAll()
                                     val restoredFp = BackupContentFingerprint.compute(restoredBackup)
                                     fingerprintStore.setLastUploadedFingerprint(uid, restoredFp)
+                                    val restoreEpochMillis = System.currentTimeMillis()
                                     stateStore.setState(
                                         uid,
-                                        CloudBackupState(
-                                            lastSuccessfulBackupAtEpochMillis = latest.completedAt?.toEpochMilli() ?: System.currentTimeMillis(),
+                                        stateStore.getState(uid).copy(
                                             lastSuccessfulSnapshotId = latest.snapshotId,
+                                            lastSuccessfulRestoreAtEpochMillis = restoreEpochMillis,
                                             pendingSnapshotId = null,
                                             pendingSinceEpochMillis = null,
                                             lastFailureAtEpochMillis = null,
                                             lastFailureCode = null
                                         )
                                     )
-                                    _syncStatus.value = AutomaticBackupSyncStatus.RestoreCompleted(latest.snapshotId, System.currentTimeMillis())
+                                    _syncStatus.value = AutomaticBackupSyncStatus.RestoreCompleted(latest.snapshotId, restoreEpochMillis)
+                                    return@withLock
+                                } else {
+                                    val failure = restoreResult.exceptionOrNull()
+                                    _syncStatus.value = AutomaticBackupSyncStatus.Failure(
+                                        "RESTORE_FAILED",
+                                        failure?.localizedMessage ?: "Cloud snapshot could not be restored."
+                                    )
                                     return@withLock
                                 }
+                            } else {
+                                val failure = downloadResult.exceptionOrNull()
+                                _syncStatus.value = AutomaticBackupSyncStatus.Failure(
+                                    "RESTORE_DOWNLOAD_FAILED",
+                                    failure?.localizedMessage ?: "Cloud snapshot could not be downloaded."
+                                )
+                                return@withLock
                             }
                         }
+                    } else if (remoteResult.isFailure) {
+                        val failure = remoteResult.exceptionOrNull()
+                        _syncStatus.value = AutomaticBackupSyncStatus.Failure(
+                            "RESTORE_CHECK_FAILED",
+                            failure?.localizedMessage ?: "Cloud snapshot availability could not be checked."
+                        )
+                        return@withLock
                     }
                 }
             }
@@ -351,7 +433,14 @@ class AutomaticCloudBackupOrchestrator(
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "evaluateOnLaunchOrSignIn failed", e)
-            _syncStatus.value = AutomaticBackupSyncStatus.Idle
+            _syncStatus.value = if (_syncStatus.value is AutomaticBackupSyncStatus.RestoreInProgress) {
+                AutomaticBackupSyncStatus.Failure(
+                    "RESTORE_FAILED",
+                    e.localizedMessage ?: "Cloud restore could not be completed."
+                )
+            } else {
+                AutomaticBackupSyncStatus.Idle
+            }
         }
     }
 
@@ -360,6 +449,11 @@ class AutomaticCloudBackupOrchestrator(
         val currentStatus = _syncStatus.value
         if (currentStatus is AutomaticBackupSyncStatus.Conflict) {
             return // Do not silently clobber cloud while conflict exists
+        }
+
+        // Check if auto mode is disabled for this UID
+        if (autoBackupPreferenceStore != null && !autoBackupPreferenceStore.isAutoBackupEnabled(uid)) {
+            return
         }
 
         try {
@@ -382,6 +476,7 @@ class AutomaticCloudBackupOrchestrator(
         val authUid = currentAuthenticatedUid()
         if (authUid == null || authUid != uid) return@withLock
 
+        _syncStatusUid.value = uid
         _syncStatus.value = AutomaticBackupSyncStatus.RestoreInProgress(remoteManifest.snapshotId)
         try {
             val downloadResult = remoteRepository.downloadChunks(uid, remoteManifest.snapshotId)
@@ -395,18 +490,19 @@ class AutomaticCloudBackupOrchestrator(
                     widgetRefreshCoordinator?.refreshAll()
                     val restoredFp = BackupContentFingerprint.compute(restoredBackup)
                     fingerprintStore.setLastUploadedFingerprint(uid, restoredFp)
+                    val restoreEpochMillis = System.currentTimeMillis()
                     stateStore.setState(
                         uid,
-                        CloudBackupState(
-                            lastSuccessfulBackupAtEpochMillis = remoteManifest.completedAt?.toEpochMilli() ?: System.currentTimeMillis(),
+                        stateStore.getState(uid).copy(
                             lastSuccessfulSnapshotId = remoteManifest.snapshotId,
+                            lastSuccessfulRestoreAtEpochMillis = restoreEpochMillis,
                             pendingSnapshotId = null,
                             pendingSinceEpochMillis = null,
                             lastFailureAtEpochMillis = null,
                             lastFailureCode = null
                         )
                     )
-                    _syncStatus.value = AutomaticBackupSyncStatus.RestoreCompleted(remoteManifest.snapshotId, System.currentTimeMillis())
+                    _syncStatus.value = AutomaticBackupSyncStatus.RestoreCompleted(remoteManifest.snapshotId, restoreEpochMillis)
                 } else {
                     _syncStatus.value = AutomaticBackupSyncStatus.Failure("RESTORE_FAILED", "Failed to restore cloud snapshot")
                 }
@@ -422,6 +518,7 @@ class AutomaticCloudBackupOrchestrator(
         val authUid = currentAuthenticatedUid()
         if (authUid == null || authUid != uid) return@withLock
 
+        _syncStatusUid.value = uid
         _syncStatus.value = AutomaticBackupSyncStatus.Idle
         // Perform backup forcing overwrite/upload of local data over cloud conflict
         performBackup(uid, forceAfterConflictResolution = true)
@@ -431,6 +528,7 @@ class AutomaticCloudBackupOrchestrator(
         if (!previousUid.isNullOrBlank()) {
             onCancelBackupWork(previousUid)
         }
+        _syncStatusUid.value = null
         _syncStatus.value = AutomaticBackupSyncStatus.Idle
     }
 

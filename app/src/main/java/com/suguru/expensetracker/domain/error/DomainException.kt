@@ -24,4 +24,5 @@ sealed class DomainException(message: String) : Exception(message) {
     data class InvalidTransfer(override val message: String) : DomainException(message)
     data class TransactionNotFound(val transactionId: Long) : DomainException("Transaction with ID $transactionId was not found")
     data class InvalidTransactionId(val transactionId: Long) : DomainException("Invalid transaction ID: $transactionId")
+    data class InvalidTransactionTime(override val message: String) : DomainException(message)
 }

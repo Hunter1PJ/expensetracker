@@ -3,6 +3,7 @@ package com.suguru.expensetracker.data.ai
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import com.suguru.expensetracker.data.security.SecureKeyStorage
@@ -42,10 +43,42 @@ class AiRepositoryImpl(
 
     private object PreferencesKeys {
         val AI_FEATURE_ENABLED = booleanPreferencesKey("ai_feature_enabled")
+        val VERIFIED_KEY_HASH = stringPreferencesKey("verified_key_hash")
+        val INVALID_KEY_HASH = stringPreferencesKey("invalid_key_hash")
     }
 
     private val _isConfiguredFlow = MutableStateFlow(secureKeyStorage.hasKey())
     override val isAiConfigured: Flow<Boolean> = _isConfiguredFlow.asStateFlow()
+
+    override val isKeyVerified: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { prefs ->
+            val verifiedHash = prefs[PreferencesKeys.VERIFIED_KEY_HASH]
+            val invalidHash = prefs[PreferencesKeys.INVALID_KEY_HASH]
+            val currentKey = secureKeyStorage.getKey()
+            if (verifiedHash != null && currentKey != null && invalidHash != computeKeyFingerprint(currentKey)) {
+                computeKeyFingerprint(currentKey) == verifiedHash
+            } else {
+                false
+            }
+        }
+
+    override val isKeyInvalid: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { prefs ->
+            val invalidHash = prefs[PreferencesKeys.INVALID_KEY_HASH]
+            val currentKey = secureKeyStorage.getKey()
+            invalidHash != null && currentKey != null &&
+                computeKeyFingerprint(currentKey.trim()) == invalidHash
+        }
 
     override val isAiFeatureEnabled: Flow<Boolean> = dataStore.data
         .catch { exception ->
@@ -56,8 +89,8 @@ class AiRepositoryImpl(
             }
         }
         .map { prefs ->
-            // Default to true so user sees AI entry point when desired, but disabled when no key is entered
-            prefs[PreferencesKeys.AI_FEATURE_ENABLED] ?: true
+            // Default to false for genuinely new user/account
+            prefs[PreferencesKeys.AI_FEATURE_ENABLED] ?: false
         }
 
     override suspend fun getMaskedApiKey(): String? {
@@ -75,8 +108,16 @@ class AiRepositoryImpl(
         if (trimmed.isEmpty()) {
             return AiResult.Failure(AiError.MissingApiKey)
         }
+        val currentKey = secureKeyStorage.getKey()
         try {
             secureKeyStorage.saveKey(trimmed)
+            // If the key changed, invalidate the previous verification
+            if (currentKey != trimmed) {
+                dataStore.edit { prefs ->
+                    prefs.remove(PreferencesKeys.VERIFIED_KEY_HASH)
+                    prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
+                }
+            }
         } catch (_: Exception) {
             return AiResult.Failure(AiError.ExecutionError("Secure key storage is unavailable."))
         }
@@ -85,7 +126,17 @@ class AiRepositoryImpl(
     }
 
     override suspend fun validateApiKey(apiKey: String): AiResult<Boolean> {
-        return aiProvider.validateKey(apiKey)
+        val result = aiProvider.validateKey(apiKey)
+        if (result is AiResult.Success && result.data) {
+            val fingerprint = computeKeyFingerprint(apiKey.trim())
+            if (secureKeyStorage.getKey()?.trim() == apiKey.trim()) {
+                dataStore.edit { prefs ->
+                    prefs[PreferencesKeys.VERIFIED_KEY_HASH] = fingerprint
+                    prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
+                }
+            }
+        }
+        return result
     }
 
     override suspend fun validateConfiguredKey(): AiResult<Boolean> {
@@ -93,11 +144,31 @@ class AiRepositoryImpl(
         if (key.isNullOrBlank()) {
             return AiResult.Failure(AiError.MissingApiKey)
         }
-        return aiProvider.validateKey(key)
+        val result = aiProvider.validateKey(key)
+        val fingerprint = computeKeyFingerprint(key.trim())
+        if (secureKeyStorage.getKey()?.trim() != key.trim()) {
+            return AiResult.Failure(AiError.ExecutionError("The saved API key changed during verification."))
+        }
+        if (result is AiResult.Success && result.data) {
+            dataStore.edit { prefs ->
+                prefs[PreferencesKeys.VERIFIED_KEY_HASH] = fingerprint
+                prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
+            }
+        } else if (result is AiResult.Failure && result.error is AiError.InvalidApiKey) {
+            dataStore.edit { prefs ->
+                prefs.remove(PreferencesKeys.VERIFIED_KEY_HASH)
+                prefs[PreferencesKeys.INVALID_KEY_HASH] = fingerprint
+            }
+        }
+        return result
     }
 
     override suspend fun deleteApiKey() {
         secureKeyStorage.deleteKey()
+        dataStore.edit { prefs ->
+            prefs.remove(PreferencesKeys.VERIFIED_KEY_HASH)
+            prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
+        }
         _isConfiguredFlow.value = false
     }
 
@@ -117,14 +188,19 @@ class AiRepositoryImpl(
         }
 
         val aiEnabled = try {
-            dataStore.data.first()[PreferencesKeys.AI_FEATURE_ENABLED] ?: true
+            dataStore.data.first()[PreferencesKeys.AI_FEATURE_ENABLED] ?: false
         } catch (_: IOException) {
-            true
+            false
         }
 
         if (!aiEnabled || !secureKeyStorage.hasKey() || secureKeyStorage.getKey().isNullOrBlank() || !runCatching(isOnline).getOrDefault(false)) {
             return parseOffline(trimmedInput, defaultCurrency)
         }
+
+        val savedKey = secureKeyStorage.getKey()?.trim()
+        if (savedKey.isNullOrBlank()) return parseOffline(trimmedInput, defaultCurrency)
+        val invalidHash = dataStore.data.first()[PreferencesKeys.INVALID_KEY_HASH]
+        if (invalidHash == computeKeyFingerprint(savedKey)) return parseOffline(trimmedInput, defaultCurrency, ParseWarning.INVALID_API_KEY)
 
         val config = AiConfiguration(defaultCurrency = defaultCurrency)
         val providerResult = try {
@@ -323,5 +399,18 @@ class AiRepositoryImpl(
         } catch (_: Exception) {
             Result.failure(IllegalArgumentException("Invalid amount format: $rawAmount"))
         }
+    }
+
+    private fun computeKeyFingerprint(key: String): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(key.trim().toByteArray(Charsets.UTF_8))
+        val hexChars = CharArray(digest.size * 2)
+        val digits = "0123456789abcdef"
+        for (index in digest.indices) {
+            val value = digest[index].toInt() and 0xFF
+            hexChars[index * 2] = digits[value ushr 4]
+            hexChars[index * 2 + 1] = digits[value and 0x0F]
+        }
+        return String(hexChars)
     }
 }

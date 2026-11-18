@@ -166,6 +166,8 @@ class HomeViewModelTest {
     fun multipleCandidates_canBeReviewedAndConsumedIndependently() = runTest {
         val fakeAiRepository = object : com.suguru.expensetracker.domain.ai.AiRepository {
             override val isAiConfigured = kotlinx.coroutines.flow.flowOf(true)
+            override val isKeyVerified = kotlinx.coroutines.flow.flowOf(true)
+        override val isKeyInvalid = kotlinx.coroutines.flow.flowOf(false)
             override val isAiFeatureEnabled = kotlinx.coroutines.flow.flowOf(true)
             override suspend fun getMaskedApiKey(): String? = "••••1234"
             override suspend fun saveApiKey(apiKey: String) = com.suguru.expensetracker.domain.ai.AiResult.Success(Unit)

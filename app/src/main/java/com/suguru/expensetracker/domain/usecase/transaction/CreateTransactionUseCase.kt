@@ -9,14 +9,16 @@ import com.suguru.expensetracker.domain.repository.AccountRepository
 import com.suguru.expensetracker.domain.repository.CategoryRepository
 import com.suguru.expensetracker.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.first
+import java.time.Clock
 
 class CreateTransactionUseCase(
     private val transactionRepository: TransactionRepository,
     private val accountRepository: AccountRepository,
     private val categoryRepository: CategoryRepository,
-    private val internalDefaultAccountProvisioner: InternalDefaultAccountProvisioner? = null
+    private val internalDefaultAccountProvisioner: InternalDefaultAccountProvisioner? = null,
+    clock: Clock = Clock.systemDefaultZone()
 ) {
-    private val validator = TransactionValidator(accountRepository, categoryRepository)
+    private val validator = TransactionValidator(accountRepository, categoryRepository, clock)
 
     suspend operator fun invoke(transaction: Transaction): Long {
         if (transaction.id != 0L) {
@@ -25,9 +27,9 @@ class CreateTransactionUseCase(
 
         ensureInternalDefaultAccountIsReady()
         
-        // CRITICAL: For ALL new Expense/Income transactions, enforce internal default account
-        // Never accept account ID from UI state, AI parsing, or incoming model for new records
-        val resolvedAccountId = resolveInternalDefaultAccountIdForNewTransaction(transaction.type)
+        // Expense and income use the internal ledger account. Transfers retain both explicitly
+        // selected accounts and are validated below.
+        val resolvedAccountId = resolveAccountIdForNewTransaction(transaction)
         
         val resolvedTransaction = transaction.copy(
             accountId = resolvedAccountId
@@ -38,24 +40,18 @@ class CreateTransactionUseCase(
     }
 
     /**
-     * Resolves the internal default account for ALL new Expense/Income transactions.
-     * TRANSFER transactions are not supported for creation (per product decision).
+     * Resolves the ledger account for new transactions. Expenses and income always use the
+     * provisioned internal account; transfers keep their selected source account.
      */
-    private suspend fun resolveInternalDefaultAccountIdForNewTransaction(transactionType: TransactionType): Long {
-        // Only allow EXPENSE and INCOME types for new transactions
-        when (transactionType) {
+    private suspend fun resolveAccountIdForNewTransaction(transaction: Transaction): Long =
+        when (transaction.type) {
             TransactionType.EXPENSE, TransactionType.INCOME -> {
                 val accounts = accountRepository.observeActiveAccounts().first()
-                return accounts.firstOrNull { it.internalKey == "default" }?.id
-                    ?: throw DomainException.AccountNotFound(0L) // Should never happen if provisioning works
+                accounts.firstOrNull { it.internalKey == "default" }?.id
+                    ?: throw DomainException.AccountNotFound(0L)
             }
-            TransactionType.TRANSFER -> {
-                // TRANSFER creation is not supported - will be handled by UI removal
-                // For now, reject with appropriate error
-                throw DomainException.InvalidTransfer("New transfer transactions are not supported. Use internal default account for Expense/Income only.")
-            }
+            TransactionType.TRANSFER -> transaction.accountId
         }
-    }
 
     private suspend fun ensureInternalDefaultAccountIsReady() {
         val result = internalDefaultAccountProvisioner?.ensureProvisioned() ?: return

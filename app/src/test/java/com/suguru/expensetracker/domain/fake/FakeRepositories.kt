@@ -118,6 +118,13 @@ class FakeTransactionRepository : TransactionRepository {
                 .sortedByDescending { it.transactionTime }
         }
 
+    override fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>> =
+        transactions.map { map ->
+            map.values.filter { it.type == com.suguru.expensetracker.domain.model.TransactionType.EXPENSE && it.categoryId != null }
+                .groupingBy { it.categoryId!! }
+                .eachCount()
+        }
+
     override fun observeTransactionsBetween(startTime: Instant, endTime: Instant): Flow<List<Transaction>> =
         transactions.map { map ->
             map.values.filter { !it.transactionTime.isBefore(startTime) && it.transactionTime.isBefore(endTime) }
