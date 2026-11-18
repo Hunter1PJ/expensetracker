@@ -33,6 +33,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -170,34 +171,65 @@ fun attemptAutoSignIn(
 
 internal fun isUserCancellationException(e: Exception): Boolean {
     if (e !is GetCredentialCancellationException) return false
-    val msg = e.message?.lowercase() ?: ""
-    if (msg.contains("[10]") ||
-        msg.contains("[12500]") ||
-        msg.contains("developer_error") ||
-        msg.contains("developer error") ||
-        msg.contains("sha") ||
-        msg.contains("signature") ||
-        msg.contains("mismatch")
-    ) {
+
+    val cause = e.cause
+    if (cause != null && cause !is GetCredentialCancellationException) {
         return false
     }
+
+    val combinedMessage = buildString {
+        append(e.message ?: "")
+        append(" ")
+        append(cause?.message ?: "")
+    }.lowercase()
+
+    val errorKeywords = listOf(
+        "[10]", "10:", "developer_error", "developer error",
+        "[12500]", "12500:", "sign_in_failed", "sign in failed",
+        "sha", "signature", "mismatch", "certificate",
+        "api_not_connected", "provider", "null string", "parcel",
+        "client_id", "unregistered", "invalid"
+    )
+
+    if (errorKeywords.any { combinedMessage.contains(it) }) {
+        return false
+    }
+
     return true
+}
+
+internal fun logAuthExceptionDiagnostics(e: Exception) {
+    val className = e.javaClass.name
+    val simpleName = e.javaClass.simpleName
+    val message = e.message
+    val causeClass = e.cause?.javaClass?.name
+    val causeMessage = e.cause?.message
+    val credentialType = (e as? GetCredentialException)?.type
+
+    Log.e(
+        AUTH_TAG,
+        "Stage: CredentialManager - ExceptionClass: $className ($simpleName), CredentialType: $credentialType, Message: $message, CauseClass: $causeClass, CauseMessage: $causeMessage",
+        e
+    )
 }
 
 internal fun mapAuthExceptionToUserMessage(e: Exception): String {
     val msg = e.message?.lowercase() ?: ""
+    val causeMsg = e.cause?.message?.lowercase() ?: ""
+    val combinedMsg = "$msg $causeMsg"
+
     return when {
         e is com.google.firebase.FirebaseNetworkException ||
         e is java.net.UnknownHostException ||
         e is java.io.IOException -> {
             "Network failure. Please check your internet connection and try again."
         }
-        msg.contains("[10]") ||
-        msg.contains("[12500]") ||
-        msg.contains("developer_error") ||
-        msg.contains("developer error") ||
-        msg.contains("sha") ||
-        msg.contains("signature") ||
+        combinedMsg.contains("[10]") ||
+        combinedMsg.contains("[12500]") ||
+        combinedMsg.contains("developer_error") ||
+        combinedMsg.contains("developer error") ||
+        combinedMsg.contains("sha") ||
+        combinedMsg.contains("signature") ||
         e is androidx.credentials.exceptions.GetCredentialCustomException -> {
             "Google Sign-In configuration error: Developer error [10/12500] or SHA-1 fingerprint mismatch."
         }
@@ -267,11 +299,12 @@ fun onGoogleSignInClicked(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            logAuthExceptionDiagnostics(e)
             if (isUserCancellationException(e)) {
-                Log.i(AUTH_TAG, "Stage: CredentialManager - User cancelled sign-in prompt")
+                Log.i(AUTH_TAG, "Stage: CredentialManager - User intentionally cancelled sign-in prompt")
                 onAuthCancelled()
             } else {
-                Log.e(AUTH_TAG, "Stage: AuthFailure - ${e.javaClass.simpleName}: ${e.message}", e)
+                Log.e(AUTH_TAG, "Stage: AuthFailure - ${e.javaClass.simpleName}: ${e.message}")
                 onAuthError(mapAuthExceptionToUserMessage(e))
             }
         }
