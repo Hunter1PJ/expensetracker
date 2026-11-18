@@ -45,6 +45,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -168,8 +169,8 @@ class CloudBackupViewModelTest {
     }
 
     @Test
-    fun `requestRestoreSnapshot sets pendingRestoreCandidate when local database is non-empty`() = runTest(testDispatcher) {
-        val backupRepo = FakeBackupRepo(nonEmptyBackup())
+    fun `requestRestoreSnapshot shows confirmation dialog and does not start restoration`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
         val remote = FakeRemoteRepo()
         val snapshot = createCloudSnapshot(backupRepo, nonEmptyBackup())
         remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
@@ -188,21 +189,118 @@ class CloudBackupViewModelTest {
         vm.requestRestoreSnapshot(snapshot.first)
         advanceUntilIdle()
 
+        // Confirmation candidate set, but no download or restoration performed
         assertNotNull(vm.actionState.value.pendingRestoreCandidate)
+        assertEquals(snapshot.first.snapshotId, vm.actionState.value.pendingRestoreCandidate?.snapshotId)
+        assertEquals(0, backupRepo.restoreCalls)
+        assertFalse(vm.actionState.value.isBusy)
+        assertNull(vm.actionState.value.restoreResult)
+    }
+
+    @Test
+    fun `cancelPendingRestore closes confirmation dialog without restoration`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(nonEmptyBackup())
+        val remote = FakeRemoteRepo()
+        val snapshot = createCloudSnapshot(backupRepo, nonEmptyBackup())
+
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        advanceUntilIdle()
+        assertNotNull(vm.actionState.value.pendingRestoreCandidate)
+
+        vm.cancelPendingRestore()
+        advanceUntilIdle()
+
+        assertNull(vm.actionState.value.pendingRestoreCandidate)
+        assertEquals(0, backupRepo.restoreCalls)
+        assertNull(vm.actionState.value.restoreResult)
+    }
+
+    @Test
+    fun `confirmPendingRestore executes restoration and displays success result`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
+        val remote = FakeRemoteRepo()
+        val cloudData = nonEmptyBackup()
+        val snapshot = createCloudSnapshot(backupRepo, cloudData)
+        remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
+
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        advanceUntilIdle()
         assertEquals(0, backupRepo.restoreCalls)
 
         vm.confirmPendingRestore()
         advanceUntilIdle()
+
         assertEquals(1, backupRepo.restoreCalls)
         assertNull(vm.actionState.value.pendingRestoreCandidate)
+        assertFalse(vm.actionState.value.isBusy)
+        val result = vm.actionState.value.restoreResult
+        assertTrue(result is CloudRestoreResult.Success)
+        assertEquals(snapshot.first.snapshotId, (result as CloudRestoreResult.Success).manifest.snapshotId)
+
+        vm.dismissRestoreResult()
+        assertNull(vm.actionState.value.restoreResult)
     }
 
     @Test
-    fun `requestRestoreSnapshot restores immediately without confirmation when local database is effectively empty`() = runTest(testDispatcher) {
-        val emptyLocal = effectivelyEmptyBackup()
-        val cloudData = nonEmptyBackup()
-        val backupRepo = FakeBackupRepo(emptyLocal)
+    fun `restore failure displays error result with failure reason`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
         val remote = FakeRemoteRepo()
+        val snapshot = createCloudSnapshot(backupRepo, nonEmptyBackup())
+        // Chunks missing -> download failure
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        advanceUntilIdle()
+
+        vm.confirmPendingRestore()
+        advanceUntilIdle()
+
+        assertEquals(0, backupRepo.restoreCalls)
+        assertFalse(vm.actionState.value.isBusy)
+        val result = vm.actionState.value.restoreResult
+        assertTrue(result is CloudRestoreResult.Failure)
+        assertTrue((result as CloudRestoreResult.Failure).reason.isNotBlank())
+
+        vm.dismissRestoreResult()
+        assertNull(vm.actionState.value.restoreResult)
+    }
+
+    @Test
+    fun `confirmPendingRestore prevents duplicate restore while already busy`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
+        val remote = FakeRemoteRepo()
+        val cloudData = nonEmptyBackup()
         val snapshot = createCloudSnapshot(backupRepo, cloudData)
         remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
 
@@ -220,9 +318,164 @@ class CloudBackupViewModelTest {
         vm.requestRestoreSnapshot(snapshot.first)
         advanceUntilIdle()
 
-        assertNull(vm.actionState.value.pendingRestoreCandidate)
+        vm.confirmPendingRestore()
+        // Try calling again immediately while running
+        vm.confirmPendingRestore()
+        advanceUntilIdle()
+
         assertEquals(1, backupRepo.restoreCalls)
-        assertEquals(cloudData.transactions.size, backupRepo.currentBackup.transactions.size)
+    }
+
+    @Test
+    fun `successful manual restore sets restoreResult immediately without navigation side effects`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
+        val remote = FakeRemoteRepo()
+        val cloudData = nonEmptyBackup()
+        val snapshot = createCloudSnapshot(backupRepo, cloudData)
+        remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
+        val fpStore = FakeFingerprintStore()
+        val stateStore = FakeStateStore()
+
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = stateStore,
+            cloudBackupFingerprintStore = fpStore,
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        advanceUntilIdle()
+        vm.confirmPendingRestore()
+        advanceUntilIdle()
+
+        // restoreResult must be Success immediately (dialog available without reopening Settings)
+        val finalState = vm.actionState.value
+        assertFalse("isBusy must be false after restore completes", finalState.isBusy)
+        assertTrue("restoreResult must be Success", finalState.restoreResult is CloudRestoreResult.Success)
+        assertNull("pendingRestoreCandidate must be cleared", finalState.pendingRestoreCandidate)
+        // The restore flow should NOT set successMessage (which could be confused with backup success).
+        // Only restoreResult should communicate the outcome to the UI.
+        assertNull("No successMessage should be set during restore flow", finalState.successMessage)
+    }
+
+    @Test
+    fun `restore with SettingsRecoveryPending outcome still sets success result and calls onPendingSettingsRecovery`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(
+            effectivelyEmptyBackup(),
+            restoreOutcomeOverride = BackupRestoreOutcome.SettingsRecoveryPending
+        )
+        val remote = FakeRemoteRepo()
+        val cloudData = nonEmptyBackup()
+        val snapshot = createCloudSnapshot(backupRepo, cloudData)
+        remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
+
+        var settingsRecoveryCalled = false
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            onPendingSettingsRecovery = {
+                settingsRecoveryCalled = true
+                null
+            },
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        advanceUntilIdle()
+        vm.confirmPendingRestore()
+        advanceUntilIdle()
+
+        // onPendingSettingsRecovery must have been invoked
+        assertTrue("onPendingSettingsRecovery should be called", settingsRecoveryCalled)
+        // restoreResult must still be Success (dialog displays over Settings)
+        val result = vm.actionState.value.restoreResult
+        assertTrue("restoreResult must be Success even with SettingsRecoveryPending", result is CloudRestoreResult.Success)
+        assertFalse(vm.actionState.value.isBusy)
+    }
+
+    @Test
+    fun `dismissRestoreResult clears result preserving Settings destination`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
+        val remote = FakeRemoteRepo()
+        val cloudData = nonEmptyBackup()
+        val snapshot = createCloudSnapshot(backupRepo, cloudData)
+        remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
+
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        advanceUntilIdle()
+        vm.confirmPendingRestore()
+        advanceUntilIdle()
+
+        assertTrue(vm.actionState.value.restoreResult is CloudRestoreResult.Success)
+
+        // Pressing Next -> dismissRestoreResult
+        vm.dismissRestoreResult()
+
+        // After dismiss, all action state is clean — no navigation triggers
+        val state = vm.actionState.value
+        assertNull("restoreResult must be null after dismiss", state.restoreResult)
+        assertNull("pendingRestoreCandidate must remain null", state.pendingRestoreCandidate)
+        assertFalse("isBusy must be false", state.isBusy)
+        assertNull("errorMessage must be null", state.errorMessage)
+        // No successMessage that could trigger navigation
+        assertNull("successMessage must be null", state.successMessage)
+    }
+
+    @Test
+    fun `restore failure also preserves clean state for Settings`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(
+            effectivelyEmptyBackup(),
+            restoreOutcomeOverride = null // will fail due to missing chunks
+        )
+        val remote = FakeRemoteRepo()
+        val snapshot = createCloudSnapshot(backupRepo, nonEmptyBackup())
+        // Intentionally NOT adding chunks -> download failure
+
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        advanceUntilIdle()
+        vm.confirmPendingRestore()
+        advanceUntilIdle()
+
+        // Result must be Failure
+        val result = vm.actionState.value.restoreResult
+        assertTrue("restoreResult must be Failure", result is CloudRestoreResult.Failure)
+        assertFalse(vm.actionState.value.isBusy)
+
+        // Dismiss failure
+        vm.dismissRestoreResult()
+        assertNull(vm.actionState.value.restoreResult)
+        assertNull(vm.actionState.value.successMessage)
     }
 
     private fun createCloudSnapshot(
@@ -404,7 +657,10 @@ class CloudBackupViewModelTest {
         }
     }
 
-    private class FakeBackupRepo(var currentBackup: ExpenseTrackerBackup) : BackupRepository {
+    private class FakeBackupRepo(
+        var currentBackup: ExpenseTrackerBackup,
+        private val restoreOutcomeOverride: BackupRestoreOutcome? = null
+    ) : BackupRepository {
         private val moshi = Moshi.Builder().build()
         private val adapter = moshi.adapter(ExpenseTrackerBackup::class.java)
         var restoreCalls = 0
@@ -414,7 +670,7 @@ class CloudBackupViewModelTest {
         override suspend fun restoreSnapshot(backup: ExpenseTrackerBackup): Result<BackupRestoreOutcome> {
             restoreCalls++
             currentBackup = backup
-            return Result.success(BackupRestoreOutcome.Complete)
+            return Result.success(restoreOutcomeOverride ?: BackupRestoreOutcome.Complete)
         }
 
         override fun serializeBackup(backup: ExpenseTrackerBackup): String = adapter.toJson(backup)

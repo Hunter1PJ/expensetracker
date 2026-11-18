@@ -111,6 +111,16 @@ fun ExpenseTrackerApp(
     var isSubmittingStartupCurrency by rememberSaveable { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
+    // Track whether the app has completed initial provisioning at least once.
+    // Once true, transient provisioning state changes (e.g. during manual restore)
+    // should NOT tear down the main UI tree and reset navigation to Home.
+    var hasCompletedInitialProvisioning by rememberSaveable { mutableStateOf(false) }
+
+    // Declare navigation state ABOVE the provisioning gate so it survives
+    // provisioning state transitions without being torn down and reset.
+    var currentDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
+    var previousDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
+
     LaunchedEffect(resolvedContainer, hasRunStartupCheck) {
         if (resolvedContainer != null && !hasRunStartupCheck) {
             hasRunStartupCheck = true
@@ -128,7 +138,18 @@ fun ExpenseTrackerApp(
         }
     }
 
-    if (!startupState.allowsNavigation) {
+    // Mark initial provisioning complete when the app first reaches Ready state.
+    LaunchedEffect(startupState) {
+        if (startupState.allowsNavigation) {
+            hasCompletedInitialProvisioning = true
+        }
+    }
+
+    // Only show the startup provisioning gate during initial app startup.
+    // Once the app has completed initial provisioning, transient provisioning
+    // state changes (e.g. from manual cloud restore) are handled in-context
+    // by the CloudBackupSection dialogs, not by tearing down the entire UI.
+    if (!startupState.allowsNavigation && !hasCompletedInitialProvisioning) {
         StartupProvisioningGate(
             state = startupState,
             selectedCurrencyCode = selectedStartupCurrency,
@@ -173,9 +194,6 @@ fun ExpenseTrackerApp(
     val settingsViewModelHolder = remember(resolvedContainer) {
         androidx.compose.runtime.mutableStateOf<com.suguru.expensetracker.presentation.settings.SettingsViewModel?>(null)
     }
-
-    var currentDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
-    var previousDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
     var selectedEditCategoryId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedEditBudgetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedEditRecurringRuleId by rememberSaveable { mutableStateOf<Long?>(null) }

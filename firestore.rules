@@ -13,6 +13,14 @@ service cloud.firestore {
       return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isGenerationId(id) {
+      return id is string && id.size() >= 5 && id.size() <= 128 && id.matches('^gen_[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isPrimaryId(id) {
+      return id == 'primary_restore_point';
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -38,7 +46,7 @@ service cloud.firestore {
     }
 
     // --- Entity Validation Helpers ---
-    function isValidBackupManifest(data) {
+    function isValidGenerationManifest(data) {
       return data.keys().hasAll([
                'userId', 'status', 'createdAt', 'updatedAt',
                'formatVersion', 'databaseSchemaVersion', 'appVersion',
@@ -53,7 +61,7 @@ service cloud.firestore {
                'payloadSha256', 'contentFingerprint'
              ]) &&
              data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
-             data.status is string && data.status.size() >= 6 && data.status.size() <= 16 &&
+             data.status is string &&
              data.status in ['UPLOADING', 'COMPLETE', 'FAILED'] &&
              data.createdAt is timestamp && data.createdAt <= request.time &&
              data.updatedAt is timestamp && data.updatedAt <= request.time &&
@@ -74,6 +82,7 @@ service cloud.firestore {
                  'completedAt' in data &&
                  data.completedAt is timestamp &&
                  data.completedAt <= request.time &&
+                 data.createdAt <= data.completedAt &&
                  !('failedAt' in data) &&
                  !('failureCode' in data)) ||
                (data.status == 'FAILED' &&
@@ -81,8 +90,107 @@ service cloud.firestore {
                  'failedAt' in data &&
                  data.failedAt is timestamp &&
                  data.failedAt <= request.time &&
+                 data.createdAt <= data.failedAt &&
                  'failureCode' in data &&
                  isFailureCode(data.failureCode))
+             );
+    }
+
+    function isValidPrimaryManifest(data) {
+      return data.keys().hasAll([
+               'userId', 'status', 'createdAt', 'updatedAt', 'completedAt',
+               'formatVersion', 'databaseSchemaVersion', 'appVersion',
+               'chunkCount', 'compressedBytes', 'uncompressedBytes',
+               'payloadSha256', 'contentFingerprint', 'generationId'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'status', 'createdAt', 'updatedAt', 'completedAt',
+               'formatVersion', 'databaseSchemaVersion', 'appVersion',
+               'chunkCount', 'compressedBytes', 'uncompressedBytes',
+               'payloadSha256', 'contentFingerprint', 'generationId'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.status == 'COMPLETE' &&
+             isGenerationId(data.generationId) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             data.completedAt is timestamp && data.completedAt <= request.time &&
+             data.createdAt <= data.completedAt &&
+             data.formatVersion is int && data.formatVersion >= 1 && data.formatVersion <= 1000 &&
+             data.databaseSchemaVersion is int && data.databaseSchemaVersion >= 1 && data.databaseSchemaVersion <= 1000 &&
+             data.appVersion is string && data.appVersion.size() >= 1 && data.appVersion.size() <= 64 &&
+             data.chunkCount is int && data.chunkCount >= 1 && data.chunkCount <= 500 &&
+             data.compressedBytes is int && data.compressedBytes >= 1 && data.compressedBytes <= 16777216 &&
+             data.uncompressedBytes is int && data.uncompressedBytes >= 1 && data.uncompressedBytes <= 16777216 &&
+             isSha256Hex(data.payloadSha256) &&
+             isSha256Hex(data.contentFingerprint);
+    }
+
+    function matchesCompletedGeneration(data, genDoc, userId) {
+      return genDoc.userId == userId &&
+             genDoc.status == 'COMPLETE' &&
+             data.completedAt == genDoc.completedAt &&
+             data.formatVersion == genDoc.formatVersion &&
+             data.databaseSchemaVersion == genDoc.databaseSchemaVersion &&
+             data.appVersion == genDoc.appVersion &&
+             data.chunkCount == genDoc.chunkCount &&
+             data.compressedBytes == genDoc.compressedBytes &&
+             data.uncompressedBytes == genDoc.uncompressedBytes &&
+             data.payloadSha256 == genDoc.payloadSha256 &&
+             data.contentFingerprint == genDoc.contentFingerprint;
+    }
+
+    function isValidPrimaryCreate(database, userId, data) {
+      return isValidPrimaryManifest(data) &&
+             data.userId == request.auth.uid &&
+             exists(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(data.generationId)) &&
+             matchesCompletedGeneration(data, get(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(data.generationId)).data, userId) &&
+             data.createdAt == get(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(data.generationId)).data.createdAt;
+    }
+
+    function isValidPrimaryUpdate(database, userId, incomingData, existingData) {
+      return isValidPrimaryManifest(incomingData) &&
+             existingData.status == 'COMPLETE' &&
+             incomingData.userId == existingData.userId &&
+             incomingData.createdAt == existingData.createdAt &&
+             incomingData.diff(existingData).affectedKeys().hasOnly([
+               'status', 'completedAt', 'updatedAt', 'formatVersion',
+               'databaseSchemaVersion', 'appVersion', 'chunkCount',
+               'compressedBytes', 'uncompressedBytes', 'payloadSha256',
+               'contentFingerprint', 'generationId'
+             ]) &&
+             exists(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(incomingData.generationId)) &&
+             matchesCompletedGeneration(incomingData, get(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(incomingData.generationId)).data, userId);
+    }
+
+    function isValidGenerationCreate(data) {
+      return isValidGenerationManifest(data) &&
+             data.userId == request.auth.uid &&
+             data.status == 'UPLOADING';
+    }
+
+    function isValidGenerationUpdate(incomingData, existingData) {
+      return isValidGenerationManifest(incomingData) &&
+             existingData.status in ['UPLOADING', 'FAILED'] &&
+             incomingData.userId == existingData.userId &&
+             incomingData.createdAt == existingData.createdAt &&
+             incomingData.formatVersion == existingData.formatVersion &&
+             incomingData.databaseSchemaVersion == existingData.databaseSchemaVersion &&
+             incomingData.appVersion == existingData.appVersion &&
+             incomingData.chunkCount == existingData.chunkCount &&
+             incomingData.compressedBytes == existingData.compressedBytes &&
+             incomingData.uncompressedBytes == existingData.uncompressedBytes &&
+             incomingData.payloadSha256 == existingData.payloadSha256 &&
+             incomingData.contentFingerprint == existingData.contentFingerprint &&
+             (
+               (existingData.status == 'UPLOADING' &&
+                 incomingData.status == 'COMPLETE' &&
+                 incomingData.diff(existingData).affectedKeys().hasOnly(['status', 'completedAt', 'updatedAt'])) ||
+               (existingData.status == 'UPLOADING' &&
+                 incomingData.status == 'FAILED' &&
+                 incomingData.diff(existingData).affectedKeys().hasOnly(['status', 'failedAt', 'failureCode', 'updatedAt'])) ||
+               (incomingData.status == 'UPLOADING' &&
+                 incomingData.diff(existingData).affectedKeys().hasOnly(['status', 'updatedAt', 'failedAt', 'failureCode']))
              );
     }
 
@@ -110,51 +218,26 @@ service cloud.firestore {
 
     // --- Collection Rules ---
     match /users/{userId}/backup_manifests/{snapshotId} {
-      allow get: if isOwner(userId) && isValidId(snapshotId);
+      allow get: if isOwner(userId) && (isGenerationId(snapshotId) || isPrimaryId(snapshotId));
       allow list: if isOwner(userId);
 
       allow create: if isOwner(userId) &&
-                       isValidId(snapshotId) &&
-                       isValidBackupManifest(incoming()) &&
-                       incoming().userId == request.auth.uid &&
-                       incoming().status == 'UPLOADING';
+                       ((isGenerationId(snapshotId) && isValidGenerationCreate(incoming())) ||
+                        (isPrimaryId(snapshotId) && isValidPrimaryCreate(database, userId, incoming())));
 
-      // Terminal State Locking: COMPLETE is immutable; UPLOADING may transition to COMPLETE or FAILED;
-      // UPLOADING or FAILED may retry back to UPLOADING with identical immutable snapshot metadata.
       allow update: if isOwner(userId) &&
-                       isValidId(snapshotId) &&
-                       isValidBackupManifest(incoming()) &&
-                       existing().status in ['UPLOADING', 'FAILED'] &&
-                       incoming().userId == existing().userId &&
-                       incoming().createdAt == existing().createdAt &&
-                       incoming().formatVersion == existing().formatVersion &&
-                       incoming().databaseSchemaVersion == existing().databaseSchemaVersion &&
-                       incoming().appVersion == existing().appVersion &&
-                       incoming().chunkCount == existing().chunkCount &&
-                       incoming().compressedBytes == existing().compressedBytes &&
-                       incoming().uncompressedBytes == existing().uncompressedBytes &&
-                       incoming().payloadSha256 == existing().payloadSha256 &&
-                       incoming().contentFingerprint == existing().contentFingerprint &&
-                       (
-                         (existing().status == 'UPLOADING' &&
-                           incoming().status == 'COMPLETE' &&
-                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt', 'updatedAt'])) ||
-                         (existing().status == 'UPLOADING' &&
-                           incoming().status == 'FAILED' &&
-                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'failedAt', 'failureCode', 'updatedAt'])) ||
-                         (incoming().status == 'UPLOADING' &&
-                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'failedAt', 'failureCode']))
-                       );
+                       ((isGenerationId(snapshotId) && isValidGenerationUpdate(incoming(), existing())) ||
+                        (isPrimaryId(snapshotId) && isValidPrimaryUpdate(database, userId, incoming(), existing())));
 
-      allow delete: if isOwner(userId) && isValidId(snapshotId);
+      allow delete: if isOwner(userId) && (isGenerationId(snapshotId) || isPrimaryId(snapshotId));
 
       match /chunks/{chunkId} {
-        allow get: if isOwner(userId) && isValidId(snapshotId) && isValidId(chunkId);
-        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isGenerationId(snapshotId) && isValidId(chunkId);
+        allow list: if isOwner(userId) && isGenerationId(snapshotId);
 
-        // Parent Gate: chunk writes require an active UPLOADING parent manifest owned by the user.
+        // Parent Gate: chunk writes require an active UPLOADING parent generation manifest owned by the user.
         allow create: if isOwner(userId) &&
-                         isValidId(snapshotId) &&
+                         isGenerationId(snapshotId) &&
                          isValidId(chunkId) &&
                          isValidBackupChunk(incoming(), snapshotId) &&
                          incoming().userId == request.auth.uid &&
@@ -167,7 +250,7 @@ service cloud.firestore {
         // Chunks are immutable once uploaded.
         allow update: if false;
 
-        allow delete: if isOwner(userId) && isValidId(snapshotId) && isValidId(chunkId);
+        allow delete: if isOwner(userId) && isGenerationId(snapshotId) && isValidId(chunkId);
       }
     }
   }

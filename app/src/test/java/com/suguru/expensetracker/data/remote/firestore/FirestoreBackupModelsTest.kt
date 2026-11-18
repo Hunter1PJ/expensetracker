@@ -74,6 +74,89 @@ class FirestoreBackupModelsTest {
     }
 
     @Test
+    fun `toPrimaryCreatePayload includes all 14 required fields with explicit generation timestamps`() {
+        val manifest = CloudBackupManifest(
+            snapshotId = "primary_restore_point",
+            uid = "uid_123",
+            status = CloudBackupManifestStatus.COMPLETE,
+            createdAt = Instant.ofEpochSecond(1_763_200_000L),
+            completedAt = Instant.ofEpochSecond(1_763_200_010L),
+            formatVersion = 1,
+            databaseSchemaVersion = 4,
+            appVersion = "1.5.0",
+            chunkCount = 2,
+            compressedBytes = 1024L,
+            uncompressedBytes = 4096L,
+            payloadSha256 = shaA,
+            contentFingerprint = shaB
+        )
+        val genCreated = Timestamp(1_763_200_000L, 0)
+        val genCompleted = Timestamp(1_763_200_010L, 0)
+
+        val map = FirestoreBackupManifestDto.toPrimaryCreatePayload(
+            uid = "uid_123",
+            manifest = manifest,
+            generationId = "gen_001",
+            generationCreatedAt = genCreated,
+            generationCompletedAt = genCompleted
+        )
+
+        val expectedKeys = setOf(
+            "userId", "status", "createdAt", "updatedAt", "completedAt",
+            "formatVersion", "databaseSchemaVersion", "appVersion",
+            "chunkCount", "compressedBytes", "uncompressedBytes",
+            "payloadSha256", "contentFingerprint", "generationId"
+        )
+        assertEquals(expectedKeys, map.keys)
+        assertEquals("uid_123", map["userId"])
+        assertEquals("COMPLETE", map["status"])
+        assertEquals(genCreated, map["createdAt"])
+        assertEquals(genCompleted, map["completedAt"])
+        assertEquals("gen_001", map["generationId"])
+        assertTrue(map["updatedAt"] is FieldValue)
+    }
+
+    @Test
+    fun `toPrimaryPromotionUpdatePayload excludes createdAt and userId to preserve immutability`() {
+        val manifest = CloudBackupManifest(
+            snapshotId = "primary_restore_point",
+            uid = "uid_123",
+            status = CloudBackupManifestStatus.COMPLETE,
+            createdAt = Instant.ofEpochSecond(1_763_200_000L),
+            completedAt = Instant.ofEpochSecond(1_763_200_020L),
+            formatVersion = 1,
+            databaseSchemaVersion = 4,
+            appVersion = "1.5.0",
+            chunkCount = 3,
+            compressedBytes = 2048L,
+            uncompressedBytes = 8192L,
+            payloadSha256 = shaA,
+            contentFingerprint = shaB
+        )
+        val genCompleted = Timestamp(1_763_200_020L, 0)
+
+        val map = FirestoreBackupManifestDto.toPrimaryPromotionUpdatePayload(
+            manifest = manifest,
+            generationId = "gen_002",
+            generationCompletedAt = genCompleted
+        )
+
+        assertFalse(map.containsKey("createdAt"))
+        assertFalse(map.containsKey("userId"))
+        val expectedKeys = setOf(
+            "status", "updatedAt", "completedAt",
+            "formatVersion", "databaseSchemaVersion", "appVersion",
+            "chunkCount", "compressedBytes", "uncompressedBytes",
+            "payloadSha256", "contentFingerprint", "generationId"
+        )
+        assertEquals(expectedKeys, map.keys)
+        assertEquals("COMPLETE", map["status"])
+        assertEquals(genCompleted, map["completedAt"])
+        assertEquals("gen_002", map["generationId"])
+        assertTrue(map["updatedAt"] is FieldValue)
+    }
+
+    @Test
     fun `manifest DTO maps valid COMPLETE and FAILED documents and rejects malformed values`() {
         val dto = FirestoreBackupManifestDto(
             snapshotId = "snap_001",

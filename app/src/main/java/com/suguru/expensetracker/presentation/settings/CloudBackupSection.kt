@@ -458,16 +458,44 @@ private fun AuthenticatedCloudBackupCard(
         )
     }
 
-    actionState.pendingRestoreCandidate?.let { candidate ->
+    if (actionState.isBusy && actionState.busyMessage != null) {
+        AlertDialog(
+            onDismissRequest = {},
+            shape = ExpenseTrackerRadius.dialog,
+            containerColor = ExpenseTrackerTheme.extendedColors.surface,
+            icon = {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(36.dp),
+                    strokeWidth = 3.dp
+                )
+            },
+            title = {
+                Text(
+                    text = "Restoring Cloud Backup",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = actionState.busyMessage ?: "Restoring data to this device...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                )
+            },
+            confirmButton = {}
+        )
+    }
+
+    actionState.pendingRestoreCandidate?.let { manifest ->
         AlertDialog(
             onDismissRequest = { viewModel.cancelPendingRestore() },
             shape = ExpenseTrackerRadius.dialog,
             containerColor = ExpenseTrackerTheme.extendedColors.surface,
             icon = {
                 Icon(
-                    imageVector = Icons.Default.Warning,
+                    imageVector = Icons.Default.CloudDownload,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(36.dp)
                 )
             },
@@ -480,19 +508,19 @@ private fun AuthenticatedCloudBackupCard(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                     Text(
-                        text = "Your device currently has local expense data. Restoring this cloud snapshot will replace local records.",
+                        text = "Cloud backup data will be restored to this device. Any existing local data will be replaced by the snapshot.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "Snapshot from ${formatInstant(candidate.manifest.completedAt ?: candidate.manifest.createdAt)} • ${candidate.backup.transactions.size} transactions",
+                        text = "Snapshot from ${formatInstant(manifest.completedAt ?: manifest.createdAt)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
                 }
             },
             confirmButton = {
-                DangerButton(
-                    text = "Restore Cloud Data",
+                PrimaryButton(
+                    text = "Restore",
                     onClick = { viewModel.confirmPendingRestore() },
                     leadingIcon = Icons.Default.CloudDownload,
                     testTag = "confirm_cloud_restore_button"
@@ -506,6 +534,86 @@ private fun AuthenticatedCloudBackupCard(
                 )
             }
         )
+    }
+
+    actionState.restoreResult?.let { result ->
+        when (result) {
+            is CloudRestoreResult.Success -> {
+                AlertDialog(
+                    onDismissRequest = { viewModel.dismissRestoreResult() },
+                    shape = ExpenseTrackerRadius.dialog,
+                    containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.CloudDone,
+                            contentDescription = null,
+                            tint = ExpenseTrackerTheme.extendedColors.financialPositive,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "Data successfully restored to this device.",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "All accounts, transactions, and categories have been updated from your cloud backup snapshot (${formatInstant(result.manifest.completedAt ?: result.manifest.createdAt)}).",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        PrimaryButton(
+                            text = "Next",
+                            onClick = { viewModel.dismissRestoreResult() },
+                            testTag = "restore_success_next_button"
+                        )
+                    }
+                )
+            }
+            is CloudRestoreResult.Failure -> {
+                AlertDialog(
+                    onDismissRequest = { viewModel.dismissRestoreResult() },
+                    shape = ExpenseTrackerRadius.dialog,
+                    containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "Restoration failed",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
+                            Text(
+                                text = "Unable to restore data from cloud backup to this device:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = result.reason,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        PrimaryButton(
+                            text = "Next",
+                            onClick = { viewModel.dismissRestoreResult() },
+                            testTag = "restore_failure_next_button"
+                        )
+                    }
+                )
+            }
+        }
     }
 }
 

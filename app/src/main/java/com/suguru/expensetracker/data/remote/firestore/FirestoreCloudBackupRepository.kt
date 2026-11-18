@@ -9,7 +9,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
-import com.google.firebase.firestore.FieldValue
 import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.error.CloudBackupRemoteException
 import com.suguru.expensetracker.domain.model.CloudBackupChunkedPayload
@@ -157,6 +156,23 @@ class FirestoreCloudBackupRepository internal constructor(
             val completedGeneration = gateway.getManifest(uid, generationId)
                 ?: throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Generation manifest missing.")
 
+            if (completedGeneration.status != CloudBackupManifestStatus.COMPLETE.name) {
+                throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Generation status is not COMPLETE.")
+            }
+            val generationCreatedAt = completedGeneration.createdAt
+                ?: throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Generation createdAt missing.")
+            val generationCompletedAt = completedGeneration.completedAt
+                ?: throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Generation completedAt missing.")
+
+            if (generationCompletedAt.seconds < generationCreatedAt.seconds ||
+                (generationCompletedAt.seconds == generationCreatedAt.seconds && generationCompletedAt.nanoseconds < generationCreatedAt.nanoseconds)) {
+                throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Invalid generation timestamp ordering.")
+            }
+
+            if (!completedGeneration.matchesImmutableMetadata(generationManifest)) {
+                throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Generation metadata mismatch.")
+            }
+
             val generationChunks = gateway.listChunks(uid, generationId)
             if (generationChunks.size != manifest.chunkCount) {
                 throw CloudBackupRemoteException.ChunkIntegrityError(
@@ -165,21 +181,25 @@ class FirestoreCloudBackupRepository internal constructor(
                 )
             }
 
-            val primaryPayload = FirestoreBackupManifestDto.toUploadingCreatePayload(uid, generationManifest).toMutableMap().apply {
-                this["status"] = CloudBackupManifestStatus.COMPLETE.name
-                this["completedAt"] = completedGeneration.completedAt ?: com.google.firebase.Timestamp.now()
-                this["updatedAt"] = FieldValue.serverTimestamp()
-                this["generationId"] = generationId
-            }
-
             val primaryExists = existingPrimaryDto != null
             currentPath = "users/$uid/backup_manifests/$PRIMARY_SNAPSHOT_ID"
             currentOp = if (primaryExists) OperationType.UPDATE else OperationType.CREATE
             if (primaryExists) {
-                gateway.markManifestComplete(uid, PRIMARY_SNAPSHOT_ID, primaryPayload)
+                val updatePayload = FirestoreBackupManifestDto.toPrimaryPromotionUpdatePayload(
+                    manifest = generationManifest,
+                    generationId = generationId,
+                    generationCompletedAt = generationCompletedAt
+                )
+                gateway.updatePrimaryManifest(uid, updatePayload)
             } else {
-                gateway.createUploadingManifest(uid, PRIMARY_SNAPSHOT_ID, primaryPayload)
-                gateway.markManifestComplete(uid, PRIMARY_SNAPSHOT_ID, primaryPayload)
+                val createPayload = FirestoreBackupManifestDto.toPrimaryCreatePayload(
+                    uid = uid,
+                    manifest = generationManifest,
+                    generationId = generationId,
+                    generationCreatedAt = generationCreatedAt,
+                    generationCompletedAt = generationCompletedAt
+                )
+                gateway.createPrimaryManifest(uid, createPayload)
             }
 
             try {
@@ -200,7 +220,10 @@ class FirestoreCloudBackupRepository internal constructor(
                 ?: manifest.copy(
                     snapshotId = PRIMARY_SNAPSHOT_ID,
                     status = CloudBackupManifestStatus.COMPLETE,
-                    completedAt = Instant.now()
+                    completedAt = Instant.ofEpochSecond(
+                        generationCompletedAt.seconds,
+                        generationCompletedAt.nanoseconds.toLong()
+                    )
                 )
             Result.success(committed)
         } catch (e: CancellationException) {

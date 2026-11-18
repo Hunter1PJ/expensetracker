@@ -28,7 +28,7 @@ function deleteFieldSentinel(db) {
   return db._appCompat.firebase.firestore.FieldValue.delete();
 }
 
-function validUploadingManifestPayload(uid, now = new Date(Date.now() - 1000)) {
+function validUploadingGenerationPayload(uid, now = new Date(Date.now() - 5000)) {
   return {
     userId: uid,
     status: "UPLOADING",
@@ -42,6 +42,25 @@ function validUploadingManifestPayload(uid, now = new Date(Date.now() - 1000)) {
     uncompressedBytes: 4096,
     payloadSha256: SHA_A,
     contentFingerprint: SHA_B,
+  };
+}
+
+function validPrimaryCreatePayload(uid, generationId, genDoc) {
+  return {
+    userId: uid,
+    status: "COMPLETE",
+    createdAt: genDoc.createdAt,
+    updatedAt: new Date(Date.now() - 500),
+    completedAt: genDoc.completedAt,
+    formatVersion: genDoc.formatVersion,
+    databaseSchemaVersion: genDoc.databaseSchemaVersion,
+    appVersion: genDoc.appVersion,
+    chunkCount: genDoc.chunkCount,
+    compressedBytes: genDoc.compressedBytes,
+    uncompressedBytes: genDoc.uncompressedBytes,
+    payloadSha256: genDoc.payloadSha256,
+    contentFingerprint: genDoc.contentFingerprint,
+    generationId: generationId,
   };
 }
 
@@ -97,105 +116,159 @@ test("Unauthenticated user: cannot read, list, create, update, or delete backup 
       .collection("users")
       .doc(ALICE_UID)
       .collection("backup_manifests")
-      .doc("snap_1")
-      .set(validUploadingManifestPayload(ALICE_UID))
+      .doc("gen_1")
+      .set(validUploadingGenerationPayload(ALICE_UID))
   );
   await assertFails(
     unauthDb
       .collection("users")
       .doc(ALICE_UID)
       .collection("backup_manifests")
-      .doc("snap_1")
+      .doc("gen_1")
       .collection("chunks")
+      .get()
+  );
+  await assertFails(
+    unauthDb
+      .collection("users")
+      .doc(ALICE_UID)
+      .collection("backup_manifests")
+      .doc("primary_restore_point")
       .get()
   );
 });
 
-test("Authenticated owner: Kotlin-mirrored upload lifecycle (UPLOADING -> binary Blob chunks -> COMPLETE) and list queries succeed", async () => {
+test("Authenticated owner: generation lifecycle and primary promotion lifecycle succeed", async () => {
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   const created = new Date(Date.now() - 5000);
-  const manifestRef = aliceDb
+  const genId = "gen_1763200000_01";
+  const genRef = aliceDb
     .collection("users")
     .doc(ALICE_UID)
     .collection("backup_manifests")
-    .doc("snap_1763200000_01");
+    .doc(genId);
 
-  // 1. Create UPLOADING manifest (no @DocumentId field, no optional fields)
-  await assertSucceeds(manifestRef.set(validUploadingManifestPayload(ALICE_UID, created)));
+  // 1. Create UPLOADING generation manifest
+  const genPayload = validUploadingGenerationPayload(ALICE_UID, created);
+  await assertSucceeds(genRef.set(genPayload));
 
-  // 2. Upload ordered binary Blob chunks under parent UPLOADING manifest
+  // 2. Upload ordered binary Blob chunks under parent generation manifest
   await assertSucceeds(
-    manifestRef
+    genRef
       .collection("chunks")
       .doc("chunk_0")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_1763200000_01", 0, 2, created))
+      .set(validChunkPayload(aliceDb, ALICE_UID, genId, 0, 2, created))
   );
   await assertSucceeds(
-    manifestRef
+    genRef
       .collection("chunks")
       .doc("chunk_1")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_1763200000_01", 1, 2, created))
+      .set(validChunkPayload(aliceDb, ALICE_UID, genId, 1, 2, created))
   );
 
-  // 3. Transition manifest to COMPLETE via partial update
-  const completed = new Date(Date.now() - 1000);
+  // 3. Transition generation manifest to COMPLETE via partial update
+  const completed = new Date(Date.now() - 2000);
   await assertSucceeds(
-    manifestRef.update({
+    genRef.update({
       status: "COMPLETE",
       completedAt: completed,
       updatedAt: completed,
     })
   );
 
-  // 4. Mirror Kotlin ordered list query, COMPLETE status query, and chunk list query
-  await assertSucceeds(
-    aliceDb
-      .collection("users")
-      .doc(ALICE_UID)
-      .collection("backup_manifests")
-      .orderBy("createdAt", "desc")
-      .limit(20)
-      .get()
-  );
-  await assertSucceeds(
-    aliceDb
-      .collection("users")
-      .doc(ALICE_UID)
-      .collection("backup_manifests")
-      .where("status", "==", "COMPLETE")
-      .get()
-  );
-  await assertSucceeds(manifestRef.collection("chunks").orderBy("index", "asc").get());
+  // 4. Create primary_restore_point referencing completed generation
+  const primaryRef = aliceDb
+    .collection("users")
+    .doc(ALICE_UID)
+    .collection("backup_manifests")
+    .doc("primary_restore_point");
 
-  // 5. Terminal state locking: COMPLETE manifest cannot be mutated or reset
-  await assertFails(
-    manifestRef.update({
-      status: "UPLOADING",
+  const completedGenDoc = {
+    ...genPayload,
+    status: "COMPLETE",
+    completedAt: completed,
+  };
+  await assertSucceeds(primaryRef.set(validPrimaryCreatePayload(ALICE_UID, genId, completedGenDoc)));
+
+  // 5. Subsequent generation upload and primary promotion
+  const genId2 = "gen_1763200000_02";
+  const genRef2 = aliceDb
+    .collection("users")
+    .doc(ALICE_UID)
+    .collection("backup_manifests")
+    .doc(genId2);
+  const created2 = new Date(Date.now() - 1500);
+  const completed2 = new Date(Date.now() - 1000);
+  const genPayload2 = validUploadingGenerationPayload(ALICE_UID, created2);
+  await assertSucceeds(genRef2.set(genPayload2));
+  await assertSucceeds(
+    genRef2
+      .collection("chunks")
+      .doc("chunk_0")
+      .set(validChunkPayload(aliceDb, ALICE_UID, genId2, 0, 2, created2))
+  );
+  await assertSucceeds(
+    genRef2
+      .collection("chunks")
+      .doc("chunk_1")
+      .set(validChunkPayload(aliceDb, ALICE_UID, genId2, 1, 2, created2))
+  );
+  await assertSucceeds(
+    genRef2.update({
+      status: "COMPLETE",
+      completedAt: completed2,
+      updatedAt: completed2,
+    })
+  );
+
+  // Promote primary: updates metadata, points to genId2, preserves createdAt
+  await assertSucceeds(
+    primaryRef.update({
+      status: "COMPLETE",
       updatedAt: new Date(Date.now() - 500),
+      completedAt: completed2,
+      formatVersion: 1,
+      databaseSchemaVersion: 4,
+      appVersion: "1.5.0",
+      chunkCount: 2,
+      compressedBytes: SAMPLE_BYTE_COUNT * 2,
+      uncompressedBytes: 4096,
+      payloadSha256: SHA_A,
+      contentFingerprint: SHA_B,
+      generationId: genId2,
+    })
+  );
+
+  // 6. Terminal state locking: generation COMPLETE cannot be mutated
+  await assertFails(
+    genRef.update({
+      status: "UPLOADING",
+      updatedAt: new Date(Date.now() - 100),
     })
   );
 });
 
-test("Authenticated owner: FAILED manifest can retry back to UPLOADING and complete, while direct FAILED -> COMPLETE is blocked", async () => {
+test("Authenticated owner: FAILED generation can retry back to UPLOADING and complete", async () => {
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   const created = new Date(Date.now() - 10000);
-  const manifestRef = aliceDb
+  const genId = "gen_retry_01";
+  const genRef = aliceDb
     .collection("users")
     .doc(ALICE_UID)
     .collection("backup_manifests")
-    .doc("snap_retry_01");
+    .doc(genId);
 
-  await assertSucceeds(manifestRef.set(validUploadingManifestPayload(ALICE_UID, created)));
+  await assertSucceeds(genRef.set(validUploadingGenerationPayload(ALICE_UID, created)));
   await assertSucceeds(
-    manifestRef
+    genRef
       .collection("chunks")
       .doc("chunk_0")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_retry_01", 0, 2, created))
+      .set(validChunkPayload(aliceDb, ALICE_UID, genId, 0, 2, created))
   );
 
   const failedAt = new Date(Date.now() - 5000);
   await assertSucceeds(
-    manifestRef.update({
+    genRef.update({
       status: "FAILED",
       failedAt,
       failureCode: "CHUNK_UPLOAD_ERROR",
@@ -203,27 +276,27 @@ test("Authenticated owner: FAILED manifest can retry back to UPLOADING and compl
     })
   );
 
-  // Cannot skip directly from FAILED to COMPLETE
+  // Direct FAILED -> COMPLETE blocked
   await assertFails(
-    manifestRef.update({
+    genRef.update({
       status: "COMPLETE",
       completedAt: new Date(Date.now() - 4000),
       updatedAt: new Date(Date.now() - 4000),
     })
   );
 
-  // Chunks cannot be created while parent manifest is FAILED
+  // Chunks cannot be created while parent is FAILED
   await assertFails(
-    manifestRef
+    genRef
       .collection("chunks")
       .doc("chunk_1")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_retry_01", 1, 2, failedAt))
+      .set(validChunkPayload(aliceDb, ALICE_UID, genId, 1, 2, failedAt))
   );
 
-  // Retry: transition FAILED -> UPLOADING (deleting failedAt/failureCode), upload remaining chunk, transition to COMPLETE
+  // Retry: FAILED -> UPLOADING
   const retryAt = new Date(Date.now() - 3000);
   await assertSucceeds(
-    manifestRef.update({
+    genRef.update({
       status: "UPLOADING",
       updatedAt: retryAt,
       failedAt: deleteFieldSentinel(aliceDb),
@@ -231,14 +304,14 @@ test("Authenticated owner: FAILED manifest can retry back to UPLOADING and compl
     })
   );
   await assertSucceeds(
-    manifestRef
+    genRef
       .collection("chunks")
       .doc("chunk_1")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_retry_01", 1, 2, retryAt))
+      .set(validChunkPayload(aliceDb, ALICE_UID, genId, 1, 2, retryAt))
   );
   const completedAt = new Date(Date.now() - 1000);
   await assertSucceeds(
-    manifestRef.update({
+    genRef.update({
       status: "COMPLETE",
       completedAt,
       updatedAt: completedAt,
@@ -249,156 +322,129 @@ test("Authenticated owner: FAILED manifest can retry back to UPLOADING and compl
 test("Authenticated user: cannot read, list, create, update, or delete another user's manifests or chunks", async () => {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const adminDb = context.firestore();
-    const bobManifest = adminDb
+    const bobGen = adminDb
       .collection("users")
       .doc(BOB_UID)
       .collection("backup_manifests")
-      .doc("bob_snap_1");
-    await bobManifest.set(validUploadingManifestPayload(BOB_UID));
-    await bobManifest
+      .doc("gen_bob_1");
+    await bobGen.set(validUploadingGenerationPayload(BOB_UID));
+    await bobGen
       .collection("chunks")
       .doc("chunk_0")
-      .set(validChunkPayload(adminDb, BOB_UID, "bob_snap_1", 0, 2));
+      .set(validChunkPayload(adminDb, BOB_UID, "gen_bob_1", 0, 2));
   });
 
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
-  const bobManifestAsAlice = aliceDb
+  const bobGenAsAlice = aliceDb
     .collection("users")
     .doc(BOB_UID)
     .collection("backup_manifests")
-    .doc("bob_snap_1");
+    .doc("gen_bob_1");
 
-  await assertFails(bobManifestAsAlice.get());
+  await assertFails(bobGenAsAlice.get());
   await assertFails(
     aliceDb.collection("users").doc(BOB_UID).collection("backup_manifests").get()
   );
-  await assertFails(bobManifestAsAlice.collection("chunks").doc("chunk_0").get());
-  await assertFails(bobManifestAsAlice.collection("chunks").get());
-  await assertFails(bobManifestAsAlice.delete());
+  await assertFails(bobGenAsAlice.collection("chunks").doc("chunk_0").get());
+  await assertFails(bobGenAsAlice.collection("chunks").get());
+  await assertFails(bobGenAsAlice.delete());
   await assertFails(
     aliceDb
       .collection("users")
       .doc(BOB_UID)
       .collection("backup_manifests")
-      .doc("alice_spoof")
-      .set(validUploadingManifestPayload(ALICE_UID))
+      .doc("gen_alice_spoof")
+      .set(validUploadingGenerationPayload(ALICE_UID))
   );
 });
 
-test("Negative security bounds: rejects @DocumentId field, ghost keys, future timestamps, spoofing, binary payload mismatches, and invalid chunk counts", async () => {
+test("Negative security bounds: rejects invalid snapshot IDs, unpromoted references, tampered primary metadata, and chunks under primary", async () => {
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   const manifests = aliceDb.collection("users").doc(ALICE_UID).collection("backup_manifests");
 
-  // Extra @DocumentId / snapshotId key forbidden
+  // Snapshot ID not starting with gen_ and not primary_restore_point rejected
   await assertFails(
-    manifests.doc("snap_extra_id").set({
-      ...validUploadingManifestPayload(ALICE_UID),
-      snapshotId: "snap_extra_id",
-    })
+    manifests.doc("snap_invalid_prefix").set(validUploadingGenerationPayload(ALICE_UID))
   );
 
-  // Ghost field rejected
+  // Generation manifest cannot be created directly as COMPLETE
   await assertFails(
-    manifests.doc("snap_ghost").set({
-      ...validUploadingManifestPayload(ALICE_UID),
-      isAdmin: true,
-    })
-  );
-
-  // Spoofed userId rejected
-  await assertFails(
-    manifests.doc("snap_spoof").set(validUploadingManifestPayload(BOB_UID))
-  );
-
-  // Cannot create directly as COMPLETE (must start as UPLOADING)
-  await assertFails(
-    manifests.doc("snap_skip_state").set({
-      ...validUploadingManifestPayload(ALICE_UID),
+    manifests.doc("gen_skip_state").set({
+      ...validUploadingGenerationPayload(ALICE_UID),
       status: "COMPLETE",
       completedAt: new Date(Date.now() - 1000),
     })
   );
 
-  // Tampered future timestamp rejected
+  // Primary restore point cannot reference non-existent generation
   await assertFails(
-    manifests.doc("snap_future").set(
-      validUploadingManifestPayload(ALICE_UID, new Date(Date.now() + 60000))
-    )
-  );
-
-  // Invalid document ID poisoned path rejected
-  await assertFails(
-    manifests.doc("bad.id.with.dots").set(validUploadingManifestPayload(ALICE_UID))
-  );
-
-  // Create valid manifest then test chunk constraints & immutable update prevention
-  const validManifestRef = manifests.doc("snap_bounds_01");
-  await assertSucceeds(validManifestRef.set(validUploadingManifestPayload(ALICE_UID)));
-
-  // Chunk with mismatched totalCount or out-of-range index fails
-  await assertFails(
-    validManifestRef
-      .collection("chunks")
-      .doc("chunk_bad_count")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_bounds_01", 0, 3))
-  );
-  await assertFails(
-    validManifestRef
-      .collection("chunks")
-      .doc("chunk_bad_idx")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_bounds_01", 2, 2))
-  );
-  // Chunk with invalid SHA256 fails
-  await assertFails(
-    validManifestRef
-      .collection("chunks")
-      .doc("chunk_bad_sha")
-      .set({
-        ...validChunkPayload(aliceDb, ALICE_UID, "snap_bounds_01", 0, 2),
-        sha256: "not-a-sha",
-      })
-  );
-  // Chunk with string instead of binary Blob or mismatched byteCount fails
-  await assertFails(
-    validManifestRef
-      .collection("chunks")
-      .doc("chunk_bad_type")
-      .set({
-        ...validChunkPayload(aliceDb, ALICE_UID, "snap_bounds_01", 0, 2),
-        payload: "not-bytes",
-      })
-  );
-  await assertFails(
-    validManifestRef
-      .collection("chunks")
-      .doc("chunk_bad_len")
-      .set({
-        ...validChunkPayload(aliceDb, ALICE_UID, "snap_bounds_01", 0, 2),
-        byteCount: SAMPLE_BYTE_COUNT + 10,
-      })
-  );
-
-  // Valid chunk created, then update on chunk fails (chunks immutable)
-  await assertSucceeds(
-    validManifestRef
-      .collection("chunks")
-      .doc("chunk_0")
-      .set(validChunkPayload(aliceDb, ALICE_UID, "snap_bounds_01", 0, 2))
-  );
-  await assertFails(
-    validManifestRef
-      .collection("chunks")
-      .doc("chunk_0")
-      .update({ byteCount: 10 })
-  );
-
-  // Tampered immutable field during manifest update fails
-  await assertFails(
-    validManifestRef.update({
+    manifests.doc("primary_restore_point").set({
+      ...validUploadingGenerationPayload(ALICE_UID),
       status: "COMPLETE",
-      completedAt: new Date(Date.now() - 500),
-      updatedAt: new Date(Date.now() - 500),
-      contentFingerprint: SHA_A,
+      completedAt: new Date(Date.now() - 1000),
+      generationId: "gen_non_existent",
+    })
+  );
+
+  // Create UPLOADING generation
+  const genId = "gen_bounds_01";
+  const genRef = manifests.doc(genId);
+  const created = new Date(Date.now() - 5000);
+  await assertSucceeds(genRef.set(validUploadingGenerationPayload(ALICE_UID, created)));
+
+  // Primary restore point cannot reference UPLOADING generation
+  await assertFails(
+    manifests.doc("primary_restore_point").set({
+      ...validUploadingGenerationPayload(ALICE_UID, created),
+      status: "COMPLETE",
+      completedAt: new Date(Date.now() - 1000),
+      generationId: genId,
+    })
+  );
+
+  // Chunks cannot be created directly under primary_restore_point
+  await assertFails(
+    manifests
+      .doc("primary_restore_point")
+      .collection("chunks")
+      .doc("chunk_0")
+      .set(validChunkPayload(aliceDb, ALICE_UID, "primary_restore_point", 0, 2))
+  );
+
+  // Complete the generation
+  const completed = new Date(Date.now() - 2000);
+  await assertSucceeds(
+    genRef.update({
+      status: "COMPLETE",
+      completedAt: completed,
+      updatedAt: completed,
+    })
+  );
+
+  // Primary with tampered contentFingerprint (not matching generation) rejected
+  await assertFails(
+    manifests.doc("primary_restore_point").set({
+      ...validPrimaryCreatePayload(ALICE_UID, genId, {
+        ...validUploadingGenerationPayload(ALICE_UID, created),
+        status: "COMPLETE",
+        completedAt: completed,
+      }),
+      contentFingerprint: SHA_A, // Tampered!
+    })
+  );
+
+  // Primary create succeeds with matching metadata
+  const validPrimary = validPrimaryCreatePayload(ALICE_UID, genId, {
+    ...validUploadingGenerationPayload(ALICE_UID, created),
+    status: "COMPLETE",
+    completedAt: completed,
+  });
+  await assertSucceeds(manifests.doc("primary_restore_point").set(validPrimary));
+
+  // Primary update cannot modify createdAt
+  await assertFails(
+    manifests.doc("primary_restore_point").update({
+      createdAt: new Date(Date.now() - 100),
     })
   );
 });

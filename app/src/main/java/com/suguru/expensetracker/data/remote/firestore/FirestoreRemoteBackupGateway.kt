@@ -33,6 +33,8 @@ internal interface RemoteBackupGateway {
     suspend fun listChunks(uid: String, snapshotId: String): List<FirestoreBackupChunkDto>
     suspend fun deleteSnapshotDocuments(uid: String, snapshotId: String)
     suspend fun listAllManifests(uid: String): List<FirestoreBackupManifestDto>
+    suspend fun createPrimaryManifest(uid: String, payload: Map<String, Any>)
+    suspend fun updatePrimaryManifest(uid: String, payload: Map<String, Any>)
 }
 
 internal class FirestoreRemoteBackupGateway(
@@ -200,5 +202,25 @@ internal class FirestoreRemoteBackupGateway(
                 DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
             )
         }
+    }
+
+    override suspend fun createPrimaryManifest(
+        uid: String,
+        payload: Map<String, Any>
+    ) {
+        manifestsCollection(uid)
+            .document(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID)
+            .set(payload)
+            .await()
+    }
+
+    override suspend fun updatePrimaryManifest(
+        uid: String,
+        payload: Map<String, Any>
+    ) {
+        manifestsCollection(uid)
+            .document(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID)
+            .update(payload)
+            .await()
     }
 }

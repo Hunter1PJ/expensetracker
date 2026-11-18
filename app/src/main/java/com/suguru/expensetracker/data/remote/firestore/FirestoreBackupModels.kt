@@ -127,6 +127,56 @@ data class FirestoreBackupManifestDto(
                 "updatedAt" to FieldValue.serverTimestamp()
             )
         }
+
+        fun toPrimaryCreatePayload(
+            uid: String,
+            manifest: CloudBackupManifest,
+            generationId: String,
+            generationCreatedAt: Timestamp,
+            generationCompletedAt: Timestamp
+        ): Map<String, Any> {
+            val raw: Map<String, Any?> = mapOf(
+                "userId" to uid,
+                "status" to CloudBackupManifestStatus.COMPLETE.name,
+                "createdAt" to generationCreatedAt,
+                "updatedAt" to FieldValue.serverTimestamp(),
+                "completedAt" to generationCompletedAt,
+                "formatVersion" to manifest.formatVersion.toLong(),
+                "databaseSchemaVersion" to manifest.databaseSchemaVersion.toLong(),
+                "appVersion" to manifest.appVersion,
+                "chunkCount" to manifest.chunkCount.toLong(),
+                "compressedBytes" to manifest.compressedBytes,
+                "uncompressedBytes" to manifest.uncompressedBytes,
+                "payloadSha256" to manifest.payloadSha256,
+                "contentFingerprint" to manifest.contentFingerprint,
+                "generationId" to generationId
+            )
+            @Suppress("UNCHECKED_CAST")
+            return raw.filterValues { it != null } as Map<String, Any>
+        }
+
+        fun toPrimaryPromotionUpdatePayload(
+            manifest: CloudBackupManifest,
+            generationId: String,
+            generationCompletedAt: Timestamp
+        ): Map<String, Any> {
+            val raw: Map<String, Any?> = mapOf(
+                "status" to CloudBackupManifestStatus.COMPLETE.name,
+                "updatedAt" to FieldValue.serverTimestamp(),
+                "completedAt" to generationCompletedAt,
+                "formatVersion" to manifest.formatVersion.toLong(),
+                "databaseSchemaVersion" to manifest.databaseSchemaVersion.toLong(),
+                "appVersion" to manifest.appVersion,
+                "chunkCount" to manifest.chunkCount.toLong(),
+                "compressedBytes" to manifest.compressedBytes,
+                "uncompressedBytes" to manifest.uncompressedBytes,
+                "payloadSha256" to manifest.payloadSha256,
+                "contentFingerprint" to manifest.contentFingerprint,
+                "generationId" to generationId
+            )
+            @Suppress("UNCHECKED_CAST")
+            return raw.filterValues { it != null } as Map<String, Any>
+        }
     }
 }
 

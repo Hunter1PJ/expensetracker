@@ -45,17 +45,18 @@ sealed interface CloudSnapshotsUiState {
     data class Error(val message: String) : CloudSnapshotsUiState
 }
 
-data class CloudRestoreCandidate(
-    val manifest: CloudBackupManifest,
-    val backup: ExpenseTrackerBackup
-)
+sealed interface CloudRestoreResult {
+    data class Success(val manifest: CloudBackupManifest) : CloudRestoreResult
+    data class Failure(val reason: String) : CloudRestoreResult
+}
 
 data class CloudBackupActionUiState(
     val isBusy: Boolean = false,
     val busyMessage: String? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null,
-    val pendingRestoreCandidate: CloudRestoreCandidate? = null
+    val pendingRestoreCandidate: CloudBackupManifest? = null,
+    val restoreResult: CloudRestoreResult? = null
 )
 
 /**
@@ -294,15 +295,31 @@ class CloudBackupViewModel(
             return
         }
 
+        // Show confirmation dialog first without starting download or restoration
+        _actionState.update {
+            it.copy(
+                pendingRestoreCandidate = manifest,
+                restoreResult = null,
+                errorMessage = null,
+                successMessage = null
+            )
+        }
+    }
+
+    fun confirmPendingRestore() {
+        val manifest = _actionState.value.pendingRestoreCandidate ?: return
+        if (_actionState.value.isBusy) return
+        _actionState.update {
+            it.copy(
+                isBusy = true,
+                busyMessage = "Restoring cloud snapshot to this device...",
+                pendingRestoreCandidate = null,
+                restoreResult = null,
+                errorMessage = null,
+                successMessage = null
+            )
+        }
         viewModelScope.launch {
-            _actionState.update {
-                it.copy(
-                    isBusy = true,
-                    busyMessage = "Downloading cloud backup chunks...",
-                    errorMessage = null,
-                    successMessage = null
-                )
-            }
             try {
                 val chunks = remoteRepository.downloadChunks(currentUserId, manifest.snapshotId)
                     .getOrThrow()
@@ -315,49 +332,28 @@ class CloudBackupViewModel(
                 val backup = withContext(workDispatcher) {
                     backupRepository.deserializeBackup(jsonBytes.toString(Charsets.UTF_8)).getOrThrow()
                 }
-                val currentLocalBackup = createFullBackupUseCase()
-                if (LocalBackupStateClassifier.isEffectivelyEmpty(currentLocalBackup)) {
-                    applyCloudRestore(backup, manifest)
-                } else {
-                    _actionState.update {
-                        it.copy(
-                            isBusy = false,
-                            busyMessage = null,
-                            pendingRestoreCandidate = CloudRestoreCandidate(manifest, backup)
-                        )
-                    }
-                }
+                applyCloudRestore(backup, manifest)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                val failureReason = e.localizedMessage ?: "Unable to verify snapshot"
                 _actionState.update {
                     it.copy(
                         isBusy = false,
                         busyMessage = null,
-                        errorMessage = "Cloud restore failed: ${e.localizedMessage ?: "Unable to verify snapshot"}"
+                        restoreResult = CloudRestoreResult.Failure(failureReason)
                     )
                 }
             }
         }
     }
 
-    fun confirmPendingRestore() {
-        val candidate = _actionState.value.pendingRestoreCandidate ?: return
-        if (_actionState.value.isBusy) return
-        viewModelScope.launch {
-            _actionState.update {
-                it.copy(
-                    isBusy = true,
-                    busyMessage = "Restoring cloud snapshot to local database...",
-                    pendingRestoreCandidate = null
-                )
-            }
-            applyCloudRestore(candidate.backup, candidate.manifest)
-        }
-    }
-
     fun cancelPendingRestore() {
         _actionState.update { it.copy(pendingRestoreCandidate = null) }
+    }
+
+    fun dismissRestoreResult() {
+        _actionState.update { it.copy(restoreResult = null) }
     }
 
     fun deleteSnapshot(snapshotId: String) {
@@ -397,11 +393,12 @@ class CloudBackupViewModel(
     private suspend fun applyCloudRestore(backup: ExpenseTrackerBackup, manifest: CloudBackupManifest) {
         val outcomeResult = restoreBackupUseCase(backup)
         if (outcomeResult.isFailure) {
+            val failureReason = outcomeResult.exceptionOrNull()?.localizedMessage ?: "Database error"
             _actionState.update {
                 it.copy(
                     isBusy = false,
                     busyMessage = null,
-                    errorMessage = "Restore failed: ${outcomeResult.exceptionOrNull()?.localizedMessage ?: "Database error"}"
+                    restoreResult = CloudRestoreResult.Failure(failureReason)
                 )
             }
             return
@@ -436,7 +433,7 @@ class CloudBackupViewModel(
                 isBusy = false,
                 busyMessage = null,
                 pendingRestoreCandidate = null,
-                successMessage = "Cloud backup restored successfully!"
+                restoreResult = CloudRestoreResult.Success(manifest)
             )
         }
     }
