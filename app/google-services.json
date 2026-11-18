@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "160334655546-22ca98gb05l0i0g8dm4eulb2u7eb4l7g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.suguru.expensetracker",
+            "certificate_hash": "9a696f6f268094fb8da587ffba8da74416e544de"
+          }
+        },
+        {
           "client_id": "160334655546-j3s66m5i6jr5gtk48aoo13ukfkre8jd4.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
