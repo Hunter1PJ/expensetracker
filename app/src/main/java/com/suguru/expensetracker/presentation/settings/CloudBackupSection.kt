@@ -176,12 +176,33 @@ private fun CloudBackupSignInCard(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
+                        text = "Status: Not connected (Google login is optional).",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                    )
+                    Text(
                         text = "Sign in with Google to save compressed backups privately to your Firebase Firestore account and restore across reinstalls.",
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary,
                         lineHeight = 18.sp
                     )
                 }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
+                    .padding(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.sm)
+            ) {
+                Text(
+                    text = "⚠️ Warning: Without cloud backup, local data will be lost if you uninstall the app or replace your device.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ExpenseTrackerTheme.extendedColors.financialWarning,
+                    fontWeight = FontWeight.Medium
+                )
             }
 
             if (authError != null) {

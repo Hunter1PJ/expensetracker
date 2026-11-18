@@ -28,6 +28,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -413,6 +415,7 @@ fun ExpenseTrackerApp(
         }
 
         else -> {
+            val snackbarHostState = remember { SnackbarHostState() }
             BackHandler(enabled = currentDestination != NavDestination.Home) {
                 currentDestination = NavDestination.Home
             }
@@ -421,6 +424,7 @@ fun ExpenseTrackerApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag("expense_tracker_root_scaffold"),
+                snackbarHost = { SnackbarHost(snackbarHostState) },
                 containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
                     TopAppBar(
@@ -663,6 +667,14 @@ fun ExpenseTrackerApp(
                             onNavigateToExport = {
                                 previousDestination = NavDestination.Settings
                                 currentDestination = NavDestination.AdvancedExport
+                            },
+                            createCloudBackupViewModel = { uid ->
+                                resolvedContainer?.createCloudBackupViewModel(uid) ?: throw IllegalStateException("AppContainer required")
+                            },
+                            onShowMessage = { msg ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(msg)
+                                }
                             },
                             modifier = Modifier.padding(innerPadding)
                         )

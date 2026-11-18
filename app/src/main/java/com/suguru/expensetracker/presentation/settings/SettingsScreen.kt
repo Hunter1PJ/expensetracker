@@ -124,6 +124,8 @@ fun SettingsScreen(
     onNavigateToRecurring: () -> Unit,
     onNavigateToDataAndStorage: () -> Unit,
     onNavigateToExport: () -> Unit = {},
+    createCloudBackupViewModel: ((String) -> CloudBackupViewModel)? = null,
+    onShowMessage: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -264,6 +266,13 @@ fun SettingsScreen(
                                 testTag = "settings_item_export"
                             )
                         }
+                    }
+
+                    if (createCloudBackupViewModel != null && onShowMessage != null) {
+                        CloudBackupSection(
+                            createCloudBackupViewModel = createCloudBackupViewModel,
+                            onShowMessage = onShowMessage
+                        )
                     }
 
                     // 2. AI Assistant (BYOK) Section
