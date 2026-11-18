@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 
 class RoomRecurringTransactionRepository(
-    private val recurringTransactionDao: RecurringTransactionDao
+    private val recurringTransactionDao: RecurringTransactionDao,
+    private val onDataMutated: () -> Unit = {}
 ) : RecurringTransactionRepository {
 
     override fun observeActiveRecurringTransactions(): Flow<List<RecurringTransaction>> {
@@ -38,14 +39,18 @@ class RoomRecurringTransactionRepository(
     }
 
     override suspend fun insertRecurringTransaction(recurringTransaction: RecurringTransaction): Long {
-        return recurringTransactionDao.insertRecurringTransaction(recurringTransaction.toEntity())
+        val id = recurringTransactionDao.insertRecurringTransaction(recurringTransaction.toEntity())
+        onDataMutated()
+        return id
     }
 
     override suspend fun updateRecurringTransaction(recurringTransaction: RecurringTransaction) {
         recurringTransactionDao.updateRecurringTransaction(recurringTransaction.toEntity())
+        onDataMutated()
     }
 
     override suspend fun deactivateRecurringTransaction(id: Long) {
         recurringTransactionDao.deactivateRecurringTransaction(id)
+        onDataMutated()
     }
 }

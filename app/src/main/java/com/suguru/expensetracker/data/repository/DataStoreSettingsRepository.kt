@@ -18,7 +18,8 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 
 class DataStoreSettingsRepository(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val onDataMutated: () -> Unit = {}
 ) : SettingsRepository {
 
     private object PreferencesKeys {
@@ -102,6 +103,7 @@ class DataStoreSettingsRepository(
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME_MODE] = value.name
         }
+        onDataMutated()
     }
 
     override suspend fun setPreferredCurrency(value: String?) {
@@ -112,36 +114,42 @@ class DataStoreSettingsRepository(
                 preferences[PreferencesKeys.PREFERRED_CURRENCY_CODE] = value
             }
         }
+        onDataMutated()
     }
 
     override suspend fun setWeekStart(value: WeekStart) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.WEEK_START] = value.name
         }
+        onDataMutated()
     }
 
     override suspend fun setDateFormat(value: DateFormatPreference) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.DATE_FORMAT] = value.name
         }
+        onDataMutated()
     }
 
     override suspend fun setTimeFormat(value: TimeFormatPreference) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.TIME_FORMAT] = value.name
         }
+        onDataMutated()
     }
 
     override suspend fun setShowCurrencyCode(value: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.SHOW_CURRENCY_CODE] = value
         }
+        onDataMutated()
     }
 
     override suspend fun setConfirmBeforeDelete(value: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.CONFIRM_BEFORE_DELETE] = value
         }
+        onDataMutated()
     }
 
     override val lastBackupAt: Flow<String?> = dataStore.data

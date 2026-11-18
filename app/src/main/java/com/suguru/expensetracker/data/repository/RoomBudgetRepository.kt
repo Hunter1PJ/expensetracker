@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class RoomBudgetRepository(
-    private val budgetDao: BudgetDao
+    private val budgetDao: BudgetDao,
+    private val onDataMutated: () -> Unit = {}
 ) : BudgetRepository {
 
     override fun observeActiveBudgets(): Flow<List<Budget>> {
@@ -39,14 +40,18 @@ class RoomBudgetRepository(
     }
 
     override suspend fun insertBudget(budget: Budget): Long {
-        return budgetDao.insertBudget(budget.toEntity())
+        val id = budgetDao.insertBudget(budget.toEntity())
+        onDataMutated()
+        return id
     }
 
     override suspend fun updateBudget(budget: Budget) {
         budgetDao.updateBudget(budget.toEntity())
+        onDataMutated()
     }
 
     override suspend fun deactivateBudget(id: Long) {
         budgetDao.deactivateBudget(id)
+        onDataMutated()
     }
 }

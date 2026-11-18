@@ -113,6 +113,20 @@ fun ExpenseTrackerApp(
         if (resolvedContainer != null && !hasRunStartupCheck) {
             hasRunStartupCheck = true
             resolvedContainer.ensureInternalDefaultAccountProvisioning()
+            val firebaseReady = try {
+                com.google.firebase.FirebaseApp.getApps(context).isNotEmpty()
+            } catch (_: Exception) {
+                false
+            }
+            if (firebaseReady) {
+                com.suguru.expensetracker.presentation.auth.attemptAutoSignIn(
+                    context = context,
+                    credentialManager = androidx.credentials.CredentialManager.create(context),
+                    onAuthSuccess = {},
+                    onUnauthenticated = {},
+                    scope = coroutineScope
+                )
+            }
         }
     }
 
@@ -371,13 +385,17 @@ fun ExpenseTrackerApp(
         }
 
         NavDestination.DataAndStorage -> {
-            val dataStorageViewModel = remember(resolvedContainer) {
-                resolvedContainer?.createDataStorageViewModel() ?: throw IllegalStateException("AppContainer required")
+            val container = resolvedContainer ?: throw IllegalStateException("AppContainer required")
+            val dataStorageViewModel = remember(container) {
+                container.createDataStorageViewModel()
             }
             com.suguru.expensetracker.presentation.settings.DataAndStorageScreen(
                 viewModel = dataStorageViewModel,
                 onNavigateBack = {
                     currentDestination = NavDestination.Settings
+                },
+                createCloudBackupViewModel = { uid ->
+                    container.createCloudBackupViewModel(uid)
                 }
             )
         }

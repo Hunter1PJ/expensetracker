@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.map
 import java.time.Instant
 
 class RoomTransactionRepository(
-    private val transactionDao: TransactionDao
+    private val transactionDao: TransactionDao,
+    private val onDataMutated: () -> Unit = {}
 ) : TransactionRepository {
 
     override fun observeAllTransactions(): Flow<List<Transaction>> {
@@ -64,18 +65,24 @@ class RoomTransactionRepository(
     }
 
     override suspend fun insertTransaction(transaction: Transaction): Long {
-        return transactionDao.insertTransaction(transaction.toEntity())
+        val id = transactionDao.insertTransaction(transaction.toEntity())
+        onDataMutated()
+        return id
     }
 
     override suspend fun insertTransactions(transactions: List<Transaction>): List<Long> {
-        return transactionDao.insertTransactions(transactions.map { it.toEntity() })
+        val ids = transactionDao.insertTransactions(transactions.map { it.toEntity() })
+        onDataMutated()
+        return ids
     }
 
     override suspend fun updateTransaction(transaction: Transaction) {
         transactionDao.updateTransaction(transaction.toEntity())
+        onDataMutated()
     }
 
     override suspend fun deleteTransactionById(id: Long) {
         transactionDao.deleteTransactionById(id)
+        onDataMutated()
     }
 }

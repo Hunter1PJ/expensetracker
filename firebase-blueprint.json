@@ -1,0 +1,151 @@
+{
+  "entities": {
+    "CloudBackupManifest": {
+      "title": "CloudBackupManifest",
+      "description": "Metadata manifest for a user's encrypted-at-rest GZIP-compressed cloud backup snapshot. Excludes transaction notes, monetary amounts, and API keys.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID owning this backup snapshot."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["UPLOADING", "COMPLETE", "FAILED"],
+          "description": "Lifecycle status of the backup snapshot upload."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() when the snapshot upload starts."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on creation and status transitions."
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional server timestamp set via FieldValue.serverTimestamp() when status transitions to COMPLETE."
+        },
+        "failedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional server timestamp set via FieldValue.serverTimestamp() when status transitions to FAILED."
+        },
+        "failureCode": {
+          "type": "string",
+          "description": "Optional bounded machine-readable failure identifier when status is FAILED."
+        },
+        "formatVersion": {
+          "type": "integer",
+          "description": "Backup envelope format version."
+        },
+        "databaseSchemaVersion": {
+          "type": "integer",
+          "description": "Local Room database schema version."
+        },
+        "appVersion": {
+          "type": "string",
+          "description": "Application version name that produced the backup."
+        },
+        "chunkCount": {
+          "type": "integer",
+          "description": "Total number of sequential chunk documents under the chunks subcollection."
+        },
+        "compressedBytes": {
+          "type": "integer",
+          "description": "Total byte length of the GZIP-compressed backup payload."
+        },
+        "uncompressedBytes": {
+          "type": "integer",
+          "description": "Total byte length of the uncompressed UTF-8 JSON backup payload."
+        },
+        "payloadSha256": {
+          "type": "string",
+          "description": "64-character lowercase hexadecimal SHA-256 checksum of the compressed payload."
+        },
+        "contentFingerprint": {
+          "type": "string",
+          "description": "64-character lowercase hexadecimal SHA-256 canonical financial content fingerprint."
+        }
+      },
+      "required": [
+        "userId",
+        "status",
+        "createdAt",
+        "updatedAt",
+        "formatVersion",
+        "databaseSchemaVersion",
+        "appVersion",
+        "chunkCount",
+        "compressedBytes",
+        "uncompressedBytes",
+        "payloadSha256",
+        "contentFingerprint"
+      ]
+    },
+    "CloudBackupChunk": {
+      "title": "CloudBackupChunk",
+      "description": "Single bounded binary Blob slice of a GZIP-compressed cloud backup payload.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID owning this backup chunk."
+        },
+        "snapshotId": {
+          "type": "string",
+          "description": "Identifier of the parent CloudBackupManifest document."
+        },
+        "index": {
+          "type": "integer",
+          "description": "Zero-based sequential chunk index."
+        },
+        "totalCount": {
+          "type": "integer",
+          "description": "Total number of chunks in the parent snapshot."
+        },
+        "sha256": {
+          "type": "string",
+          "description": "64-character lowercase hexadecimal SHA-256 digest of the raw chunk bytes."
+        },
+        "byteCount": {
+          "type": "integer",
+          "description": "Raw chunk byte count (1..524288)."
+        },
+        "payload": {
+          "type": "string",
+          "format": "byte",
+          "description": "Firestore binary Blob bytes of this compressed chunk."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on chunk creation."
+        }
+      },
+      "required": [
+        "userId",
+        "snapshotId",
+        "index",
+        "totalCount",
+        "sha256",
+        "byteCount",
+        "payload",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/backup_manifests/{snapshotId}": {
+      "schema": { "$ref": "#/entities/CloudBackupManifest" },
+      "description": "UID-isolated collection of cloud backup snapshot manifests."
+    },
+    "/users/{userId}/backup_manifests/{snapshotId}/chunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/CloudBackupChunk" },
+      "description": "Ordered compressed backup payload chunks belonging to a single snapshot manifest."
+    }
+  }
+}

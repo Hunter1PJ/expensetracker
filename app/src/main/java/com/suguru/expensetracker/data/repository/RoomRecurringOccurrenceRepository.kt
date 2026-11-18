@@ -12,7 +12,8 @@ import java.time.Instant
 import java.time.LocalDate
 
 class RoomRecurringOccurrenceRepository(
-    private val database: ExpenseTrackerDatabase
+    private val database: ExpenseTrackerDatabase,
+    private val onDataMutated: () -> Unit = {}
 ) : RecurringOccurrenceRepository {
 
     private val occurrenceDao = database.recurringOccurrenceDao()
@@ -30,7 +31,7 @@ class RoomRecurringOccurrenceRepository(
         newNextOccurrence: LocalDate,
         isRuleNowActive: Boolean
     ): Long? {
-        return database.withTransaction {
+        val insertedId = database.withTransaction {
             val existing = occurrenceDao.getOccurrence(rule.id, occurrenceDate)
             if (existing != null) {
                 // Already processed (either GENERATED or TRANSACTION_DELETED).
@@ -65,6 +66,10 @@ class RoomRecurringOccurrenceRepository(
 
             insertedTxId
         }
+        if (insertedId != null) {
+            onDataMutated()
+        }
+        return insertedId
     }
 
     override suspend fun markTransactionDeleted(ruleId: Long, occurrenceDate: LocalDate) {
@@ -84,5 +89,6 @@ class RoomRecurringOccurrenceRepository(
                 )
             }
         }
+        onDataMutated()
     }
 }

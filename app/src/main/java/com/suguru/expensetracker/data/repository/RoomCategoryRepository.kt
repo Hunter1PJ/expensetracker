@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class RoomCategoryRepository(
-    private val categoryDao: CategoryDao
+    private val categoryDao: CategoryDao,
+    private val onDataMutated: () -> Unit = {}
 ) : CategoryRepository {
 
     override fun observeActiveCategories(): Flow<List<Category>> {
@@ -40,18 +41,24 @@ class RoomCategoryRepository(
     }
 
     override suspend fun insertCategory(category: Category): Long {
-        return categoryDao.insertCategory(category.toEntity())
+        val id = categoryDao.insertCategory(category.toEntity())
+        onDataMutated()
+        return id
     }
 
     override suspend fun insertCategories(categories: List<Category>): List<Long> {
-        return categoryDao.insertCategories(categories.map { it.toEntity() })
+        val ids = categoryDao.insertCategories(categories.map { it.toEntity() })
+        onDataMutated()
+        return ids
     }
 
     override suspend fun updateCategory(category: Category) {
         categoryDao.updateCategory(category.toEntity())
+        onDataMutated()
     }
 
     override suspend fun archiveCategory(id: Long) {
         categoryDao.archiveCategory(id)
+        onDataMutated()
     }
 }

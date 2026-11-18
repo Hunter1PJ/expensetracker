@@ -1,0 +1,174 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all reads and writes unless explicitly matched below.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSha256Hex(val) {
+      return val is string && val.size() == 64 && val.matches('^[0-9a-f]{64}$');
+    }
+
+    function isFailureCode(val) {
+      return val is string && val.size() >= 1 && val.size() <= 64 && val.matches('^[A-Za-z][A-Za-z0-9_\\-]{0,63}$');
+    }
+
+    // --- Entity Validation Helpers ---
+    function isValidBackupManifest(data) {
+      return data.keys().hasAll([
+               'userId', 'status', 'createdAt', 'updatedAt',
+               'formatVersion', 'databaseSchemaVersion', 'appVersion',
+               'chunkCount', 'compressedBytes', 'uncompressedBytes',
+               'payloadSha256', 'contentFingerprint'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'status', 'createdAt', 'updatedAt',
+               'completedAt', 'failedAt', 'failureCode',
+               'formatVersion', 'databaseSchemaVersion', 'appVersion',
+               'chunkCount', 'compressedBytes', 'uncompressedBytes',
+               'payloadSha256', 'contentFingerprint'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.status is string && data.status.size() >= 6 && data.status.size() <= 16 &&
+             data.status in ['UPLOADING', 'COMPLETE', 'FAILED'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             data.formatVersion is int && data.formatVersion >= 1 && data.formatVersion <= 1000 &&
+             data.databaseSchemaVersion is int && data.databaseSchemaVersion >= 1 && data.databaseSchemaVersion <= 1000 &&
+             data.appVersion is string && data.appVersion.size() >= 1 && data.appVersion.size() <= 64 &&
+             data.chunkCount is int && data.chunkCount >= 1 && data.chunkCount <= 500 &&
+             data.compressedBytes is int && data.compressedBytes >= 1 && data.compressedBytes <= 16777216 &&
+             data.uncompressedBytes is int && data.uncompressedBytes >= 1 && data.uncompressedBytes <= 16777216 &&
+             isSha256Hex(data.payloadSha256) &&
+             isSha256Hex(data.contentFingerprint) &&
+             (
+               (data.status == 'UPLOADING' &&
+                 !('completedAt' in data) &&
+                 !('failedAt' in data) &&
+                 !('failureCode' in data)) ||
+               (data.status == 'COMPLETE' &&
+                 'completedAt' in data &&
+                 data.completedAt is timestamp &&
+                 data.completedAt <= request.time &&
+                 !('failedAt' in data) &&
+                 !('failureCode' in data)) ||
+               (data.status == 'FAILED' &&
+                 !('completedAt' in data) &&
+                 'failedAt' in data &&
+                 data.failedAt is timestamp &&
+                 data.failedAt <= request.time &&
+                 'failureCode' in data &&
+                 isFailureCode(data.failureCode))
+             );
+    }
+
+    function isValidBackupChunk(data, snapshotId) {
+      return data.keys().hasAll([
+               'userId', 'snapshotId', 'index', 'totalCount',
+               'sha256', 'byteCount', 'payload', 'createdAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'snapshotId', 'index', 'totalCount',
+               'sha256', 'byteCount', 'payload', 'createdAt'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.snapshotId is string && data.snapshotId.size() >= 1 && data.snapshotId.size() <= 128 &&
+             data.snapshotId == snapshotId &&
+             data.index is int && data.index >= 0 && data.index < 500 &&
+             data.totalCount is int && data.totalCount >= 1 && data.totalCount <= 500 &&
+             data.index < data.totalCount &&
+             isSha256Hex(data.sha256) &&
+             data.byteCount is int && data.byteCount >= 1 && data.byteCount <= 524288 &&
+             data.payload is bytes && data.payload.size() >= 1 && data.payload.size() <= 524288 &&
+             data.byteCount == data.payload.size() &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    // --- Collection Rules ---
+    match /users/{userId}/backup_manifests/{snapshotId} {
+      allow get: if isOwner(userId) && isValidId(snapshotId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(snapshotId) &&
+                       isValidBackupManifest(incoming()) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'UPLOADING';
+
+      // Terminal State Locking: COMPLETE is immutable; UPLOADING may transition to COMPLETE or FAILED;
+      // UPLOADING or FAILED may retry back to UPLOADING with identical immutable snapshot metadata.
+      allow update: if isOwner(userId) &&
+                       isValidId(snapshotId) &&
+                       isValidBackupManifest(incoming()) &&
+                       existing().status in ['UPLOADING', 'FAILED'] &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().formatVersion == existing().formatVersion &&
+                       incoming().databaseSchemaVersion == existing().databaseSchemaVersion &&
+                       incoming().appVersion == existing().appVersion &&
+                       incoming().chunkCount == existing().chunkCount &&
+                       incoming().compressedBytes == existing().compressedBytes &&
+                       incoming().uncompressedBytes == existing().uncompressedBytes &&
+                       incoming().payloadSha256 == existing().payloadSha256 &&
+                       incoming().contentFingerprint == existing().contentFingerprint &&
+                       (
+                         (existing().status == 'UPLOADING' &&
+                           incoming().status == 'COMPLETE' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt', 'updatedAt'])) ||
+                         (existing().status == 'UPLOADING' &&
+                           incoming().status == 'FAILED' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'failedAt', 'failureCode', 'updatedAt'])) ||
+                         (incoming().status == 'UPLOADING' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'failedAt', 'failureCode']))
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(snapshotId);
+
+      match /chunks/{chunkId} {
+        allow get: if isOwner(userId) && isValidId(snapshotId) && isValidId(chunkId);
+        allow list: if isOwner(userId);
+
+        // Parent Gate: chunk writes require an active UPLOADING parent manifest owned by the user.
+        allow create: if isOwner(userId) &&
+                         isValidId(snapshotId) &&
+                         isValidId(chunkId) &&
+                         isValidBackupChunk(incoming(), snapshotId) &&
+                         incoming().userId == request.auth.uid &&
+                         exists(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(snapshotId)) &&
+                         get(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(snapshotId)).data.userId == request.auth.uid &&
+                         get(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(snapshotId)).data.status == 'UPLOADING' &&
+                         incoming().totalCount == get(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(snapshotId)).data.chunkCount &&
+                         incoming().index < get(/databases/$(database)/documents/users/$(userId)/backup_manifests/$(snapshotId)).data.chunkCount;
+
+        // Chunks are immutable once uploaded.
+        allow update: if false;
+
+        allow delete: if isOwner(userId) && isValidId(snapshotId) && isValidId(chunkId);
+      }
+    }
+  }
+}

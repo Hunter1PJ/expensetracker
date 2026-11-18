@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class RoomAccountRepository(
-    private val accountDao: AccountDao
+    private val accountDao: AccountDao,
+    private val onDataMutated: () -> Unit = {}
 ) : AccountRepository {
 
     override fun observeActiveAccounts(): Flow<List<Account>> {
@@ -33,14 +34,18 @@ class RoomAccountRepository(
     }
 
     override suspend fun insertAccount(account: Account): Long {
-        return accountDao.insertAccount(account.toEntity())
+        val id = accountDao.insertAccount(account.toEntity())
+        onDataMutated()
+        return id
     }
 
     override suspend fun updateAccount(account: Account) {
         accountDao.updateAccount(account.toEntity())
+        onDataMutated()
     }
 
     override suspend fun archiveAccount(id: Long) {
         accountDao.archiveAccount(id)
+        onDataMutated()
     }
 }

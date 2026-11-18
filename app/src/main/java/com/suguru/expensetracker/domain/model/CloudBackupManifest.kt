@@ -5,19 +5,21 @@ import java.time.Instant
 /**
  * Explicit lifecycle states for a cloud backup snapshot manifest.
  *
- * A snapshot begins in [UPLOADING] while chunks are being uploaded and transitions to [COMPLETE]
- * only after all chunks have been uploaded and validated.
+ * A snapshot begins in [UPLOADING] while chunks are being uploaded, transitions to [COMPLETE]
+ * only after all chunks have been uploaded and validated, or transitions to [FAILED] if upload
+ * or verification fails before completion.
  */
 enum class CloudBackupManifestStatus {
     UPLOADING,
-    COMPLETE
+    COMPLETE,
+    FAILED
 }
 
 /**
  * Pure domain metadata contract describing a single cloud backup snapshot.
  *
  * Contains structural, versioning, sizing, and integrity metadata only; excludes financial
- * amounts, transaction notes, category details, and Gemini BYOK secrets.
+ * amounts, transaction notes, category details, raw exception messages, and Gemini BYOK secrets.
  */
 data class CloudBackupManifest(
     val snapshotId: String,
@@ -32,7 +34,9 @@ data class CloudBackupManifest(
     val compressedBytes: Long,
     val uncompressedBytes: Long,
     val payloadSha256: String,
-    val contentFingerprint: String
+    val contentFingerprint: String,
+    val failedAt: Instant? = null,
+    val failureCode: String? = null
 ) {
     /**
      * Validates this manifest against all domain integrity rules without mutating or normalizing
@@ -78,6 +82,20 @@ data class CloudBackupManifest(
                             )
                         )
                     }
+                    if (manifest.failedAt != null) {
+                        return Result.failure(
+                            IllegalArgumentException(
+                                "UPLOADING manifest must not have a failure timestamp."
+                            )
+                        )
+                    }
+                    if (manifest.failureCode != null) {
+                        return Result.failure(
+                            IllegalArgumentException(
+                                "UPLOADING manifest must not have a failure code."
+                            )
+                        )
+                    }
                 }
                 CloudBackupManifestStatus.COMPLETE -> {
                     val completedAt = manifest.completedAt
@@ -90,6 +108,55 @@ data class CloudBackupManifest(
                         return Result.failure(
                             IllegalArgumentException(
                                 "Completion timestamp ($completedAt) must not be earlier than creation timestamp (${manifest.createdAt})."
+                            )
+                        )
+                    }
+                    if (manifest.failedAt != null) {
+                        return Result.failure(
+                            IllegalArgumentException(
+                                "COMPLETE manifest must not have a failure timestamp."
+                            )
+                        )
+                    }
+                    if (manifest.failureCode != null) {
+                        return Result.failure(
+                            IllegalArgumentException(
+                                "COMPLETE manifest must not have a failure code."
+                            )
+                        )
+                    }
+                }
+                CloudBackupManifestStatus.FAILED -> {
+                    if (manifest.completedAt != null) {
+                        return Result.failure(
+                            IllegalArgumentException(
+                                "FAILED manifest must not have a completion timestamp."
+                            )
+                        )
+                    }
+                    val failedAt = manifest.failedAt
+                        ?: return Result.failure(
+                            IllegalArgumentException(
+                                "FAILED manifest must have a failure timestamp."
+                            )
+                        )
+                    if (failedAt.isBefore(manifest.createdAt)) {
+                        return Result.failure(
+                            IllegalArgumentException(
+                                "Failure timestamp ($failedAt) must not be earlier than creation timestamp (${manifest.createdAt})."
+                            )
+                        )
+                    }
+                    val failureCode = manifest.failureCode
+                        ?: return Result.failure(
+                            IllegalArgumentException(
+                                "FAILED manifest must have a failure code."
+                            )
+                        )
+                    if (!CloudBackupState.isValidFailureCode(failureCode)) {
+                        return Result.failure(
+                            IllegalArgumentException(
+                                "FAILED manifest failure code must be a bounded machine-readable identifier."
                             )
                         )
                     }

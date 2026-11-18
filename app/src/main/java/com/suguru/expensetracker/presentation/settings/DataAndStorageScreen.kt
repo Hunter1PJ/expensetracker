@@ -83,7 +83,8 @@ import java.time.format.DateTimeFormatter
 fun DataAndStorageScreen(
     viewModel: DataStorageViewModel,
     onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    createCloudBackupViewModel: ((String) -> CloudBackupViewModel)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -324,7 +325,11 @@ fun DataAndStorageScreen(
                                             .padding(horizontal = 8.dp, vertical = 3.dp)
                                     ) {
                                         Text(
-                                            text = "No automatic cloud sync",
+                                            text = if (createCloudBackupViewModel != null) {
+                                                "Optional Google cloud backup"
+                                            } else {
+                                                "No automatic cloud sync"
+                                            },
                                             style = MaterialTheme.typography.labelSmall,
                                             color = ExpenseTrackerTheme.extendedColors.textSecondary,
                                             fontWeight = FontWeight.Medium
@@ -334,6 +339,15 @@ fun DataAndStorageScreen(
                             }
                         }
                     }
+                }
+
+                if (createCloudBackupViewModel != null) {
+                    CloudBackupSection(
+                        createCloudBackupViewModel = createCloudBackupViewModel,
+                        onShowMessage = { msg ->
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
+                        }
+                    )
                 }
 
                 // 2. Data Operations Section

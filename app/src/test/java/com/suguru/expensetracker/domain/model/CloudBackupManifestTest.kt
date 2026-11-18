@@ -13,6 +13,7 @@ class CloudBackupManifestTest {
 
     private val createdInstant = Instant.parse("2026-11-15T08:00:00Z")
     private val completedInstant = Instant.parse("2026-11-15T08:00:05Z")
+    private val failedInstant = Instant.parse("2026-11-15T08:00:07Z")
     private val validPayloadSha256 = "0123456789abcdef".repeat(4)
     private val validContentFingerprint = "fedcba9876543210".repeat(4)
 
@@ -52,6 +53,20 @@ class CloudBackupManifestTest {
         createdAt = createdAt,
         completedAt = completedAt
     ).copy(status = CloudBackupManifestStatus.COMPLETE)
+
+    private fun validFailedManifest(
+        createdAt: Instant = createdInstant,
+        completedAt: Instant? = null,
+        failedAt: Instant? = failedInstant,
+        failureCode: String? = "UPLOAD_ABORTED"
+    ): CloudBackupManifest = validUploadingManifest(
+        createdAt = createdAt,
+        completedAt = completedAt
+    ).copy(
+        status = CloudBackupManifestStatus.FAILED,
+        failedAt = failedAt,
+        failureCode = failureCode
+    )
 
     private fun assertInvalid(manifest: CloudBackupManifest, expectedMessagePart: String? = null) {
         val instanceResult = manifest.validate()
@@ -313,5 +328,85 @@ class CloudBackupManifestTest {
         )
 
         assertTrue(manifest.validate().isSuccess)
+    }
+
+    @Test
+    fun `17 - valid FAILED manifest passes validation including equal created and failed timestamps`() {
+        val failedLater = validFailedManifest()
+        assertTrue(failedLater.validate().isSuccess)
+
+        val failedSameTimestamp = validFailedManifest(
+            createdAt = createdInstant,
+            failedAt = createdInstant,
+            failureCode = "network-timeout"
+        )
+        assertTrue(failedSameTimestamp.validate().isSuccess)
+    }
+
+    @Test
+    fun `18 - FAILED manifest rejects completedAt, missing failedAt, or failedAt before createdAt`() {
+        assertInvalid(
+            validFailedManifest(completedAt = completedInstant),
+            expectedMessagePart = "FAILED"
+        )
+        assertInvalid(
+            validFailedManifest(failedAt = null),
+            expectedMessagePart = "failure timestamp"
+        )
+        assertInvalid(
+            validFailedManifest(
+                createdAt = createdInstant,
+                failedAt = createdInstant.minusNanos(1)
+            ),
+            expectedMessagePart = "earlier"
+        )
+    }
+
+    @Test
+    fun `19 - FAILED manifest requires bounded machine-readable failureCode without exception messages`() {
+        assertInvalid(
+            validFailedManifest(failureCode = null),
+            expectedMessagePart = "failure code"
+        )
+
+        val invalidFailureCodes = listOf(
+            "",
+            " ",
+            " NETWORK_ERROR",
+            "Failed to upload backup",
+            "java.io.IOException: Connection reset",
+            "https://firestore.googleapis.com/v1/projects/foo",
+            "ERR\nat Foo.kt:10",
+            "_LEADING_UNDERSCORE",
+            "123_NUMERIC_START",
+            "A".repeat(CloudBackupState.MAX_FAILURE_CODE_LENGTH + 1)
+        )
+
+        for (invalidCode in invalidFailureCodes) {
+            assertInvalid(
+                validFailedManifest(failureCode = invalidCode),
+                expectedMessagePart = "machine-readable"
+            )
+        }
+    }
+
+    @Test
+    fun `20 - UPLOADING and COMPLETE manifests reject failure metadata`() {
+        assertInvalid(
+            validUploadingManifest().copy(failedAt = failedInstant),
+            expectedMessagePart = "UPLOADING"
+        )
+        assertInvalid(
+            validUploadingManifest().copy(failureCode = "UPLOAD_ABORTED"),
+            expectedMessagePart = "UPLOADING"
+        )
+        assertInvalid(
+            validCompleteManifest().copy(failedAt = failedInstant),
+            expectedMessagePart = "COMPLETE"
+        )
+        assertInvalid(
+            validCompleteManifest().copy(failureCode = "UPLOAD_ABORTED"),
+            expectedMessagePart = "COMPLETE"
+        )
     }
 }

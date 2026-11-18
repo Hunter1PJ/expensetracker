@@ -71,8 +71,16 @@ class AppContainer(private val context: Context) {
 
     val database: ExpenseTrackerDatabase = ExpenseTrackerDatabaseProvider.getDatabase(context)
 
+    private val onDataMutated: () -> Unit = {
+        startupScope.launch {
+            try {
+                cloudBackupOrchestrator.onLocalDataMutated()
+            } catch (_: Exception) {}
+        }
+    }
+
     val settingsRepository: com.suguru.expensetracker.domain.repository.SettingsRepository by lazy {
-        com.suguru.expensetracker.data.repository.DataStoreSettingsRepository(context.dataStore)
+        com.suguru.expensetracker.data.repository.DataStoreSettingsRepository(context.dataStore, onDataMutated)
     }
 
     val cloudBackupFingerprintStore: com.suguru.expensetracker.domain.repository.CloudBackupFingerprintStore by lazy {
@@ -81,6 +89,43 @@ class AppContainer(private val context: Context) {
 
     val cloudBackupStateStore: com.suguru.expensetracker.domain.repository.CloudBackupStateStore by lazy {
         com.suguru.expensetracker.data.repository.DataStoreCloudBackupStateStore(context.dataStore)
+    }
+
+    val firestoreDatabaseId: String by lazy {
+        context.applicationContext.getString(com.suguru.expensetracker.R.string.firestore_database_id)
+    }
+
+    val firestoreDb: com.google.firebase.firestore.FirebaseFirestore by lazy {
+        com.google.firebase.firestore.FirebaseFirestore.getInstance(firestoreDatabaseId).apply {
+            firestoreSettings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
+                .setLocalCacheSettings(
+                    com.google.firebase.firestore.MemoryCacheSettings.newBuilder().build()
+                )
+                .build()
+        }
+    }
+
+    val cloudBackupRemoteRepository: com.suguru.expensetracker.domain.repository.CloudBackupRemoteRepository by lazy {
+        com.suguru.expensetracker.data.remote.firestore.FirestoreCloudBackupRepository(firestoreDb)
+    }
+
+    val cloudBackupOrchestrator: com.suguru.expensetracker.data.backup.AutomaticCloudBackupOrchestrator by lazy {
+        com.suguru.expensetracker.data.backup.AutomaticCloudBackupOrchestrator(
+            remoteRepository = cloudBackupRemoteRepository,
+            backupRepository = backupRepository,
+            createFullBackupUseCase = createFullBackupUseCase,
+            restoreBackupUseCase = restoreBackupUseCase,
+            stateStore = cloudBackupStateStore,
+            fingerprintStore = cloudBackupFingerprintStore,
+            internalDefaultAccountProvisioner = internalDefaultAccountProvisioner,
+            widgetRefreshCoordinator = widgetRefreshCoordinator,
+            onScheduleDebouncedBackup = { uid ->
+                com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.scheduleDebounced(context, uid)
+            },
+            onCancelBackupWork = { uid ->
+                com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.cancelWork(context, uid)
+            }
+        )
     }
 
     // AI BYOK Foundation
@@ -147,11 +192,11 @@ class AppContainer(private val context: Context) {
     }
 
     val accountRepository: AccountRepository by lazy {
-        RoomAccountRepository(database.accountDao())
+        RoomAccountRepository(database.accountDao(), onDataMutated)
     }
 
     val categoryRepository: CategoryRepository by lazy {
-        RoomCategoryRepository(database.categoryDao())
+        RoomCategoryRepository(database.categoryDao(), onDataMutated)
     }
 
     val defaultCategorySeeder: DefaultCategorySeeder by lazy {
@@ -165,19 +210,19 @@ class AppContainer(private val context: Context) {
     }
 
     val transactionRepository: TransactionRepository by lazy {
-        RoomTransactionRepository(database.transactionDao())
+        RoomTransactionRepository(database.transactionDao(), onDataMutated)
     }
 
     val budgetRepository: BudgetRepository by lazy {
-        RoomBudgetRepository(database.budgetDao())
+        RoomBudgetRepository(database.budgetDao(), onDataMutated)
     }
 
     val recurringTransactionRepository: RecurringTransactionRepository by lazy {
-        RoomRecurringTransactionRepository(database.recurringTransactionDao())
+        RoomRecurringTransactionRepository(database.recurringTransactionDao(), onDataMutated)
     }
 
     val recurringOccurrenceRepository: com.suguru.expensetracker.domain.repository.RecurringOccurrenceRepository by lazy {
-        com.suguru.expensetracker.data.repository.RoomRecurringOccurrenceRepository(database)
+        com.suguru.expensetracker.data.repository.RoomRecurringOccurrenceRepository(database, onDataMutated)
     }
 
     // Account Use Cases
@@ -534,6 +579,20 @@ class AppContainer(private val context: Context) {
             exportTransactionsToCsvUseCase = exportTransactionsToCsvUseCase,
             backupRepository = backupRepository,
             settingsRepository = settingsRepository,
+            widgetRefreshCoordinator = widgetRefreshCoordinator,
+            onPendingSettingsRecovery = { ensureInternalDefaultAccountProvisioning() }
+        )
+    }
+
+    fun createCloudBackupViewModel(currentUserId: String): com.suguru.expensetracker.presentation.settings.CloudBackupViewModel {
+        return com.suguru.expensetracker.presentation.settings.CloudBackupViewModel(
+            currentUserId = currentUserId,
+            remoteRepository = cloudBackupRemoteRepository,
+            createFullBackupUseCase = createFullBackupUseCase,
+            restoreBackupUseCase = restoreBackupUseCase,
+            backupRepository = backupRepository,
+            cloudBackupStateStore = cloudBackupStateStore,
+            cloudBackupFingerprintStore = cloudBackupFingerprintStore,
             widgetRefreshCoordinator = widgetRefreshCoordinator,
             onPendingSettingsRecovery = { ensureInternalDefaultAccountProvisioning() }
         )

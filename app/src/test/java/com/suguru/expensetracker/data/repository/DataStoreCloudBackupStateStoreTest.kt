@@ -20,12 +20,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -124,26 +124,28 @@ class DataStoreCloudBackupStateStoreTest {
             lastAttemptAtEpochMillis = 2_000L
         )
 
-        val collected = mutableListOf<CloudBackupState>()
-        val collectorJob = launch(Dispatchers.Unconfined) {
-            store.observeState(uid).take(4).toList(collected)
+        val emissions = Channel<CloudBackupState>(Channel.UNLIMITED)
+        val collectorJob = launch {
+            store.observeState(uid).collect { emissions.send(it) }
         }
+        try {
+            withTimeout(10_000L) {
+                assertEquals(CloudBackupState.EMPTY, emissions.receive())
 
-        store.setState(uid, state1)
-        store.setState(uid, state1) // Duplicate should be deduplicated by distinctUntilChanged
-        store.setState(uid, state2)
-        store.clearState(uid)
-        collectorJob.join()
+                store.setState(uid, state1)
+                assertEquals(state1, emissions.receive())
 
-        assertEquals(
-            listOf(
-                CloudBackupState.EMPTY,
-                state1,
-                state2,
-                CloudBackupState.EMPTY
-            ),
-            collected
-        )
+                // Duplicate write should be deduplicated by distinctUntilChanged
+                store.setState(uid, state1)
+                store.setState(uid, state2)
+                assertEquals(state2, emissions.receive())
+
+                store.clearState(uid)
+                assertEquals(CloudBackupState.EMPTY, emissions.receive())
+            }
+        } finally {
+            collectorJob.cancel()
+        }
     }
 
     @Test
