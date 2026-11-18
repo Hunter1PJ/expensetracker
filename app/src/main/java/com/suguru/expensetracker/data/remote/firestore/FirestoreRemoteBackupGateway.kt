@@ -32,6 +32,7 @@ internal interface RemoteBackupGateway {
     suspend fun deleteChunk(uid: String, snapshotId: String, chunkId: String)
     suspend fun listChunks(uid: String, snapshotId: String): List<FirestoreBackupChunkDto>
     suspend fun deleteSnapshotDocuments(uid: String, snapshotId: String)
+    suspend fun listAllManifests(uid: String): List<FirestoreBackupManifestDto>
 }
 
 internal class FirestoreRemoteBackupGateway(
@@ -189,5 +190,15 @@ internal class FirestoreRemoteBackupGateway(
             chunkDoc.reference.delete().await()
         }
         manifestRef.delete().await()
+    }
+
+    override suspend fun listAllManifests(uid: String): List<FirestoreBackupManifestDto> {
+        val querySnapshot = manifestsCollection(uid).get().await()
+        return querySnapshot.documents.mapNotNull { doc ->
+            doc.toObject(
+                FirestoreBackupManifestDto::class.java,
+                DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+            )
+        }
     }
 }

@@ -33,7 +33,8 @@ data class FirestoreBackupManifestDto(
     val compressedBytes: Long = 0L,
     val uncompressedBytes: Long = 0L,
     val payloadSha256: String = "",
-    val contentFingerprint: String = ""
+    val contentFingerprint: String = "",
+    val generationId: String? = null
 ) {
     fun toDomainOrNull(): CloudBackupManifest? {
         if (snapshotId.isBlank() || userId.isBlank()) return null

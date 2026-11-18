@@ -91,24 +91,7 @@ class FirestoreCloudBackupRepository internal constructor(
             if (primary != null && primary.status == CloudBackupManifestStatus.COMPLETE && primary.completedAt != null) {
                 return Result.success(primary)
             }
-
-            val candidates = gateway.listCompleteManifests(uid)
-                .mapNotNull { dto ->
-                    if (dto.userId != uid) return@mapNotNull null
-                    dto.toDomainOrNull()
-                }
-                .filter { manifest ->
-                    manifest.status == CloudBackupManifestStatus.COMPLETE && manifest.completedAt != null
-                }
-
-            val latest = candidates.maxWithOrNull(
-                compareBy<CloudBackupManifest>(
-                    { it.completedAt },
-                    { it.createdAt },
-                    { it.snapshotId }
-                )
-            )
-            Result.success(latest)
+            Result.success(null)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -124,9 +107,9 @@ class FirestoreCloudBackupRepository internal constructor(
     ): Result<CloudBackupManifest> {
         var currentPath = "users/$userId/backup_manifests/$PRIMARY_SNAPSHOT_ID"
         var currentOp = OperationType.CREATE
-        var stagingUploading = false
+        var generationUploading = false
         var authenticatedUid: String? = null
-        val stagingSnapshotId = "gen_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().replace("-", "").take(8)}"
+        val generationId = "gen_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().replace("-", "").take(8)}"
 
         return try {
             val uid = requireAuthenticatedUid()
@@ -143,42 +126,50 @@ class FirestoreCloudBackupRepository internal constructor(
             }
 
             currentOp = OperationType.CREATE
-            val stagingManifest = manifest.copy(snapshotId = stagingSnapshotId)
+            val generationManifest = manifest.copy(snapshotId = generationId)
             gateway.createUploadingManifest(
                 uid = uid,
-                snapshotId = stagingSnapshotId,
-                payload = FirestoreBackupManifestDto.toUploadingCreatePayload(uid, stagingManifest)
+                snapshotId = generationId,
+                payload = FirestoreBackupManifestDto.toUploadingCreatePayload(uid, generationManifest)
             )
-            stagingUploading = true
+            generationUploading = true
 
             for (chunk in chunkedPayload.chunks) {
                 val chunkId = chunkDocumentId(chunk.index)
-                currentPath = "users/$uid/backup_manifests/$stagingSnapshotId/chunks/$chunkId"
+                currentPath = "users/$uid/backup_manifests/$generationId/chunks/$chunkId"
                 currentOp = OperationType.CREATE
                 gateway.createChunk(
                     uid = uid,
-                    snapshotId = stagingSnapshotId,
+                    snapshotId = generationId,
                     chunkId = chunkId,
-                    payload = FirestoreBackupChunkDto.toCreatePayload(uid, stagingSnapshotId, chunk)
+                    payload = FirestoreBackupChunkDto.toCreatePayload(uid, generationId, chunk)
                 )
             }
 
-            currentPath = "users/$uid/backup_manifests/$stagingSnapshotId"
+            currentPath = "users/$uid/backup_manifests/$generationId"
             currentOp = OperationType.UPDATE
             gateway.markManifestComplete(
                 uid = uid,
-                snapshotId = stagingSnapshotId,
+                snapshotId = generationId,
                 payload = FirestoreBackupManifestDto.toCompleteUpdatePayload()
             )
 
-            val completedStaging = gateway.getManifest(uid, stagingSnapshotId)
-                ?: throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Staging manifest missing.")
+            val completedGeneration = gateway.getManifest(uid, generationId)
+                ?: throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Generation manifest missing.")
 
-            val stagingDomain = completedStaging.toDomainOrNull() ?: manifest
-            val primaryPayload = FirestoreBackupManifestDto.toUploadingCreatePayload(uid, stagingDomain).toMutableMap().apply {
+            val generationChunks = gateway.listChunks(uid, generationId)
+            if (generationChunks.size != manifest.chunkCount) {
+                throw CloudBackupRemoteException.ChunkIntegrityError(
+                    snapshotId = generationId,
+                    message = "Generation chunk count mismatch."
+                )
+            }
+
+            val primaryPayload = FirestoreBackupManifestDto.toUploadingCreatePayload(uid, generationManifest).toMutableMap().apply {
                 this["status"] = CloudBackupManifestStatus.COMPLETE.name
-                this["completedAt"] = completedStaging.completedAt ?: com.google.firebase.Timestamp.now()
+                this["completedAt"] = completedGeneration.completedAt ?: com.google.firebase.Timestamp.now()
                 this["updatedAt"] = FieldValue.serverTimestamp()
+                this["generationId"] = generationId
             }
 
             val primaryExists = existingPrimaryDto != null
@@ -188,25 +179,20 @@ class FirestoreCloudBackupRepository internal constructor(
                 gateway.markManifestComplete(uid, PRIMARY_SNAPSHOT_ID, primaryPayload)
             } else {
                 gateway.createUploadingManifest(uid, PRIMARY_SNAPSHOT_ID, primaryPayload)
-            }
-
-            val stagingChunks = gateway.listChunks(uid, stagingSnapshotId)
-            for (chunkDto in stagingChunks) {
-                val chunkId = chunkDto.id
-                val chunkPayload = mapOf(
-                    "userId" to uid,
-                    "snapshotId" to PRIMARY_SNAPSHOT_ID,
-                    "index" to chunkDto.index,
-                    "totalCount" to chunkDto.totalCount,
-                    "sha256" to chunkDto.sha256,
-                    "byteCount" to chunkDto.byteCount,
-                    "payload" to (chunkDto.payload ?: com.google.firebase.firestore.Blob.fromBytes(ByteArray(0)))
-                )
-                gateway.createChunk(uid, PRIMARY_SNAPSHOT_ID, chunkId, chunkPayload)
+                gateway.markManifestComplete(uid, PRIMARY_SNAPSHOT_ID, primaryPayload)
             }
 
             try {
-                gateway.deleteSnapshotDocuments(uid, stagingSnapshotId)
+                val oldGenId = existingPrimaryDto?.generationId
+                if (!oldGenId.isNullOrBlank() && oldGenId != generationId) {
+                    gateway.deleteSnapshotDocuments(uid, oldGenId)
+                }
+                val allManifests = gateway.listAllManifests(uid)
+                for (dto in allManifests) {
+                    if (dto.snapshotId.startsWith("gen_") && dto.snapshotId != generationId) {
+                        gateway.deleteSnapshotDocuments(uid, dto.snapshotId)
+                    }
+                }
             } catch (_: Exception) {}
 
             val committed = gateway.getManifest(uid, PRIMARY_SNAPSHOT_ID)
@@ -222,9 +208,9 @@ class FirestoreCloudBackupRepository internal constructor(
         } catch (e: Exception) {
             handleFirestoreError(e, currentOp, currentPath)
             val uid = authenticatedUid
-            if (stagingUploading && uid != null && gateway.currentUserUid() == uid) {
+            if (generationUploading && uid != null && gateway.currentUserUid() == uid) {
                 try {
-                    gateway.deleteSnapshotDocuments(uid, stagingSnapshotId)
+                    gateway.deleteSnapshotDocuments(uid, generationId)
                 } catch (_: Exception) {}
             }
             Result.failure(toTypedRemoteException(e))
@@ -235,53 +221,52 @@ class FirestoreCloudBackupRepository internal constructor(
         userId: String,
         snapshotId: String
     ): Result<List<CloudBackupPayloadChunk>> {
-        var path = "users/$userId/backup_manifests/$snapshotId"
+        var path = "users/$userId/backup_manifests/$PRIMARY_SNAPSHOT_ID"
         var op = OperationType.GET
         return try {
             val uid = requireAuthenticatedUid()
             requireMatchingUid(uid, userId)
-            val targetId = if (gateway.getManifest(uid, snapshotId) != null) snapshotId else PRIMARY_SNAPSHOT_ID
-            if (!isValidFirestoreId(targetId)) {
-                throw CloudBackupRemoteException.InvalidSnapshot("Snapshot ID is invalid.")
-            }
 
-            path = "users/$uid/backup_manifests/$targetId"
-            op = OperationType.GET
-            val manifestDto = gateway.getManifest(uid, targetId)
-                ?: throw CloudBackupRemoteException.SnapshotNotFound(targetId)
+            val primaryDto = gateway.getManifest(uid, PRIMARY_SNAPSHOT_ID)
+                ?: throw CloudBackupRemoteException.SnapshotNotFound(PRIMARY_SNAPSHOT_ID)
 
-            val manifest = manifestDto.toDomainOrNull()
+            val manifest = primaryDto.toDomainOrNull()
                 ?: throw CloudBackupRemoteException.InvalidSnapshot(
-                    "Manifest '$targetId' is malformed or missing required fields."
+                    "Manifest '$PRIMARY_SNAPSHOT_ID' is malformed or missing required fields."
                 )
             if (manifest.uid != uid) {
                 throw CloudBackupRemoteException.UidMismatch()
             }
             if (manifest.status != CloudBackupManifestStatus.COMPLETE) {
-                throw CloudBackupRemoteException.SnapshotNotComplete(targetId, manifest.status)
+                throw CloudBackupRemoteException.SnapshotNotComplete(PRIMARY_SNAPSHOT_ID, manifest.status)
             }
 
-            path = "users/$uid/backup_manifests/$targetId/chunks"
+            val activeGenerationId = primaryDto.generationId?.takeIf { it.isNotBlank() } ?: PRIMARY_SNAPSHOT_ID
+            if (!isValidFirestoreId(activeGenerationId)) {
+                throw CloudBackupRemoteException.InvalidSnapshot("Generation ID is invalid.")
+            }
+
+            path = "users/$uid/backup_manifests/$activeGenerationId/chunks"
             op = OperationType.LIST
-            val chunkDtos = gateway.listChunks(uid, targetId)
+            val chunkDtos = gateway.listChunks(uid, activeGenerationId)
             if (chunkDtos.size != manifest.chunkCount) {
                 throw CloudBackupRemoteException.ChunkIntegrityError(
-                    snapshotId = targetId,
-                    message = "Expected ${manifest.chunkCount} chunk(s) for snapshot '$targetId', found ${chunkDtos.size}."
+                    snapshotId = PRIMARY_SNAPSHOT_ID,
+                    message = "Expected ${manifest.chunkCount} chunk(s) for snapshot '$PRIMARY_SNAPSHOT_ID', found ${chunkDtos.size}."
                 )
             }
 
             val chunks = chunkDtos.map { dto ->
                 val chunk = dto.toDomainOrNull(
                     expectedUid = uid,
-                    expectedSnapshotId = targetId
+                    expectedSnapshotId = activeGenerationId
                 ) ?: throw CloudBackupRemoteException.ChunkIntegrityError(
-                    snapshotId = targetId,
+                    snapshotId = PRIMARY_SNAPSHOT_ID,
                     message = "Malformed or corrupted backup chunk '${dto.id}'."
                 )
                 if (chunk.totalCount != manifest.chunkCount) {
                     throw CloudBackupRemoteException.ChunkIntegrityError(
-                        snapshotId = targetId,
+                        snapshotId = PRIMARY_SNAPSHOT_ID,
                         message = "Chunk ${chunk.index} totalCount (${chunk.totalCount}) does not match manifest (${manifest.chunkCount})."
                     )
                 }
@@ -290,14 +275,14 @@ class FirestoreCloudBackupRepository internal constructor(
 
             val reassembled = chunker.reassemble(chunks, manifest.payloadSha256).getOrElse { error ->
                 throw CloudBackupRemoteException.ChunkIntegrityError(
-                    snapshotId = targetId,
+                    snapshotId = PRIMARY_SNAPSHOT_ID,
                     message = error.message ?: "Backup chunk checksum verification failed.",
                     cause = error
                 )
             }
             if (reassembled.size.toLong() != manifest.compressedBytes) {
                 throw CloudBackupRemoteException.ChunkIntegrityError(
-                    snapshotId = targetId,
+                    snapshotId = PRIMARY_SNAPSHOT_ID,
                     message = "Reassembled byte count (${reassembled.size}) does not match manifest compressedBytes (${manifest.compressedBytes})."
                 )
             }
@@ -315,16 +300,23 @@ class FirestoreCloudBackupRepository internal constructor(
         userId: String,
         snapshotId: String
     ): Result<Unit> {
-        val targetId = if (snapshotId == PRIMARY_SNAPSHOT_ID || gateway.getManifest(requireAuthenticatedUid(), snapshotId) != null) snapshotId else PRIMARY_SNAPSHOT_ID
-        val path = "users/$userId/backup_manifests/$targetId"
+        val path = "users/$userId/backup_manifests/$PRIMARY_SNAPSHOT_ID"
         return try {
             val uid = requireAuthenticatedUid()
             requireMatchingUid(uid, userId)
-            if (!isValidFirestoreId(targetId)) {
-                throw CloudBackupRemoteException.InvalidSnapshot("Snapshot ID is invalid.")
-            }
+            val primaryDto = gateway.getManifest(uid, PRIMARY_SNAPSHOT_ID)
+            val generationId = primaryDto?.generationId
 
-            gateway.deleteSnapshotDocuments(uid, targetId)
+            gateway.deleteSnapshotDocuments(uid, PRIMARY_SNAPSHOT_ID)
+            if (!generationId.isNullOrBlank()) {
+                gateway.deleteSnapshotDocuments(uid, generationId)
+            }
+            val allManifests = gateway.listAllManifests(uid)
+            for (dto in allManifests) {
+                if (dto.snapshotId.startsWith("gen_")) {
+                    gateway.deleteSnapshotDocuments(uid, dto.snapshotId)
+                }
+            }
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e

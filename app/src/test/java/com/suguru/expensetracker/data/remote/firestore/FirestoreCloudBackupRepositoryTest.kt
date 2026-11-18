@@ -13,6 +13,7 @@ import com.suguru.expensetracker.domain.model.CloudBackupPayloadCodec
 import com.suguru.expensetracker.domain.model.CloudBackupState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -35,6 +36,7 @@ class FirestoreCloudBackupRepositoryTest {
     private val chunker = CloudBackupPayloadChunker(maxChunkSizeBytes = 16)
     private val codec = CloudBackupPayloadCodec()
     private val contentFingerprint = "f".repeat(64)
+    private val contentFingerprintAlt = "e".repeat(64)
 
     @Test
     fun `unauthenticated operations fail with typed Unauthenticated error`() = runTest {
@@ -100,7 +102,12 @@ class FirestoreCloudBackupRepositoryTest {
         assertEquals(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID, committed.snapshotId)
         assertNotNull(committed.completedAt)
 
-        val storedChunks = gateway.chunks["uid_alice" to FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID]!!
+        val primaryDto = gateway.manifests["uid_alice" to FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID]
+        assertNotNull(primaryDto)
+        val genId = requireNotNull(primaryDto!!.generationId)
+        assertTrue(genId.startsWith("gen_"))
+
+        val storedChunks = gateway.chunks["uid_alice" to genId]!!
         assertTrue(storedChunks.values.all { it.payload != null && it.payloadBase64 == null })
 
         val downloaded = repository.downloadChunks("uid_alice", FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID).getOrThrow()
@@ -115,19 +122,23 @@ class FirestoreCloudBackupRepositoryTest {
         val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
         val repository = FirestoreCloudBackupRepository(gateway, chunker)
 
-        val (m1, c1) = buildSnapshot("snap_1", "uid_alice", ByteArray(16) { 1 })
+        val (m1, c1) = buildSnapshot("snap_1", "uid_alice", ByteArray(16) { 1 }, fingerprint = contentFingerprint)
         assertTrue(repository.uploadBackup("uid_alice", m1, c1).isSuccess)
 
         gateway.failOnCreateChunkIndex = 0
         gateway.chunkCreateError = FirebaseFirestoreException("Network error", FirebaseFirestoreException.Code.UNAVAILABLE)
 
-        val (m2, c2) = buildSnapshot("snap_2", "uid_alice", ByteArray(16) { 2 })
+        val (m2, c2) = buildSnapshot("snap_2", "uid_alice", ByteArray(16) { 2 }, fingerprint = contentFingerprintAlt)
         val failRes = repository.uploadBackup("uid_alice", m2, c2)
         assertTrue(failRes.isFailure)
 
         val latest = repository.getLatestCompleteManifest().getOrThrow()
         assertNotNull(latest)
         assertEquals(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID, latest!!.snapshotId)
+
+        // Previous backup remains downloadable
+        val downloaded = repository.downloadChunks("uid_alice", FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID).getOrThrow()
+        assertNotNull(downloaded)
     }
 
     @Test
@@ -135,19 +146,18 @@ class FirestoreCloudBackupRepositoryTest {
         val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
         val repository = FirestoreCloudBackupRepository(gateway, chunker)
 
-        val (m1, c1) = buildSnapshot("snap_1", "uid_alice", ByteArray(16) { 1 })
+        val (m1, c1) = buildSnapshot("snap_1", "uid_alice", ByteArray(16) { 1 }, fingerprint = contentFingerprint)
         val res1 = repository.uploadBackup("uid_alice", m1, c1)
         assertTrue(res1.isSuccess)
         assertEquals(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID, res1.getOrThrow().snapshotId)
 
-        val (m2, c2) = buildSnapshot("snap_2", "uid_alice", ByteArray(16) { 2 })
+        val (m2, c2) = buildSnapshot("snap_2", "uid_alice", ByteArray(16) { 2 }, fingerprint = contentFingerprintAlt)
         val res2 = repository.uploadBackup("uid_alice", m2, c2)
         assertTrue(res2.isSuccess)
         assertEquals(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID, res2.getOrThrow().snapshotId)
 
-        val userManifests = gateway.manifests.filter { it.key.first == "uid_alice" }
-        assertEquals(1, userManifests.size)
-        assertTrue(userManifests.containsKey("uid_alice" to FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID))
+        val userPrimary = gateway.manifests.filter { it.key.first == "uid_alice" && it.key.second == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID }
+        assertEquals(1, userPrimary.size)
     }
 
     @Test
@@ -155,7 +165,7 @@ class FirestoreCloudBackupRepositoryTest {
         val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
         val repository = FirestoreCloudBackupRepository(gateway, chunker)
 
-        val (manifest1, chunked1) = buildSnapshot("snap_fixed", "uid_alice", ByteArray(20) { 1 })
+        val (manifest1, chunked1) = buildSnapshot("snap_fixed", "uid_alice", ByteArray(20) { 1 }, fingerprint = contentFingerprint)
         assertTrue(repository.uploadBackup("uid_alice", manifest1, chunked1).isSuccess)
 
         gateway.events.clear()
@@ -165,10 +175,44 @@ class FirestoreCloudBackupRepositoryTest {
         assertEquals(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID, idempotentResult.getOrThrow().snapshotId)
     }
 
+    @Test
+    fun `failure during promotion preserves previous backup`() = runTest {
+        val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
+        val repository = FirestoreCloudBackupRepository(gateway, chunker)
+
+        val (m1, c1) = buildSnapshot("snap_1", "uid_alice", ByteArray(16) { 1 }, fingerprint = contentFingerprint)
+        assertTrue(repository.uploadBackup("uid_alice", m1, c1).isSuccess)
+
+        gateway.failOnMarkPrimaryComplete = true
+        val (m2, c2) = buildSnapshot("snap_2", "uid_alice", ByteArray(16) { 2 }, fingerprint = contentFingerprintAlt)
+        val res = repository.uploadBackup("uid_alice", m2, c2)
+        assertTrue(res.isFailure)
+
+        // Previous valid backup still latest and downloadable
+        val latest = repository.getLatestCompleteManifest().getOrThrow()
+        assertNotNull(latest)
+        val downloaded = repository.downloadChunks("uid_alice", FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID).getOrThrow()
+        assertNotNull(downloaded)
+    }
+
+    @Test
+    fun `no duplicate visible restore points in observeManifests`() = runTest {
+        val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
+        val repository = FirestoreCloudBackupRepository(gateway, chunker)
+
+        val (m1, c1) = buildSnapshot("snap_1", "uid_alice", ByteArray(16) { 1 }, fingerprint = contentFingerprint)
+        assertTrue(repository.uploadBackup("uid_alice", m1, c1).isSuccess)
+
+        val list = repository.observeManifests("uid_alice").first()
+        assertEquals(1, list.size)
+        assertEquals(FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID, list[0].snapshotId)
+    }
+
     private fun buildSnapshot(
         snapshotId: String,
         uid: String,
-        compressedBytes: ByteArray
+        compressedBytes: ByteArray,
+        fingerprint: String = contentFingerprint
     ): Pair<CloudBackupManifest, CloudBackupChunkedPayload> {
         val chunked = chunker.chunk(compressedBytes)
         val manifest = CloudBackupManifest(
@@ -184,7 +228,7 @@ class FirestoreCloudBackupRepositoryTest {
             compressedBytes = compressedBytes.size.toLong(),
             uncompressedBytes = maxOf(compressedBytes.size.toLong(), 128L),
             payloadSha256 = chunked.payloadSha256,
-            contentFingerprint = contentFingerprint
+            contentFingerprint = fingerprint
         )
         return manifest to chunked
     }
@@ -193,7 +237,8 @@ class FirestoreCloudBackupRepositoryTest {
         var authenticatedUid: String?,
         var failOnCreateChunkIndex: Int? = null,
         var chunkCreateError: Exception = RuntimeException("Chunk upload failed"),
-        var failMarkFailedError: Exception? = null
+        var failMarkFailedError: Exception? = null,
+        var failOnMarkPrimaryComplete: Boolean = false
     ) : RemoteBackupGateway {
 
         val events = mutableListOf<String>()
@@ -205,7 +250,7 @@ class FirestoreCloudBackupRepositoryTest {
         override fun currentUserUid(): String? = authenticatedUid
 
         override fun observeManifests(uid: String, limit: Long): Flow<List<CloudBackupManifest>> =
-            observed.map { list -> list.filter { it.uid == uid }.take(limit.toInt()) }
+            observed.map { list -> list.filter { it.uid == uid && it.snapshotId == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID }.take(limit.toInt()) }
 
         override suspend fun getManifest(uid: String, snapshotId: String): FirestoreBackupManifestDto? =
             manifests[uid to snapshotId]
@@ -215,19 +260,27 @@ class FirestoreCloudBackupRepositoryTest {
                 .filter { (key, dto) -> key.first == uid && dto.status == CloudBackupManifestStatus.COMPLETE.name }
                 .map { it.value }
 
+        override suspend fun listAllManifests(uid: String): List<FirestoreBackupManifestDto> =
+            manifests.entries
+                .filter { (key, _) -> key.first == uid }
+                .map { it.value }
+
         override suspend fun createUploadingManifest(
             uid: String,
             snapshotId: String,
             payload: Map<String, Any>
         ) {
-            events.add("createManifest:$snapshotId:UPLOADING")
+            events.add("createManifest:$snapshotId:${payload["status"] ?: "UPLOADING"}")
             val now = Timestamp(serverTimeSec++, 0)
+            val status = (payload["status"] as? String) ?: CloudBackupManifestStatus.UPLOADING.name
+            val completedAt = if (status == CloudBackupManifestStatus.COMPLETE.name) Timestamp(serverTimeSec++, 0) else null
             manifests[uid to snapshotId] = FirestoreBackupManifestDto(
                 snapshotId = snapshotId,
                 userId = payload["userId"] as String,
-                status = payload["status"] as String,
+                status = status,
                 createdAt = now,
                 updatedAt = now,
+                completedAt = completedAt,
                 formatVersion = payload["formatVersion"] as Long,
                 databaseSchemaVersion = payload["databaseSchemaVersion"] as Long,
                 appVersion = payload["appVersion"] as String,
@@ -235,7 +288,8 @@ class FirestoreCloudBackupRepositoryTest {
                 compressedBytes = payload["compressedBytes"] as Long,
                 uncompressedBytes = payload["uncompressedBytes"] as Long,
                 payloadSha256 = payload["payloadSha256"] as String,
-                contentFingerprint = payload["contentFingerprint"] as String
+                contentFingerprint = payload["contentFingerprint"] as String,
+                generationId = payload["generationId"] as? String
             )
             emitObserved()
         }
@@ -261,34 +315,45 @@ class FirestoreCloudBackupRepositoryTest {
             snapshotId: String,
             payload: Map<String, Any>
         ) {
+            if (failOnMarkPrimaryComplete && snapshotId == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID) {
+                throw RuntimeException("Promotion failed")
+            }
             events.add("markComplete:$snapshotId")
             val now = Timestamp(serverTimeSec++, 0)
             val existing = manifests[uid to snapshotId]
-            if (existing != null) {
-                manifests[uid to snapshotId] = existing.copy(
-                    snapshotId = snapshotId,
-                    status = CloudBackupManifestStatus.COMPLETE.name,
-                    completedAt = now,
-                    updatedAt = now
-                )
-            } else {
-                manifests[uid to snapshotId] = FirestoreBackupManifestDto(
-                    snapshotId = snapshotId,
-                    userId = uid,
-                    status = CloudBackupManifestStatus.COMPLETE.name,
-                    createdAt = now,
-                    updatedAt = now,
-                    completedAt = now,
-                    formatVersion = 1L,
-                    databaseSchemaVersion = 4L,
-                    appVersion = "1.5.0",
-                    chunkCount = 1L,
-                    compressedBytes = 16L,
-                    uncompressedBytes = 128L,
-                    payloadSha256 = "a".repeat(64),
-                    contentFingerprint = "f".repeat(64)
-                )
+            val formatVersion = (payload["formatVersion"] as? Long) ?: existing?.formatVersion ?: 1L
+            val databaseSchemaVersion = (payload["databaseSchemaVersion"] as? Long) ?: existing?.databaseSchemaVersion ?: 4L
+            val appVersion = (payload["appVersion"] as? String) ?: existing?.appVersion ?: "1.5.0"
+            val chunkCount = (payload["chunkCount"] as? Long) ?: existing?.chunkCount ?: 1L
+            val compressedBytes = (payload["compressedBytes"] as? Long) ?: existing?.compressedBytes ?: 0L
+            val uncompressedBytes = (payload["uncompressedBytes"] as? Long) ?: existing?.uncompressedBytes ?: 0L
+            val payloadSha256 = (payload["payloadSha256"] as? String) ?: existing?.payloadSha256 ?: ""
+            val contentFingerprint = (payload["contentFingerprint"] as? String) ?: existing?.contentFingerprint ?: ""
+            val generationId = (payload["generationId"] as? String) ?: existing?.generationId
+
+            val createdAt = existing?.createdAt ?: now
+            var completedAt = (payload["completedAt"] as? Timestamp) ?: now
+            if (completedAt.seconds < createdAt.seconds) {
+                completedAt = createdAt
             }
+
+            manifests[uid to snapshotId] = FirestoreBackupManifestDto(
+                snapshotId = snapshotId,
+                userId = uid,
+                status = CloudBackupManifestStatus.COMPLETE.name,
+                createdAt = createdAt,
+                updatedAt = now,
+                completedAt = completedAt,
+                formatVersion = formatVersion,
+                databaseSchemaVersion = databaseSchemaVersion,
+                appVersion = appVersion,
+                chunkCount = chunkCount,
+                compressedBytes = compressedBytes,
+                uncompressedBytes = uncompressedBytes,
+                payloadSha256 = payloadSha256,
+                contentFingerprint = contentFingerprint,
+                generationId = generationId
+            )
             emitObserved()
         }
 
@@ -357,7 +422,9 @@ class FirestoreCloudBackupRepositoryTest {
         }
 
         private fun emitObserved() {
-            observed.value = manifests.values.mapNotNull { it.toDomainOrNull() }
+            observed.value = manifests.values
+                .filter { it.status == CloudBackupManifestStatus.COMPLETE.name && it.snapshotId == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID }
+                .mapNotNull { it.toDomainOrNull() }
         }
     }
 }

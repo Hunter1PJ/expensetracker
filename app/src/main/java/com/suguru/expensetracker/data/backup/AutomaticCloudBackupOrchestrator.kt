@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
+import com.suguru.expensetracker.data.remote.firestore.FirestoreCloudBackupRepository
 import com.suguru.expensetracker.domain.error.CloudBackupRemoteException
 import com.suguru.expensetracker.domain.model.BackupContentFingerprint
 import com.suguru.expensetracker.domain.model.BackupRestoreOutcome
@@ -92,7 +93,7 @@ class AutomaticCloudBackupOrchestrator(
         }
 
         val attemptEpochMillis = System.currentTimeMillis()
-        val snapshotId = "snap_${attemptEpochMillis}_${UUID.randomUUID().toString().replace("-", "").take(8)}"
+        val snapshotId = FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID
 
         try {
             val backup = createFullBackupUseCase()
@@ -338,7 +339,7 @@ class AutomaticCloudBackupOrchestrator(
                 stateStore.setState(
                     uid,
                     prevState.copy(
-                        pendingSnapshotId = prevState.pendingSnapshotId ?: "snap_${System.currentTimeMillis()}_pending",
+                        pendingSnapshotId = prevState.pendingSnapshotId ?: "primary_backup_pending",
                         pendingSinceEpochMillis = prevState.pendingSinceEpochMillis ?: System.currentTimeMillis()
                     )
                 )
@@ -367,7 +368,7 @@ class AutomaticCloudBackupOrchestrator(
             stateStore.setState(
                 uid,
                 prevState.copy(
-                    pendingSnapshotId = prevState.pendingSnapshotId ?: "snap_${now}_pending",
+                    pendingSnapshotId = prevState.pendingSnapshotId ?: "primary_backup_pending",
                     pendingSinceEpochMillis = prevState.pendingSinceEpochMillis ?: now
                 )
             )
