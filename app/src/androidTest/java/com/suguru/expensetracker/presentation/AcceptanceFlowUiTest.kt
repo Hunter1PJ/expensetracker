@@ -1,5 +1,6 @@
 package com.suguru.expensetracker.presentation
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -98,6 +99,25 @@ class AcceptanceFlowUiTest {
         composeRule.onNodeWithTag("ai_candidate_confirm_button").performClick()
 
         assertEquals(candidate, selectedCandidate)
+    }
+
+    @Test
+    fun homeHasOnePrimaryAddTransactionButtonBeforeAssistant() {
+        var addRequested = false
+        composeRule.setContent {
+            ExpenseTrackerTheme {
+                HomeScreenContent(
+                    uiState = HomeUiState(),
+                    onNavigateToAddTransaction = { addRequested = true }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_add_transaction_button").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("home_ai_assistant_card").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("recent_transactions_empty_add_button").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("add_transaction_button").assertCountEquals(0)
+        assertEquals(true, addRequested)
     }
 
     @Test

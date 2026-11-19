@@ -165,6 +165,74 @@ class BackupRestoreUseCaseTest {
     }
 
     @Test
+    fun guardedCloudRestoreRejectsUnbackedLocalFinancialChanges() = runBlocking {
+        val accountId = accountRepo.insertAccount(
+            Account(name = "Wallet", type = AccountType.CASH, initialBalance = Money(0L, "USD"))
+        )
+        transactionRepo.insertTransaction(
+            Transaction(
+                type = TransactionType.EXPENSE,
+                amount = Money(500L, "USD"),
+                accountId = accountId,
+                categoryId = null,
+                transactionTime = Instant.parse("2026-10-01T10:00:00Z"),
+                note = "Existing local expense"
+            )
+        )
+        val cloudSnapshot = createFullBackupUseCase()
+        val expectedFingerprint = BackupContentFingerprint.compute(cloudSnapshot)
+
+        transactionRepo.insertTransaction(
+            Transaction(
+                type = TransactionType.INCOME,
+                amount = Money(900L, "USD"),
+                accountId = accountId,
+                categoryId = null,
+                transactionTime = Instant.parse("2026-10-02T10:00:00Z"),
+                note = "Newer local income"
+            )
+        )
+
+        val result = restoreBackupUseCase(cloudSnapshot, expectedFingerprint) { true }
+
+        assertTrue(result.isFailure)
+        val localTransactions = transactionRepo.observeAllTransactions().first()
+        assertEquals(2, localTransactions.size)
+        assertTrue(localTransactions.any { it.note == "Newer local income" })
+    }
+
+    @Test
+    fun guardedCloudRestoreRollsBackWhenIdentityChangesBeforeRoomCommit() = runBlocking {
+        val accountId = accountRepo.insertAccount(
+            Account(name = "Wallet", type = AccountType.CASH, initialBalance = Money(0L, "USD"))
+        )
+        transactionRepo.insertTransaction(
+            Transaction(
+                type = TransactionType.EXPENSE,
+                amount = Money(500L, "USD"),
+                accountId = accountId,
+                categoryId = null,
+                transactionTime = Instant.parse("2026-10-01T10:00:00Z"),
+                note = "Keep this expense"
+            )
+        )
+        val cloudSnapshot = createFullBackupUseCase()
+        val expectedFingerprint = BackupContentFingerprint.compute(cloudSnapshot)
+        var identityChecks = 0
+
+        val result = restoreBackupUseCase(cloudSnapshot, expectedFingerprint) {
+            identityChecks++
+            identityChecks == 1
+        }
+
+        assertTrue(result.isFailure)
+        assertTrue(identityChecks >= 2)
+        val localTransactions = transactionRepo.observeAllTransactions().first()
+        assertEquals(1, localTransactions.size)
+        assertEquals("Keep this expense", localTransactions.single().note)
+    }
+
+    @Test
     fun testRestoreWithMultipleAccountsAndNoPreferenceIsRecoverable() = runBlocking {
         settingsRepository.setPreferredCurrency(null)
         accountRepo.insertAccount(

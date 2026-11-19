@@ -4,16 +4,16 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.suguru.expensetracker.domain.model.CloudBackupState
 import com.suguru.expensetracker.domain.repository.CloudBackupStateStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.delay
 import java.io.IOException
 import java.security.MessageDigest
 
@@ -31,11 +31,12 @@ class DataStoreCloudBackupStateStore(
     override suspend fun getState(uid: String): CloudBackupState {
         val keys = keysForUid(uid)
         val preferences = dataStore.data
-            .catch { exception ->
+            .retryWhen { exception, attempt ->
                 if (exception is IOException) {
-                    emit(emptyPreferences())
+                    delay((1_000L * (attempt + 1)).coerceAtMost(30_000L))
+                    true
                 } else {
-                    throw exception
+                    false
                 }
             }
             .first()
@@ -45,11 +46,12 @@ class DataStoreCloudBackupStateStore(
     override fun observeState(uid: String): Flow<CloudBackupState> {
         val keys = keysForUid(uid)
         return dataStore.data
-            .catch { exception ->
+            .retryWhen { exception, attempt ->
                 if (exception is IOException) {
-                    emit(emptyPreferences())
+                    delay((1_000L * (attempt + 1)).coerceAtMost(30_000L))
+                    true
                 } else {
-                    throw exception
+                    false
                 }
             }
             .map { preferences -> decodeState(preferences, keys) }

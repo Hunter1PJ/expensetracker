@@ -21,7 +21,6 @@ import com.suguru.expensetracker.domain.repository.CloudBackupRemoteRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -68,12 +67,17 @@ class FirestoreCloudBackupRepository internal constructor(
 
     override fun observeManifests(userId: String): Flow<List<CloudBackupManifest>> = flow {
         val authenticatedUid = gateway.currentUserUid()
-        if (userId.isBlank() || authenticatedUid == null || authenticatedUid != userId) {
-            emitAll(emptyFlow())
-            return@flow
+        if (userId.isBlank()) {
+            throw CloudBackupRemoteException.UidMismatch("A valid account is required to observe cloud backups.")
+        }
+        if (authenticatedUid == null) {
+            throw CloudBackupRemoteException.Unauthenticated()
+        }
+        if (authenticatedUid != userId) {
+            throw CloudBackupRemoteException.UidMismatch()
         }
         emitAll(
-            gateway.observeManifests(authenticatedUid, MAX_MANIFESTS_LIMIT)
+            gateway.observeManifests(authenticatedUid)
                 .map { manifests ->
                     manifests.filter { it.snapshotId == PRIMARY_SNAPSHOT_ID && it.status == CloudBackupManifestStatus.COMPLETE }
                 }
@@ -86,11 +90,21 @@ class FirestoreCloudBackupRepository internal constructor(
             val uid = requireAuthenticatedUid()
             path = "users/$uid/backup_manifests"
             val primaryDto = gateway.getManifest(uid, PRIMARY_SNAPSHOT_ID)
-            val primary = primaryDto?.toDomainOrNull()
-            if (primary != null && primary.status == CloudBackupManifestStatus.COMPLETE && primary.completedAt != null) {
-                return Result.success(primary)
+                ?: return Result.success(null) // Server-confirmed absence is the only no-backup result.
+            val primary = primaryDto.toDomainOrNull()
+                ?: throw CloudBackupRemoteException.InvalidSnapshot(
+                    "The primary restore point metadata is invalid."
+                )
+            requireMatchingUid(uid, primary.uid)
+            if (primary.status != CloudBackupManifestStatus.COMPLETE) {
+                throw CloudBackupRemoteException.SnapshotNotComplete(primary.snapshotId, primary.status)
             }
-            Result.success(null)
+            if (primary.completedAt == null) {
+                throw CloudBackupRemoteException.InvalidSnapshot(
+                    "The primary restore point is missing its completion timestamp."
+                )
+            }
+            Result.success(primary)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -468,7 +482,6 @@ class FirestoreCloudBackupRepository internal constructor(
     private fun maxOfInstant(a: Instant, b: Instant): Instant = if (a.isAfter(b)) a else b
 
     companion object {
-        private const val MAX_MANIFESTS_LIMIT = 20L
         private const val MAX_CHUNKS_COUNT = 500
         const val PRIMARY_SNAPSHOT_ID = "primary_restore_point"
         private val FIRESTORE_ID_REGEX = Regex("^[a-zA-Z0-9_\\-]{1,128}$")

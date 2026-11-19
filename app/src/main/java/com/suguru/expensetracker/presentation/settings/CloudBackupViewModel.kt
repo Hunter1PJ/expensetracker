@@ -33,12 +33,15 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.util.UUID
 
@@ -112,8 +115,8 @@ class CloudBackupViewModel(
         viewModelScope.launch {
             autoBackupPreferenceStore?.setAutoBackupEnabled(currentUserId, enabled)
             if (enabled && orchestrator != null) {
-                // When enabled, evaluate or schedule pending backup safely
-                orchestrator.onLocalDataMutated()
+                // Reconcile both local changes and any cloud generation that arrived while disabled.
+                orchestrator.evaluateOnLaunchOrSignIn(currentUserId)
             }
         }
     }
@@ -169,6 +172,22 @@ class CloudBackupViewModel(
 
     val manifestsState: StateFlow<CloudSnapshotsUiState> = remoteRepository.observeManifests(currentUserId)
         .map<List<CloudBackupManifest>, CloudSnapshotsUiState> { CloudSnapshotsUiState.Success(it) }
+        .retryWhen { error, attempt ->
+            val firestoreError = generateSequence(error) { it.cause }
+                .filterIsInstance<FirebaseFirestoreException>()
+                .firstOrNull()
+            val retryable = error is java.io.IOException ||
+                error is CloudBackupRemoteException.Unauthenticated ||
+                error is CloudBackupRemoteException.UidMismatch ||
+                error is FirebaseNetworkException ||
+                firestoreError?.code in setOf(
+                    FirebaseFirestoreException.Code.UNAVAILABLE,
+                    FirebaseFirestoreException.Code.DEADLINE_EXCEEDED,
+                    FirebaseFirestoreException.Code.ABORTED
+                )
+            if (retryable) delay((1_000L * (attempt + 1)).coerceAtMost(30_000L))
+            retryable
+        }
         .catch { error ->
             val firestoreError = generateSequence(error) { it.cause }
                 .filterIsInstance<FirebaseFirestoreException>()
@@ -185,16 +204,48 @@ class CloudBackupViewModel(
         )
 
     val localCloudState: StateFlow<CloudBackupState> = cloudBackupStateStore.observeState(currentUserId)
-        .catch { error ->
-            if (error is CancellationException) throw error
-            Log.w(TAG, "Failed to read local cloud backup state", error)
-            emit(CloudBackupState.EMPTY)
+        .retryWhen { error, attempt ->
+            if (error is java.io.IOException) {
+                Log.w(TAG, "Retrying transient cloud backup state read failure.")
+                delay((1_000L * (attempt + 1)).coerceAtMost(30_000L))
+                true
+            } else {
+                if (error !is CancellationException) {
+                    Log.w(TAG, "Cloud backup state read failed (${error::class.java.simpleName}).")
+                }
+                false
+            }
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
             initialValue = CloudBackupState.EMPTY
         )
+
+    init {
+        viewModelScope.launch {
+            manifestsState.collect { snapshots ->
+                val latest = (snapshots as? CloudSnapshotsUiState.Success)
+                    ?.manifests
+                    ?.firstOrNull { it.status == CloudBackupManifestStatus.COMPLETE }
+                    ?: return@collect
+                val preferenceEnabled = autoBackupPreferenceStore?.isAutoBackupEnabled(currentUserId) ?: true
+                if (!preferenceEnabled || orchestrator == null) return@collect
+
+                val localState = cloudBackupStateStore.getState(currentUserId)
+                val generationAlreadyApplied = if (
+                    latest.generationId != null && localState.lastSuccessfulRestoreGenerationId != null
+                ) {
+                    latest.generationId == localState.lastSuccessfulRestoreGenerationId
+                } else {
+                    latest.contentFingerprint == localState.lastSuccessfulRestoreFingerprint
+                }
+                if (!generationAlreadyApplied) {
+                    orchestrator.scheduleAutomaticRestoreIfEligible(currentUserId)
+                }
+            }
+        }
+    }
 
     private val _actionState = MutableStateFlow(CloudBackupActionUiState())
     val actionState: StateFlow<CloudBackupActionUiState> = _actionState.asStateFlow()
@@ -499,7 +550,20 @@ class CloudBackupViewModel(
             return
         }
 
-        val outcomeResult = restoreBackupUseCase(backup)
+        val outcomeResult = restoreBackupUseCase(backup) {
+            val stillAuthenticated = runCatching { authenticatedUidProvider() == currentUserId }.getOrDefault(false)
+            val stillInWorkspace = runCatching { isWorkspaceIdentityCurrent(currentUserId) }.getOrDefault(false)
+            val orchestratorStillScoped = orchestrator == null ||
+                orchestrator.currentAuthenticatedUid() == currentUserId
+            val automaticModeStillOff =
+                autoBackupPreferenceStore?.isAutoBackupEnabled(currentUserId) != true
+            manifest.uid == currentUserId &&
+                manifest.status == CloudBackupManifestStatus.COMPLETE &&
+                stillAuthenticated &&
+                stillInWorkspace &&
+                orchestratorStillScoped &&
+                automaticModeStillOff
+        }
         if (outcomeResult.isFailure) {
             val failure = outcomeResult.exceptionOrNull()
             recordRestoreFailure(toFailureCode(failure), manifest)
@@ -509,6 +573,17 @@ class CloudBackupViewModel(
                     isBusy = false,
                     busyMessage = null,
                     restoreResult = CloudRestoreResult.Failure(failureReason)
+                )
+            }
+            return
+        }
+
+        if (!isCloudOperationIdentityCurrent("manual restore post-commit")) {
+            _actionState.update {
+                it.copy(
+                    isBusy = false,
+                    busyMessage = null,
+                    errorMessage = UiMessage(R.string.cloud_workspace_changing)
                 )
             }
             return

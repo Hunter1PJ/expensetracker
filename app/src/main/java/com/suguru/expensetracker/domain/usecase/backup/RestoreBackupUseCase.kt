@@ -10,4 +10,16 @@ class RestoreBackupUseCase(
     suspend operator fun invoke(backup: ExpenseTrackerBackup): Result<BackupRestoreOutcome> {
         return backupRepository.restoreSnapshot(backup)
     }
+
+    suspend operator fun invoke(
+        backup: ExpenseTrackerBackup,
+        expectedCurrentFingerprint: String? = null,
+        preCommitCheck: suspend () -> Boolean
+    ): Result<BackupRestoreOutcome> {
+        return backupRepository.restoreSnapshotGuarded(
+            backup = backup,
+            expectedCurrentFingerprint = expectedCurrentFingerprint,
+            preCommitCheck = preCommitCheck
+        )
+    }
 }

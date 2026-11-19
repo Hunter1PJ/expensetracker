@@ -14,6 +14,7 @@ import com.suguru.expensetracker.data.local.entity.RecurringOccurrenceEntity
 import com.suguru.expensetracker.data.local.entity.RecurringTransactionEntity
 import com.suguru.expensetracker.data.local.entity.TransactionEntity
 import com.suguru.expensetracker.domain.model.AccountType
+import com.suguru.expensetracker.domain.model.BackupContentFingerprint
 import com.suguru.expensetracker.domain.model.BackupRestoreOutcome
 import com.suguru.expensetracker.domain.model.BackupSettings
 import com.suguru.expensetracker.domain.model.BudgetPeriodType
@@ -26,6 +27,7 @@ import com.suguru.expensetracker.domain.model.toBackup
 import com.suguru.expensetracker.domain.model.toDomain
 import com.suguru.expensetracker.domain.model.toEntity
 import com.suguru.expensetracker.domain.repository.BackupRepository
+import com.suguru.expensetracker.domain.repository.BackupRestorePreconditionFailedException
 import com.suguru.expensetracker.domain.repository.SettingsRepository
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -142,20 +144,22 @@ class RoomBackupRepository(
         val recurringOccurrences: List<RecurringOccurrenceEntity>
     )
 
-    override suspend fun createSnapshot(): ExpenseTrackerBackup {
-        val snapshotData = db.withTransaction {
-            val backupDao = db.backupDao()
-            RoomSnapshotData(
-                accounts = backupDao.getAllAccounts(),
-                categories = backupDao.getAllCategories(),
-                transactions = backupDao.getAllTransactions(),
-                budgets = backupDao.getAllBudgets(),
-                recurringTransactions = backupDao.getAllRecurringTransactions(),
-                recurringOccurrences = backupDao.getAllRecurringOccurrences()
-            )
-        }
-        val settings = settingsRepository.settings.first()
+    private suspend fun readRoomSnapshotData(): RoomSnapshotData {
+        val backupDao = db.backupDao()
+        return RoomSnapshotData(
+            accounts = backupDao.getAllAccounts(),
+            categories = backupDao.getAllCategories(),
+            transactions = backupDao.getAllTransactions(),
+            budgets = backupDao.getAllBudgets(),
+            recurringTransactions = backupDao.getAllRecurringTransactions(),
+            recurringOccurrences = backupDao.getAllRecurringOccurrences()
+        )
+    }
 
+    private fun createBackupSnapshot(
+        snapshotData: RoomSnapshotData,
+        settings: com.suguru.expensetracker.domain.model.AppSettings
+    ): ExpenseTrackerBackup {
         val backup = ExpenseTrackerBackup(
             formatVersion = CURRENT_FORMAT_VERSION,
             appVersion = appVersion,
@@ -170,11 +174,30 @@ class RoomBackupRepository(
             settings = settings.toBackup(),
             checksum = null
         )
-
         return backup.copy(checksum = computeChecksum(backup))
     }
 
-    override suspend fun restoreSnapshot(backup: ExpenseTrackerBackup): Result<BackupRestoreOutcome> {
+    override suspend fun createSnapshot(): ExpenseTrackerBackup {
+        val snapshotData = db.withTransaction { readRoomSnapshotData() }
+        val settings = settingsRepository.settings.first()
+        return createBackupSnapshot(snapshotData, settings)
+    }
+
+    override suspend fun restoreSnapshot(backup: ExpenseTrackerBackup): Result<BackupRestoreOutcome> =
+        restoreSnapshotInternal(backup, expectedCurrentFingerprint = null, preCommitCheck = null)
+
+    override suspend fun restoreSnapshotGuarded(
+        backup: ExpenseTrackerBackup,
+        expectedCurrentFingerprint: String?,
+        preCommitCheck: suspend () -> Boolean
+    ): Result<BackupRestoreOutcome> =
+        restoreSnapshotInternal(backup, expectedCurrentFingerprint, preCommitCheck)
+
+    private suspend fun restoreSnapshotInternal(
+        backup: ExpenseTrackerBackup,
+        expectedCurrentFingerprint: String?,
+        preCommitCheck: (suspend () -> Boolean)?
+    ): Result<BackupRestoreOutcome> {
         val validationResult = validateBackup(backup)
         if (validationResult.isFailure) {
             return validationResult.map { BackupRestoreOutcome.Complete }
@@ -183,6 +206,18 @@ class RoomBackupRepository(
         return try {
             recoveryMutex.withLock {
                 db.withTransaction {
+                    if (preCommitCheck != null) {
+                        if (!preCommitCheck()) throw BackupRestorePreconditionFailedException()
+                        if (expectedCurrentFingerprint != null) {
+                            val currentBackup = createBackupSnapshot(
+                                readRoomSnapshotData(),
+                                settingsRepository.settings.first()
+                            )
+                            if (BackupContentFingerprint.compute(currentBackup) != expectedCurrentFingerprint) {
+                                throw BackupRestorePreconditionFailedException()
+                            }
+                        }
+                    }
                     val backupDao = db.backupDao()
 
                     db.compileStatement("DELETE FROM budgets").execute()
@@ -235,6 +270,10 @@ class RoomBackupRepository(
                         val payload = backupSettingsAdapter.toJson(backupSettings)
                         db.pendingSettingsRecoveryDao().insert(PendingSettingsRecoveryEntity(settingsJson = payload))
                     } ?: db.pendingSettingsRecoveryDao().clear()
+
+                    if (preCommitCheck != null && !preCommitCheck()) {
+                        throw BackupRestorePreconditionFailedException()
+                    }
                 }
 
                 val backupSettings = backup.settings?.toDomain() ?: return@withLock Result.success(BackupRestoreOutcome.Complete)

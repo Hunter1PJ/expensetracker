@@ -1,7 +1,9 @@
 package com.suguru.expensetracker.presentation.transactions
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
@@ -336,8 +338,7 @@ class TransactionsViewModelTest {
                     onTypeFilterChanged = {},
                     onCategoryFilterChanged = {},
                     onClearFilters = {},
-                    onNavigateToDetail = {},
-                    onNavigateToAddTransaction = {}
+                    onNavigateToDetail = {}
                 )
             }
         }
@@ -346,6 +347,8 @@ class TransactionsViewModelTest {
         composeTestRule.onNodeWithTag("account_filter_1").assertDoesNotExist()
         composeTestRule.onNodeWithText("All Accounts").assertDoesNotExist()
 
+        composeTestRule.onAllNodesWithTag("add_transaction_fab").assertCountEquals(0)
+        composeTestRule.onAllNodesWithTag("empty_add_transaction_button").assertCountEquals(0)
         composeTestRule.onNodeWithTag("category_filter_all").assertIsDisplayed()
         composeTestRule.onNodeWithTag("type_filter_all").assertIsDisplayed()
         composeTestRule.onNodeWithTag("type_filter_transfer").assertIsDisplayed()
@@ -354,5 +357,29 @@ class TransactionsViewModelTest {
         composeTestRule.onNodeWithText("Weekly run").assertIsDisplayed()
         composeTestRule.onNodeWithTag("transaction_row_11").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Checking → Savings").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyTransactionsScreenShowsInformativeStateWithoutCreationAction() {
+        composeTestRule.setContent {
+            ExpenseTrackerTheme {
+                TransactionsScreenContent(
+                    uiState = TransactionsUiState(
+                        isLoading = false,
+                        hasAnyTransactionsInDb = false
+                    ),
+                    onSearchQueryChanged = {},
+                    onTypeFilterChanged = {},
+                    onCategoryFilterChanged = {},
+                    onClearFilters = {},
+                    onNavigateToDetail = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("empty_transactions_state").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("add_transaction_fab").assertCountEquals(0)
+        composeTestRule.onAllNodesWithTag("empty_add_transaction_button").assertCountEquals(0)
+        composeTestRule.onNodeWithText("Add Transaction").assertDoesNotExist()
     }
 }

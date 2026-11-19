@@ -4,6 +4,7 @@ import android.app.Application
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.squareup.moshi.Moshi
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.data.backup.AutomaticCloudBackupOrchestrator
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.AppSettings
 import com.suguru.expensetracker.domain.model.BackupAccount
@@ -26,6 +27,7 @@ import com.suguru.expensetracker.domain.model.TimeFormatPreference
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.model.WeekStart
 import com.suguru.expensetracker.domain.model.toBackup
+import com.suguru.expensetracker.domain.repository.AutoBackupPreferenceStore
 import com.suguru.expensetracker.domain.repository.BackupRepository
 import com.suguru.expensetracker.domain.repository.CloudBackupFingerprintStore
 import com.suguru.expensetracker.domain.repository.CloudBackupRemoteRepository
@@ -76,6 +78,50 @@ class CloudBackupViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `new cloud manifest observed while settings is open schedules guarded automatic restore`() =
+        runTest(testDispatcher) {
+            val remote = FakeRemoteRepo()
+            val stateStore = FakeStateStore()
+            val fingerprintStore = FakeFingerprintStore()
+            val backupRepo = FakeBackupRepo(nonEmptyBackup())
+            val preferenceStore = FakeAutoBackupPreferenceStore(enabled = true)
+            val scheduledRestores = mutableListOf<String>()
+            val orchestrator = AutomaticCloudBackupOrchestrator(
+                remoteRepository = remote,
+                backupRepository = backupRepo,
+                createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+                restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+                stateStore = stateStore,
+                fingerprintStore = fingerprintStore,
+                autoBackupPreferenceStore = preferenceStore,
+                onScheduleAutomaticRestore = scheduledRestores::add,
+                authenticatedUidProvider = { "uid_1" },
+                activeWorkspaceUidProvider = { "uid_1" }
+            )
+            CloudBackupViewModel(
+                currentUserId = "uid_1",
+                remoteRepository = remote,
+                createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+                restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+                backupRepository = backupRepo,
+                cloudBackupStateStore = stateStore,
+                cloudBackupFingerprintStore = fingerprintStore,
+                autoBackupPreferenceStore = preferenceStore,
+                orchestrator = orchestrator,
+                isWorkspaceIdentityCurrent = { true },
+                authenticatedUidProvider = { "uid_1" },
+                workDispatcher = testDispatcher
+            )
+            advanceUntilIdle()
+            val (manifest, chunks) = createCloudSnapshot(backupRepo, backupRepo.currentBackup)
+            remote.publish(manifest, chunks)
+
+            advanceUntilIdle()
+
+            assertEquals(listOf("uid_1"), scheduledRestores)
+        }
 
     @Test
     fun `backUpNow uploads chunks and updates CloudBackupStateStore and FingerprintStore`() = runTest(testDispatcher) {
@@ -657,6 +703,12 @@ class CloudBackupViewModelTest {
         override fun observeManifests(userId: String): Flow<List<CloudBackupManifest>> =
             observeFlowOverride ?: flow
 
+        fun publish(manifest: CloudBackupManifest, chunks: List<CloudBackupPayloadChunk>) {
+            uploadedManifests.add(manifest)
+            chunksBySnapshot[manifest.snapshotId] = chunks
+            flow.value = uploadedManifests.toList()
+        }
+
         override suspend fun getLatestCompleteManifest(): Result<CloudBackupManifest?> {
             val latest = uploadedManifests
                 .filter { it.status == CloudBackupManifestStatus.COMPLETE }
@@ -729,6 +781,18 @@ class CloudBackupViewModelTest {
 
         override suspend fun clearLastUploadedFingerprint(uid: String) {
             fpFlow.value = fpFlow.value - uid
+        }
+    }
+
+    private class FakeAutoBackupPreferenceStore(
+        private var enabled: Boolean
+    ) : AutoBackupPreferenceStore {
+        override suspend fun isAutoBackupEnabled(uid: String): Boolean = enabled
+
+        override fun observeAutoBackupEnabled(uid: String): Flow<Boolean> = MutableStateFlow(enabled)
+
+        override suspend fun setAutoBackupEnabled(uid: String, enabled: Boolean) {
+            this.enabled = enabled
         }
     }
 

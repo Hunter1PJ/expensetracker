@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +52,6 @@ import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerFilterChip
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerSearchField
 import com.suguru.expensetracker.presentation.components.FinancialListRow
-import com.suguru.expensetracker.presentation.components.PrimaryButton
 import com.suguru.expensetracker.presentation.components.SecondaryButton
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
@@ -64,7 +61,6 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 fun TransactionsScreen(
     viewModel: TransactionsViewModel,
     onNavigateToDetail: (Long) -> Unit,
-    onNavigateToAddTransaction: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -76,7 +72,6 @@ fun TransactionsScreen(
         onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
         onClearFilters = viewModel::clearFilters,
         onNavigateToDetail = onNavigateToDetail,
-        onNavigateToAddTransaction = onNavigateToAddTransaction,
         modifier = modifier
     )
 }
@@ -90,7 +85,6 @@ fun TransactionsScreenContent(
     onCategoryFilterChanged: (Long?) -> Unit,
     onClearFilters: () -> Unit,
     onNavigateToDetail: (Long) -> Unit,
-    onNavigateToAddTransaction: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -105,20 +99,6 @@ fun TransactionsScreenContent(
                 .fillMaxSize()
                 .testTag("transactions_screen"),
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = onNavigateToAddTransaction,
-                    containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = ExpenseTrackerRadius.button,
-                    modifier = Modifier.testTag("add_transaction_fab")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.title_add_transaction)
-                    )
-                }
-            }
         ) { innerPadding ->
             Column(
                 modifier = Modifier
@@ -286,12 +266,6 @@ fun TransactionsScreenContent(
                                 description = stringResource(R.string.no_transactions_desc),
                                 icon = Icons.Default.ReceiptLong,
                                 testTag = "empty_transactions_state"
-                            )
-                            PrimaryButton(
-                                text = stringResource(R.string.title_add_transaction),
-                                onClick = onNavigateToAddTransaction,
-                                leadingIcon = Icons.Default.Add,
-                                modifier = Modifier.testTag("empty_add_transaction_button")
                             )
                         }
                     }

@@ -13,15 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -546,32 +542,6 @@ fun ExpenseTrackerApp(
                             )
                         }
                     }
-                },
-                floatingActionButton = {
-                    if (currentDestination == NavDestination.Home) {
-                        FloatingActionButton(
-                            onClick = {
-                                activeAiCandidate = null
-                                resolvedAddTransactionViewModel.clearForm()
-                                previousDestination = currentDestination
-                                currentDestination = NavDestination.AddTransaction
-                            },
-                            shape = ExpenseTrackerRadius.button,
-                            containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
-                            contentColor = androidx.compose.ui.graphics.Color.White,
-                            elevation = FloatingActionButtonDefaults.elevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 2.dp
-                            ),
-                            modifier = Modifier.testTag("add_transaction_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = stringResource(R.string.action_add_transaction),
-                                modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
-                            )
-                        }
-                    }
                 }
             ) { innerPadding ->
                 when (currentDestination) {
@@ -621,12 +591,6 @@ fun ExpenseTrackerApp(
                                 previousDestination = NavDestination.Transactions
                                 selectedTransactionId = txId
                                 currentDestination = NavDestination.TransactionDetail
-                            },
-                            onNavigateToAddTransaction = {
-                                activeAiCandidate = null
-                                resolvedAddTransactionViewModel.clearForm()
-                                previousDestination = NavDestination.Transactions
-                                currentDestination = NavDestination.AddTransaction
                             },
                             modifier = Modifier.padding(innerPadding)
                         )

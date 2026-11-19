@@ -3,14 +3,14 @@ package com.suguru.expensetracker.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.suguru.expensetracker.domain.repository.CloudBackupFingerprintStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.delay
 import java.io.IOException
 import java.security.MessageDigest
 
@@ -34,11 +34,12 @@ class DataStoreCloudBackupFingerprintStore(
     override suspend fun getLastUploadedFingerprint(uid: String): String? {
         val key = preferenceKeyForUid(uid)
         val stored = dataStore.data
-            .catch { exception ->
+            .retryWhen { exception, attempt ->
                 if (exception is IOException) {
-                    emit(emptyPreferences())
+                    delay((1_000L * (attempt + 1)).coerceAtMost(30_000L))
+                    true
                 } else {
-                    throw exception
+                    false
                 }
             }
             .first()[key]
@@ -48,11 +49,12 @@ class DataStoreCloudBackupFingerprintStore(
     override fun observeLastUploadedFingerprint(uid: String): Flow<String?> {
         val key = preferenceKeyForUid(uid)
         return dataStore.data
-            .catch { exception ->
+            .retryWhen { exception, attempt ->
                 if (exception is IOException) {
-                    emit(emptyPreferences())
+                    delay((1_000L * (attempt + 1)).coerceAtMost(30_000L))
+                    true
                 } else {
-                    throw exception
+                    false
                 }
             }
             .map { preferences ->

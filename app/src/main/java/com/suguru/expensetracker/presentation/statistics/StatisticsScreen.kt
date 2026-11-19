@@ -46,7 +46,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material.icons.outlined.ShowChart
@@ -379,15 +378,6 @@ fun StatisticsScreen(
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
                 }
 
-                // Account Breakdown
-                if (uiState.accountBreakdown.isNotEmpty()) {
-                    AccountAnalyticsCard(
-                        accounts = uiState.accountBreakdown,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("account_breakdown_card")
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxl))
@@ -1204,133 +1194,6 @@ private fun CategoryProgressRow(
                     .clip(RoundedCornerShape(3.dp))
                     .background(categoryColor)
             )
-        }
-    }
-}
-
-@Composable
-private fun AccountAnalyticsCard(
-    accounts: List<AccountAnalyticsUiModel>,
-    modifier: Modifier = Modifier
-) {
-    ExpenseTrackerCard(
-        modifier = modifier,
-        shape = ExpenseTrackerRadius.card,
-        contentPadding = PaddingValues(ExpenseTrackerSpacing.cardContentPadding)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.AccountBalance,
-                    contentDescription = stringResource(R.string.ui_stats_account_breakdown),
-                    tint = ExpenseTrackerTheme.extendedColors.accentIndigo,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.xs))
-                Text(
-                    text = stringResource(R.string.home_accounts),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = ExpenseTrackerTheme.extendedColors.textPrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
-
-            Column {
-                accounts.forEachIndexed { index, acc ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            IconAvatar(
-                                icon = Icons.Outlined.AccountBalance,
-                                contentDescription = acc.accountName,
-                                size = 36.dp,
-                                tint = ExpenseTrackerTheme.extendedColors.accentIndigo,
-                                backgroundColor = ExpenseTrackerTheme.extendedColors.accentIndigo.copy(alpha = 0.16f),
-                                borderColor = ExpenseTrackerTheme.extendedColors.accentIndigo.copy(alpha = 0.35f),
-                                shapeType = AvatarShape.ROUNDED_SQUARE
-                            )
-
-                            Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.md))
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = acc.accountName,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ExpenseTrackerTheme.extendedColors.textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (acc.isArchived) {
-                                    Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.xs))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(ExpenseTrackerRadius.chipPill)
-                                            .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.status_archived),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.sp,
-                                            color = ExpenseTrackerTheme.extendedColors.textMuted
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = stringResource(R.string.type_income),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ExpenseTrackerTheme.extendedColors.textMuted
-                                )
-                                Text(
-                                    text = acc.formattedIncome,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ExpenseTrackerTheme.extendedColors.financialPositive
-                                )
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = stringResource(R.string.type_expense),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ExpenseTrackerTheme.extendedColors.textMuted
-                                )
-                                Text(
-                                    text = acc.formattedExpense,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ExpenseTrackerTheme.extendedColors.financialNegative
-                                )
-                            }
-                        }
-                    }
-
-                    if (index < accounts.lastIndex) {
-                        Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
-                        HorizontalDivider(
-                            color = ExpenseTrackerTheme.extendedColors.divider,
-                            thickness = 0.5.dp
-                        )
-                        Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
-                    }
-                }
-            }
         }
     }
 }

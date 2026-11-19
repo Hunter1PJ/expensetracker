@@ -1,5 +1,6 @@
 package com.suguru.expensetracker.data.remote.firestore
 
+import android.app.Application
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.Blob
@@ -30,7 +31,7 @@ import org.robolectric.annotation.Config
 import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], application = Application::class)
 class FirestoreCloudBackupRepositoryTest {
 
     private val chunker = CloudBackupPayloadChunker(maxChunkSizeBytes = 16)
@@ -60,7 +61,8 @@ class FirestoreCloudBackupRepositoryTest {
         assertTrue(deleteResult.isFailure)
         assertTrue(deleteResult.exceptionOrNull() is CloudBackupRemoteException.Unauthenticated)
 
-        assertTrue(repository.observeManifests("uid_1").toList().isEmpty())
+        val observeResult = runCatching { repository.observeManifests("uid_1").toList() }
+        assertTrue(observeResult.exceptionOrNull() is CloudBackupRemoteException.Unauthenticated)
         assertTrue(gateway.events.isEmpty())
     }
 
@@ -82,7 +84,8 @@ class FirestoreCloudBackupRepositoryTest {
         val crossDelete = repository.deleteSnapshot("uid_bob", FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID)
         assertTrue(crossDelete.exceptionOrNull() is CloudBackupRemoteException.UidMismatch)
 
-        assertTrue(repository.observeManifests("uid_bob").toList().isEmpty())
+        val observeResult = runCatching { repository.observeManifests("uid_bob").toList() }
+        assertTrue(observeResult.exceptionOrNull() is CloudBackupRemoteException.UidMismatch)
     }
 
     @Test
@@ -120,6 +123,42 @@ class FirestoreCloudBackupRepositoryTest {
         assertArrayEquals(compressed, reassembled)
         val decompressed = codec.decompress(reassembled).getOrThrow().toString(Charsets.UTF_8)
         assertEquals(rawJson, decompressed)
+    }
+
+    @Test
+    fun `incomplete primary is not reported as no cloud backup`() = runTest {
+        val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
+        val repository = FirestoreCloudBackupRepository(gateway, chunker)
+        val (manifest, chunked) = buildSnapshot("snap_incomplete", "uid_alice", byteArrayOf(1, 2, 3))
+        assertTrue(repository.uploadBackup("uid_alice", manifest, chunked).isSuccess)
+
+        val primaryKey = "uid_alice" to FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID
+        gateway.manifests[primaryKey] = gateway.manifests.getValue(primaryKey).copy(
+            status = CloudBackupManifestStatus.UPLOADING.name,
+            completedAt = null
+        )
+
+        val result = repository.getLatestCompleteManifest()
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is CloudBackupRemoteException.SnapshotNotComplete)
+    }
+
+    @Test
+    fun `temporary manifest lookup failure is not reported as a missing backup`() = runTest {
+        val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
+        val repository = FirestoreCloudBackupRepository(gateway, chunker)
+        val (manifest, chunked) = buildSnapshot("snap_available", "uid_alice", byteArrayOf(4, 5, 6))
+        assertTrue(repository.uploadBackup("uid_alice", manifest, chunked).isSuccess)
+        gateway.getManifestError = FirebaseNetworkException("temporarily unavailable")
+
+        val result = repository.getLatestCompleteManifest()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is CloudBackupRemoteException.RemoteOperationFailed)
+        assertEquals(
+            "NETWORK_UNAVAILABLE",
+            (result.exceptionOrNull() as CloudBackupRemoteException.RemoteOperationFailed).failureCode
+        )
     }
 
     @Test
@@ -380,7 +419,8 @@ class FirestoreCloudBackupRepositoryTest {
         var failMarkFailedError: Exception? = null,
         var failOnMarkPrimaryComplete: Boolean = false,
         var failOnPrimaryPromotion: Boolean = false,
-        var corruptUploadedChunksOnRead: Boolean = false
+        var corruptUploadedChunksOnRead: Boolean = false,
+        var getManifestError: Exception? = null
     ) : RemoteBackupGateway {
 
         val events = mutableListOf<String>()
@@ -391,11 +431,13 @@ class FirestoreCloudBackupRepositoryTest {
 
         override fun currentUserUid(): String? = authenticatedUid
 
-        override fun observeManifests(uid: String, limit: Long): Flow<List<CloudBackupManifest>> =
-            observed.map { list -> list.filter { it.uid == uid && it.snapshotId == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID }.take(limit.toInt()) }
+        override fun observeManifests(uid: String): Flow<List<CloudBackupManifest>> =
+            observed.map { list -> list.filter { it.uid == uid && it.snapshotId == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID } }
 
-        override suspend fun getManifest(uid: String, snapshotId: String): FirestoreBackupManifestDto? =
-            manifests[uid to snapshotId]
+        override suspend fun getManifest(uid: String, snapshotId: String): FirestoreBackupManifestDto? {
+            getManifestError?.let { throw it }
+            return manifests[uid to snapshotId]
+        }
 
         override suspend fun listCompleteManifests(uid: String): List<FirestoreBackupManifestDto> =
             manifests.entries

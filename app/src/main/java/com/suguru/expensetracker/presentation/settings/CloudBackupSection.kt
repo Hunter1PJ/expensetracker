@@ -97,8 +97,15 @@ fun CloudBackupSection(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val isFirebaseInitialized = remember(context) {
-        com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(context)
+    var isFirebaseInitialized by remember(context) {
+        mutableStateOf(com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(context))
+    }
+    LaunchedEffect(context, isFirebaseInitialized) {
+        while (!isFirebaseInitialized) {
+            kotlinx.coroutines.delay(500L)
+            isFirebaseInitialized =
+                com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(context)
+        }
     }
 
     if (!isFirebaseInitialized) {

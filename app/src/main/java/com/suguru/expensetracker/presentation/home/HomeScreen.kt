@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -198,7 +199,20 @@ fun HomeScreenContent(
                 )
             }
 
-            // --- 2.5 AI ASSISTANT ENTRY SECTION ---
+            // --- 2.5 PRIMARY TRANSACTION ENTRY ---
+            item {
+                PrimaryButton(
+                    text = stringResource(R.string.title_add_transaction),
+                    onClick = onNavigateToAddTransaction,
+                    leadingIcon = Icons.Default.Add,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 540.dp)
+                        .testTag("home_add_transaction_button")
+                )
+            }
+
+            // --- 2.6 AI ASSISTANT ENTRY SECTION ---
             item {
                 HomeAiSection(
                         isConfigured = uiState.isAiConfigured,
@@ -235,7 +249,6 @@ fun HomeScreenContent(
                 HomeRecentActivitySection(
                     transactions = uiState.recentTransactions,
                     onSeeAll = onNavigateToTransactions,
-                    onAddTransaction = onNavigateToAddTransaction,
                     onNavigateToDetail = onNavigateToTransactionDetail,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -519,7 +532,6 @@ private fun HomeMonthlyOverviewSection(
 private fun HomeRecentActivitySection(
     transactions: List<RecentTransactionUiModel>,
     onSeeAll: () -> Unit,
-    onAddTransaction: () -> Unit,
     onNavigateToDetail: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -591,13 +603,6 @@ private fun HomeRecentActivitySection(
                         textAlign = TextAlign.Center
                     )
 
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
-
-                    SecondaryButton(
-                        text = stringResource(R.string.title_add_transaction),
-                        onClick = onAddTransaction,
-                        testTag = "recent_transactions_empty_add_button"
-                    )
                 }
             }
         } else {
