@@ -181,7 +181,7 @@ class TransactionsViewModel(
         return when (tx.type) {
             TransactionType.EXPENSE -> {
                 val formattedAmount = "- ${MoneyParser.format(tx.amount, includeSymbol = true, useGrouping = true, showExplicitSign = false)}"
-                val title = category?.name ?: "Expense"
+                val title = category?.name.orEmpty()
                 val subtitle = tx.note?.trim()?.takeIf { it.isNotEmpty() } ?: ""
 
                 TransactionListItemUiModel(
@@ -201,7 +201,7 @@ class TransactionsViewModel(
             }
             TransactionType.INCOME -> {
                 val formattedAmount = "+ ${MoneyParser.format(tx.amount, includeSymbol = true, useGrouping = true, showExplicitSign = false)}"
-                val title = category?.name ?: "Income"
+                val title = category?.name.orEmpty()
                 val subtitle = tx.note?.trim()?.takeIf { it.isNotEmpty() } ?: ""
 
                 TransactionListItemUiModel(
@@ -221,10 +221,10 @@ class TransactionsViewModel(
             }
             TransactionType.TRANSFER -> {
                 val formattedAmount = MoneyParser.format(tx.amount, includeSymbol = true, useGrouping = true, showExplicitSign = false)
-                val fromName = sourceAccount?.name ?: "Account"
-                val toName = destAccount?.name ?: "Account"
+                val fromName = sourceAccount?.name.orEmpty()
+                val toName = destAccount?.name.orEmpty()
                 val title = "$fromName → $toName"
-                val subtitle = if (!tx.note.isNullOrBlank()) tx.note else "Transfer"
+                val subtitle = tx.note.orEmpty()
 
                 TransactionListItemUiModel(
                     id = tx.id,

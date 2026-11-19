@@ -33,6 +33,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.suguru.expensetracker.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -156,7 +158,7 @@ fun HeroFinancialCard(
                 ) {
                     if (incomeText != null) {
                         HeroStatPill(
-                            label = "Income",
+                            label = stringResource(R.string.type_income),
                             amount = incomeText,
                             isIncome = true,
                             modifier = Modifier.weight(1f)
@@ -165,7 +167,7 @@ fun HeroFinancialCard(
 
                     if (expenseText != null) {
                         HeroStatPill(
-                            label = "Expense",
+                            label = stringResource(R.string.type_expense),
                             amount = expenseText,
                             isIncome = false,
                             modifier = Modifier.weight(1f)

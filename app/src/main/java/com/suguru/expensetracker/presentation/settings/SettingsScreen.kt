@@ -56,6 +56,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import com.suguru.expensetracker.presentation.util.AppLanguageManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -136,8 +138,13 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var activeSheet by remember { mutableStateOf<ActiveSettingsSheet?>(null) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
+    var showLegacyKeyMigrationDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var selectedLanguage by remember { mutableStateOf(AppLanguageManager.selectedLanguageTag(context)) }
     var apiKeyInput by remember { mutableStateOf("") }
     val apiKeySavedMessage = stringResource(R.string.ai_settings_key_saved)
+    val legacyKeyMigratedMessage = stringResource(R.string.ai_legacy_key_migrated)
     val apiKeyVerifiedMessage = stringResource(R.string.ai_settings_key_verified)
 
     LaunchedEffect(viewModel) {
@@ -148,6 +155,7 @@ fun SettingsScreen(
                     showApiKeyDialog = false
                     snackbarHostState.showSnackbar(apiKeyVerifiedMessage)
                 }
+                SettingsEvent.LegacyKeyMigrated -> snackbarHostState.showSnackbar(legacyKeyMigratedMessage)
             }
         }
     }
@@ -178,7 +186,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "PREFERENCES",
+                    text = stringResource(R.string.settings_preferences_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -200,7 +208,7 @@ fun SettingsScreen(
             when (val state = uiState) {
                 is SettingsUiState.Loading -> {
                     LoadingState(
-                        message = "Loading preferences...",
+                        message = stringResource(R.string.ui_settings_loading),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = ExpenseTrackerSpacing.xxl)
@@ -292,6 +300,29 @@ fun SettingsScreen(
                         )
 
                         SettingsGroupCard(testTag = "settings_ai_group_card") {
+                            if (!state.isSignedIn) {
+                                Text(
+                                    text = stringResource(R.string.ai_guest_profile_notice),
+                                    modifier = Modifier.padding(horizontal = ExpenseTrackerSpacing.lg, vertical = ExpenseTrackerSpacing.sm),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                )
+                            }
+                            if (state.hasLegacyApiKey) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = ExpenseTrackerSpacing.lg, vertical = ExpenseTrackerSpacing.sm),
+                                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.ai_legacy_key_notice),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                    )
+                                    TextButton(onClick = { showLegacyKeyMigrationDialog = true }) {
+                                        Text(stringResource(R.string.action_migrate_legacy_key))
+                                    }
+                                }
+                            }
                             SettingsSwitchRow(
                                 title = stringResource(R.string.title_ai_feature),
                                 subtitle = stringResource(R.string.desc_ai_feature),
@@ -299,10 +330,11 @@ fun SettingsScreen(
                                 iconTint = ExpenseTrackerTheme.extendedColors.primaryPurple,
                                 checked = state.isAiFeatureEnabled,
                                 onCheckedChange = { viewModel.setAiFeatureEnabled(it) },
-                                switchTestTag = "toggle_ai_feature_switch"
+                                switchTestTag = "toggle_ai_feature_switch",
+                                enabled = state.isAiProfileAvailable
                             )
 
-                            if (state.isAiFeatureEnabled) {
+                            if (state.isAiFeatureEnabled && state.isAiProfileAvailable) {
                                 SettingsDivider()
 
                                 val keySubtitle = if (state.isAiConfigured) {
@@ -344,7 +376,7 @@ fun SettingsScreen(
                                         state.isAiConfigured -> ExpenseTrackerTheme.extendedColors.financialPositive
                                         else -> ExpenseTrackerTheme.extendedColors.accentViolet
                                     },
-                                    trailingText = if (state.isAiConfigured) "Manage" else "Set Up",
+                                    trailingText = stringResource(if (state.isAiConfigured) R.string.action_manage else R.string.action_setup),
                                     onClick = {
                                         apiKeyInput = ""
                                         showApiKeyDialog = true
@@ -362,12 +394,12 @@ fun SettingsScreen(
                             .widthIn(max = 560.dp),
                         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
                     ) {
-                        SectionHeader(title = "Appearance")
+                        SectionHeader(title = stringResource(R.string.ui_settings_appearance))
 
                         SettingsGroupCard {
                             SettingsRow(
                                 title = stringResource(R.string.title_theme),
-                                subtitle = "App appearance theme",
+                                subtitle = stringResource(R.string.ui_settings_theme_desc),
                                 icon = Icons.Default.DarkMode,
                                 iconTint = MaterialTheme.colorScheme.primary,
                                 trailingText = when (settings.themeMode) {
@@ -388,14 +420,14 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
                     ) {
                         SectionHeader(
-                            title = "Financial",
+                            title = stringResource(R.string.ui_settings_financial),
                             testTag = "section_preferences"
                         )
 
                         SettingsGroupCard(testTag = "settings_preferences_card") {
                             SettingsRow(
                                 title = stringResource(R.string.title_preferred_currency),
-                                subtitle = "Used as a default, not for conversion",
+                                subtitle = stringResource(R.string.ui_settings_currency_desc),
                                 icon = Icons.Default.Payments,
                                 iconTint = MaterialTheme.colorScheme.primary,
                                 trailingText = settings.preferredCurrencyCode ?: stringResource(R.string.currency_automatic),
@@ -421,12 +453,12 @@ fun SettingsScreen(
                             .widthIn(max = 560.dp),
                         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
                     ) {
-                        SectionHeader(title = "Regional")
+                        SectionHeader(title = stringResource(R.string.ui_settings_regional))
 
                         SettingsGroupCard {
                             SettingsRow(
                                 title = stringResource(R.string.title_week_start),
-                                subtitle = "Weekly budget calculation anchor",
+                                subtitle = stringResource(R.string.ui_settings_week_anchor),
                                 icon = Icons.Default.CalendarMonth,
                                 iconTint = MaterialTheme.colorScheme.primary,
                                 trailingText = if (settings.weekStart == WeekStart.MONDAY) {
@@ -439,7 +471,7 @@ fun SettingsScreen(
                             SettingsDivider()
                             SettingsRow(
                                 title = stringResource(R.string.title_date_format),
-                                subtitle = "Date format preview",
+                                subtitle = stringResource(R.string.ui_settings_date_preview),
                                 icon = Icons.Default.DateRange,
                                 iconTint = MaterialTheme.colorScheme.secondary,
                                 trailingText = when (settings.dateFormat) {
@@ -453,15 +485,27 @@ fun SettingsScreen(
                             SettingsDivider()
                             SettingsRow(
                                 title = stringResource(R.string.title_time_format),
-                                subtitle = "Time format preview",
+                                subtitle = stringResource(R.string.ui_settings_24hour),
                                 icon = Icons.Default.Schedule,
                                 iconTint = MaterialTheme.colorScheme.tertiary,
-                                trailingText = when (settings.timeFormat) {
-                                    TimeFormatPreference.SYSTEM_DEFAULT -> stringResource(R.string.time_format_system)
-                                    TimeFormatPreference.HOUR_24 -> "16:45 (24h)"
-                                    TimeFormatPreference.HOUR_12 -> "4:45 PM (12h)"
+                                trailingText = stringResource(R.string.time_display_24_preview),
+                                onClick = {
+                                    viewModel.setTimeFormat(TimeFormatPreference.HOUR_24)
+                                    activeSheet = null
+                                }
+                            )
+                            SettingsDivider()
+                            SettingsRow(
+                                title = stringResource(R.string.title_language),
+                                subtitle = stringResource(R.string.language_description),
+                                icon = Icons.Default.Info,
+                                iconTint = MaterialTheme.colorScheme.primary,
+                                trailingText = when (selectedLanguage) {
+                                    "uz" -> stringResource(R.string.language_uzbek)
+                                    "ru" -> stringResource(R.string.language_russian)
+                                    else -> stringResource(R.string.language_english)
                                 },
-                                onClick = { activeSheet = ActiveSettingsSheet.TIME_FORMAT }
+                                onClick = { showLanguageDialog = true }
                             )
                         }
                     }
@@ -473,7 +517,7 @@ fun SettingsScreen(
                             .widthIn(max = 560.dp),
                         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
                     ) {
-                        SectionHeader(title = "Behavior")
+                        SectionHeader(title = stringResource(R.string.ui_settings_behavior))
 
                         SettingsGroupCard {
                             SettingsSwitchRow(
@@ -529,7 +573,7 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onBackground
                                     )
                                     Text(
-                                        text = "Offline-first • Your financial data stays on this device unless you choose to export it.",
+                                        text = stringResource(R.string.settings_privacy_copy),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )
@@ -553,13 +597,13 @@ fun SettingsScreen(
                                 onDismissRequest = { activeSheet = null }
                             ) {
                                 Text(
-                                    text = "Choose Theme",
+                                    text = stringResource(R.string.settings_choose_theme),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Select your preferred visual appearance",
+                                    text = stringResource(R.string.settings_theme_explanation),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
@@ -567,7 +611,7 @@ fun SettingsScreen(
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                                     SettingsOptionCard(
                                         title = stringResource(R.string.theme_system),
-                                        subtitle = "Follow system light/dark appearance",
+                                        subtitle = stringResource(R.string.ui_theme_follow_system),
                                         isSelected = settings.themeMode == ThemeMode.SYSTEM,
                                         onClick = {
                                             viewModel.setThemeMode(ThemeMode.SYSTEM)
@@ -577,7 +621,7 @@ fun SettingsScreen(
                                     )
                                     SettingsOptionCard(
                                         title = stringResource(R.string.theme_light),
-                                        subtitle = "Clean light interface",
+                                        subtitle = stringResource(R.string.ui_theme_light_desc),
                                         isSelected = settings.themeMode == ThemeMode.LIGHT,
                                         onClick = {
                                             viewModel.setThemeMode(ThemeMode.LIGHT)
@@ -587,7 +631,7 @@ fun SettingsScreen(
                                     )
                                     SettingsOptionCard(
                                         title = stringResource(R.string.theme_dark),
-                                        subtitle = "Midnight indigo dark interface",
+                                        subtitle = stringResource(R.string.ui_theme_dark_desc),
                                         isSelected = settings.themeMode == ThemeMode.DARK,
                                         onClick = {
                                             viewModel.setThemeMode(ThemeMode.DARK)
@@ -604,13 +648,13 @@ fun SettingsScreen(
                                 onDismissRequest = { activeSheet = null }
                             ) {
                                 Text(
-                                    text = "Preferred Currency",
+                                    text = stringResource(R.string.title_preferred_currency),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Used as initial default for new accounts. Does not convert existing balances.",
+                                    text = stringResource(R.string.settings_currency_explanation),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
@@ -618,7 +662,7 @@ fun SettingsScreen(
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                                     SettingsOptionCard(
                                         title = stringResource(R.string.currency_automatic),
-                                        subtitle = "Automatic (use account or device currency)",
+                                        subtitle = stringResource(R.string.ui_currency_automatic_desc),
                                         isSelected = settings.preferredCurrencyCode == null,
                                         onClick = {
                                             viewModel.setPreferredCurrency(null)
@@ -627,8 +671,8 @@ fun SettingsScreen(
                                         testTag = "currency_none_chip"
                                     )
                                     SettingsOptionCard(
-                                        title = "UZS — Uzbekistani Som",
-                                        subtitle = "Uzbekistan national currency",
+                                        title = stringResource(R.string.ui_currency_uzs),
+                                        subtitle = stringResource(R.string.ui_currency_uzs_desc),
                                         isSelected = settings.preferredCurrencyCode == "UZS",
                                         onClick = {
                                             viewModel.setPreferredCurrency("UZS")
@@ -637,8 +681,8 @@ fun SettingsScreen(
                                         testTag = "currency_uzs_chip"
                                     )
                                     SettingsOptionCard(
-                                        title = "USD — US Dollar",
-                                        subtitle = "United States currency",
+                                        title = stringResource(R.string.ui_currency_usd),
+                                        subtitle = stringResource(R.string.ui_currency_usd_desc),
                                         isSelected = settings.preferredCurrencyCode == "USD",
                                         onClick = {
                                             viewModel.setPreferredCurrency("USD")
@@ -647,8 +691,8 @@ fun SettingsScreen(
                                         testTag = "currency_usd_chip"
                                     )
                                     SettingsOptionCard(
-                                        title = "EUR — Euro",
-                                        subtitle = "European Union currency",
+                                        title = stringResource(R.string.ui_currency_eur),
+                                        subtitle = stringResource(R.string.ui_currency_eur_desc),
                                         isSelected = settings.preferredCurrencyCode == "EUR",
                                         onClick = {
                                             viewModel.setPreferredCurrency("EUR")
@@ -657,8 +701,8 @@ fun SettingsScreen(
                                         testTag = "currency_eur_chip"
                                     )
                                     SettingsOptionCard(
-                                        title = "KRW — South Korean Won",
-                                        subtitle = "South Korea currency",
+                                        title = stringResource(R.string.ui_currency_krw),
+                                        subtitle = stringResource(R.string.ui_currency_krw_desc),
                                         isSelected = settings.preferredCurrencyCode == "KRW",
                                         onClick = {
                                             viewModel.setPreferredCurrency("KRW")
@@ -667,8 +711,8 @@ fun SettingsScreen(
                                         testTag = "currency_krw_chip"
                                     )
                                     SettingsOptionCard(
-                                        title = "JPY — Japanese Yen",
-                                        subtitle = "Japan currency",
+                                        title = stringResource(R.string.ui_currency_jpy),
+                                        subtitle = stringResource(R.string.ui_currency_jpy_desc),
                                         isSelected = settings.preferredCurrencyCode == "JPY",
                                         onClick = {
                                             viewModel.setPreferredCurrency("JPY")
@@ -685,13 +729,13 @@ fun SettingsScreen(
                                 onDismissRequest = { activeSheet = null }
                             ) {
                                 Text(
-                                    text = "Week Starts On",
+                                    text = stringResource(R.string.settings_week_starts),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Anchor day used for weekly budgets and charts",
+                                    text = stringResource(R.string.settings_week_charts_explanation),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
@@ -699,7 +743,7 @@ fun SettingsScreen(
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                                     SettingsOptionCard(
                                         title = stringResource(R.string.week_start_monday),
-                                        subtitle = "Standard ISO calendar week start",
+                                        subtitle = stringResource(R.string.ui_week_monday_desc),
                                         isSelected = settings.weekStart == WeekStart.MONDAY,
                                         onClick = {
                                             viewModel.setWeekStart(WeekStart.MONDAY)
@@ -709,7 +753,7 @@ fun SettingsScreen(
                                     )
                                     SettingsOptionCard(
                                         title = stringResource(R.string.week_start_sunday),
-                                        subtitle = "Traditional calendar week start",
+                                        subtitle = stringResource(R.string.ui_week_sunday_desc),
                                         isSelected = settings.weekStart == WeekStart.SUNDAY,
                                         onClick = {
                                             viewModel.setWeekStart(WeekStart.SUNDAY)
@@ -726,13 +770,13 @@ fun SettingsScreen(
                                 onDismissRequest = { activeSheet = null }
                             ) {
                                 Text(
-                                    text = "Date Format",
+                                    text = stringResource(R.string.title_date_format),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Display format for dates in transaction records",
+                                    text = stringResource(R.string.settings_date_explanation),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
@@ -740,7 +784,7 @@ fun SettingsScreen(
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                                     SettingsOptionCard(
                                         title = stringResource(R.string.date_format_system),
-                                        subtitle = "Follows Android system locale settings",
+                                        subtitle = stringResource(R.string.ui_locale_desc),
                                         isSelected = settings.dateFormat == DateFormatPreference.SYSTEM_DEFAULT,
                                         onClick = {
                                             viewModel.setDateFormat(DateFormatPreference.SYSTEM_DEFAULT)
@@ -750,7 +794,7 @@ fun SettingsScreen(
                                     )
                                     SettingsOptionCard(
                                         title = "11/09/2026",
-                                        subtitle = "DD/MM/YYYY (Day / Month / Year)",
+                                        subtitle = stringResource(R.string.ui_date_ddmmyyyy),
                                         isSelected = settings.dateFormat == DateFormatPreference.DD_MM_YYYY,
                                         onClick = {
                                             viewModel.setDateFormat(DateFormatPreference.DD_MM_YYYY)
@@ -760,7 +804,7 @@ fun SettingsScreen(
                                     )
                                     SettingsOptionCard(
                                         title = "09/11/2026",
-                                        subtitle = "MM/DD/YYYY (Month / Day / Year)",
+                                        subtitle = stringResource(R.string.ui_date_mmddyyyy),
                                         isSelected = settings.dateFormat == DateFormatPreference.MM_DD_YYYY,
                                         onClick = {
                                             viewModel.setDateFormat(DateFormatPreference.MM_DD_YYYY)
@@ -770,7 +814,7 @@ fun SettingsScreen(
                                     )
                                     SettingsOptionCard(
                                         title = "2026-09-11",
-                                        subtitle = "YYYY-MM-DD (ISO standard format)",
+                                        subtitle = stringResource(R.string.ui_date_iso),
                                         isSelected = settings.dateFormat == DateFormatPreference.YYYY_MM_DD,
                                         onClick = {
                                             viewModel.setDateFormat(DateFormatPreference.YYYY_MM_DD)
@@ -787,53 +831,68 @@ fun SettingsScreen(
                                 onDismissRequest = { activeSheet = null }
                             ) {
                                 Text(
-                                    text = "Time Format",
+                                    text = stringResource(R.string.title_time_format),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Display format for timestamps in transaction records",
+                                    text = stringResource(R.string.settings_time_explanation),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
                                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                                     SettingsOptionCard(
-                                        title = stringResource(R.string.time_format_system),
-                                        subtitle = "Follows Android system 24-hour setting",
-                                        isSelected = settings.timeFormat == TimeFormatPreference.SYSTEM_DEFAULT,
-                                        onClick = {
-                                            viewModel.setTimeFormat(TimeFormatPreference.SYSTEM_DEFAULT)
-                                            activeSheet = null
-                                        },
-                                        testTag = "time_system_chip"
-                                    )
-                                    SettingsOptionCard(
-                                        title = "16:45",
-                                        subtitle = "24-Hour clock display",
-                                        isSelected = settings.timeFormat == TimeFormatPreference.HOUR_24,
+                                        title = stringResource(R.string.time_display_24_preview),
+                                        subtitle = stringResource(R.string.time_format_24),
+                                        isSelected = true,
                                         onClick = {
                                             viewModel.setTimeFormat(TimeFormatPreference.HOUR_24)
                                             activeSheet = null
                                         },
                                         testTag = "time_24_chip"
                                     )
-                                    SettingsOptionCard(
-                                        title = "4:45 PM",
-                                        subtitle = "12-Hour clock display with AM/PM",
-                                        isSelected = settings.timeFormat == TimeFormatPreference.HOUR_12,
-                                        onClick = {
-                                            viewModel.setTimeFormat(TimeFormatPreference.HOUR_12)
-                                            activeSheet = null
-                                        },
-                                        testTag = "time_12_chip"
-                                    )
                                 }
                             }
                         }
 
                         null -> Unit
+                    }
+
+                    if (showLanguageDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showLanguageDialog = false },
+                            title = { Text(stringResource(R.string.language_change_title)) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
+                                    listOf(
+                                        "uz" to R.string.language_uzbek,
+                                        "en" to R.string.language_english,
+                                        "ru" to R.string.language_russian
+                                    ).forEach { (tag, labelRes) ->
+                                        TextButton(
+                                            onClick = {
+                                                AppLanguageManager.setLanguage(context, tag)
+                                                selectedLanguage = tag
+                                                showLanguageDialog = false
+                                            },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = stringResource(labelRes),
+                                                fontWeight = if (selectedLanguage == tag) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showLanguageDialog = false }) {
+                                    Text(stringResource(R.string.action_cancel))
+                                }
+                            }
+                        )
                     }
 
                     if (showApiKeyDialog) {
@@ -859,7 +918,7 @@ fun SettingsScreen(
                                         onClick = { showApiKeyDialog = false },
                                         modifier = Modifier.testTag("close_api_key_dialog_button")
                                     ) {
-                                        Icon(Icons.Default.Close, contentDescription = "Close")
+                                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.ui_close))
                                     }
                                 }
                             },
@@ -913,6 +972,24 @@ fun SettingsScreen(
                                     Text(stringResource(R.string.action_save_key))
                                 }
                             },
+                        )
+                    }
+                    if (showLegacyKeyMigrationDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showLegacyKeyMigrationDialog = false },
+                            title = { Text(stringResource(R.string.dialog_migrate_legacy_key_title)) },
+                            text = { Text(stringResource(R.string.dialog_migrate_legacy_key_message)) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showLegacyKeyMigrationDialog = false
+                                    viewModel.migrateLegacyGeminiApiKey()
+                                }) { Text(stringResource(R.string.action_migrate_legacy_key)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showLegacyKeyMigrationDialog = false }) {
+                                    Text(stringResource(R.string.action_cancel))
+                                }
+                            }
                         )
                     }
 
@@ -1046,12 +1123,13 @@ private fun SettingsSwitchRow(
     switchTestTag: String,
     iconTint: Color = MaterialTheme.colorScheme.primary,
     subtitle: String? = null,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(
                 horizontal = ExpenseTrackerSpacing.lg,
                 vertical = ExpenseTrackerSpacing.md
@@ -1091,6 +1169,7 @@ private fun SettingsSwitchRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
@@ -1162,7 +1241,7 @@ private fun SettingsOptionCard(
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Selected",
+                    contentDescription = stringResource(R.string.ui_selected),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )

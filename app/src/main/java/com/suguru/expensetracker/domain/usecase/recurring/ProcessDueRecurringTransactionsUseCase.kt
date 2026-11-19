@@ -35,7 +35,7 @@ class ProcessDueRecurringTransactionsUseCase(
         var totalGeneratedCount = 0
 
         for (rule in dueRules) {
-            if (!rule.isActive) continue
+            if (!rule.isActive || rule.type == TransactionType.TRANSFER) continue
 
             var currentRule = rule
             var iterationCount = 0

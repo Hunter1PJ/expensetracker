@@ -4,6 +4,7 @@ import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.Transaction
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.presentation.util.UiMessage
 
 /**
  * UI State for the Transaction Detail screen.
@@ -21,7 +22,7 @@ data class TransactionDetailUiState(
     val dateTimeFormatted: String = "",
     val isDeleting: Boolean = false,
     val isDeletedSuccessfully: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: UiMessage? = null
 ) {
     val isExpense: Boolean get() = type == TransactionType.EXPENSE
     val isIncome: Boolean get() = type == TransactionType.INCOME

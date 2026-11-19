@@ -37,6 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.suguru.expensetracker.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -54,9 +56,11 @@ import androidx.compose.ui.unit.sp
 import com.suguru.expensetracker.domain.model.statistics.ComparisonSemantic
 import com.suguru.expensetracker.domain.model.statistics.StatisticsComparisonMode
 import com.suguru.expensetracker.presentation.components.EmptyState
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerFilterChip
 import com.suguru.expensetracker.presentation.components.IconAvatar
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
@@ -81,7 +85,7 @@ fun CompareControlsRow(
             ExpenseTrackerFilterChip(
                 selected = isComparisonEnabled,
                 onClick = onToggleComparison,
-                text = if (isComparisonEnabled) "Comparing Active" else "Compare",
+                text = stringResource(if (isComparisonEnabled) R.string.statistics_comparing_active else R.string.statistics_compare),
                 icon = Icons.Default.CompareArrows,
                 modifier = Modifier.testTag("compare_toggle_chip")
             )
@@ -98,7 +102,7 @@ fun CompareControlsRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "vs",
+                    text = stringResource(R.string.statistics_vs),
                     style = MaterialTheme.typography.labelMedium,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary,
                     modifier = Modifier.padding(end = ExpenseTrackerSpacing.xs)
@@ -107,14 +111,14 @@ fun CompareControlsRow(
                 ExpenseTrackerFilterChip(
                     selected = comparisonMode == StatisticsComparisonMode.PREVIOUS_PERIOD,
                     onClick = { onModeSelected(StatisticsComparisonMode.PREVIOUS_PERIOD) },
-                    text = "Previous Period",
+                    text = stringResource(R.string.statistics_previous_period),
                     modifier = Modifier.testTag("compare_mode_prev_period_chip")
                 )
 
                 ExpenseTrackerFilterChip(
                     selected = comparisonMode == StatisticsComparisonMode.PREVIOUS_YEAR,
                     onClick = { onModeSelected(StatisticsComparisonMode.PREVIOUS_YEAR) },
-                    text = "Previous Year",
+                    text = stringResource(R.string.statistics_previous_year),
                     modifier = Modifier.testTag("compare_mode_prev_year_chip")
                 )
             }
@@ -169,7 +173,7 @@ fun ComparisonSummaryCards(
     ) {
         // Net Card (Hero)
         ComparisonMetricCard(
-            title = "Net Savings / Flow",
+            title = stringResource(com.suguru.expensetracker.R.string.title_net_savings_flow),
             metric = comparison.netMetric,
             isHero = true,
             modifier = Modifier
@@ -183,7 +187,7 @@ fun ComparisonSummaryCards(
             horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
         ) {
             ComparisonMetricCard(
-                title = "Income",
+                title = stringResource(com.suguru.expensetracker.R.string.type_income),
                 metric = comparison.incomeMetric,
                 isHero = false,
                 modifier = Modifier
@@ -192,7 +196,7 @@ fun ComparisonSummaryCards(
             )
 
             ComparisonMetricCard(
-                title = "Expenses",
+                title = stringResource(com.suguru.expensetracker.R.string.type_expense),
                 metric = comparison.expenseMetric,
                 isHero = false,
                 modifier = Modifier
@@ -216,8 +220,11 @@ private fun ComparisonMetricCard(
         ComparisonSemantic.NEUTRAL -> ExpenseTrackerTheme.extendedColors.textSecondary
     }
 
+    val metricAccessibilityDescription = metric.contentDescription.localized()
+    val relativeText = metric.relativeChangeText?.localized()
+
     ExpenseTrackerCard(
-        modifier = modifier.semantics { contentDescription = metric.contentDescription },
+        modifier = modifier.semantics { contentDescription = metricAccessibilityDescription },
         shape = if (isHero) ExpenseTrackerRadius.cardHero else ExpenseTrackerRadius.card,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.md)
     ) {
@@ -241,7 +248,7 @@ private fun ComparisonMetricCard(
 
             // Previous amount subtitle
             Text(
-                text = "Previous: ${metric.comparisonAmount}",
+                text = stringResource(R.string.statistics_previous_amount, metric.comparisonAmount),
                 style = MaterialTheme.typography.bodySmall,
                 color = ExpenseTrackerTheme.extendedColors.textSecondary,
                 maxLines = 1,
@@ -262,11 +269,7 @@ private fun ComparisonMetricCard(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = if (metric.relativeChangeText.isNotBlank()) {
-                            "${metric.formattedDelta} (${metric.relativeChangeText})"
-                        } else {
-                            metric.formattedDelta
-                        },
+                        text = relativeText?.let { "${metric.formattedDelta} ($it)" } ?: metric.formattedDelta,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = semanticColor
@@ -285,19 +288,26 @@ fun ComparisonTrendChartCard(
 ) {
     if (trendPoints.isEmpty()) return
 
-    val currentLegend = "Current period"
-    val previousLegend = if (mode == StatisticsComparisonMode.PREVIOUS_YEAR) "Previous year" else "Previous period"
+    val currentLegend = stringResource(R.string.statistics_current_period_legend)
+    val previousLegend = stringResource(if (mode == StatisticsComparisonMode.PREVIOUS_YEAR) R.string.statistics_previous_year_legend else R.string.statistics_previous_period_legend)
 
     val currentBarColor = ExpenseTrackerTheme.extendedColors.primaryPurple
     val previousBarColor = Color(0xFF64748B)
 
     // Construct TalkBack readable description
-    val chartDescription = buildString {
-        append("Comparison trend chart. ")
-        trendPoints.take(5).forEach { pt ->
-            append("${pt.label}: current expenses ${pt.formattedPrimaryExpense}, previous ${pt.formattedComparisonExpense}. ")
-        }
+    val chartPointDescriptions = mutableListOf<String>()
+    for (point in trendPoints.take(5)) {
+        chartPointDescriptions += stringResource(
+            R.string.statistics_comparison_chart_point,
+            point.label,
+            point.formattedPrimaryExpense,
+            point.formattedComparisonExpense
+        )
     }
+    val chartDescription = stringResource(
+        R.string.statistics_comparison_chart_description,
+        chartPointDescriptions.joinToString(" ")
+    )
 
     ExpenseTrackerCard(
         modifier = modifier
@@ -315,7 +325,7 @@ fun ComparisonTrendChartCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Spending Comparison Trend",
+                    text = stringResource(R.string.statistics_spending_trend),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = ExpenseTrackerTheme.extendedColors.textPrimary
@@ -435,7 +445,7 @@ fun ComparisonCategoryBreakdownCard(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
             Text(
-                text = "Category Changes",
+                text = stringResource(R.string.statistics_category_changes),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = ExpenseTrackerTheme.extendedColors.textPrimary
@@ -467,11 +477,14 @@ private fun CategoryComparisonRow(
         ComparisonSemantic.NEUTRAL -> ExpenseTrackerTheme.extendedColors.textSecondary
     }
 
+    val categoryAccessibilityDescription = category.contentDescription.localized()
+    val relativeText = category.relativeChangeText?.localized()
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = ExpenseTrackerSpacing.xs)
-            .semantics { contentDescription = category.contentDescription },
+            .semantics { contentDescription = categoryAccessibilityDescription },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -492,7 +505,7 @@ private fun CategoryComparisonRow(
 
             Column {
                 Text(
-                    text = category.categoryName,
+                    text = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else category.categoryName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = ExpenseTrackerTheme.extendedColors.textPrimary,
@@ -500,7 +513,7 @@ private fun CategoryComparisonRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "Prev: ${category.formattedComparisonAmount}",
+                    text = stringResource(R.string.statistics_previous_amount, category.formattedComparisonAmount),
                     style = MaterialTheme.typography.bodySmall,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                 )
@@ -522,11 +535,7 @@ private fun CategoryComparisonRow(
                     .padding(horizontal = 4.dp, vertical = 1.dp)
             ) {
                 Text(
-                    text = if (category.relativeChangeText.isNotBlank()) {
-                        "${category.formattedDelta} (${category.relativeChangeText})"
-                    } else {
-                        category.formattedDelta
-                    },
+                    text = relativeText?.let { "${category.formattedDelta} ($it)" } ?: category.formattedDelta,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = semanticColor

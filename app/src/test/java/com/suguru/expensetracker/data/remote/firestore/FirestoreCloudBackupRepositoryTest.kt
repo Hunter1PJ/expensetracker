@@ -109,12 +109,56 @@ class FirestoreCloudBackupRepositoryTest {
 
         val storedChunks = gateway.chunks["uid_alice" to genId]!!
         assertTrue(storedChunks.values.all { it.payload != null && it.payloadBase64 == null })
+        val lastChunkUploadIndex = gateway.events.indexOfLast { it.startsWith("createChunk:$genId:") }
+        val generationCompleteIndex = gateway.events.indexOf("markComplete:$genId")
+        val primaryPromotionIndex = gateway.events.indexOf("createPrimaryManifest:${FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID}")
+        assertTrue(lastChunkUploadIndex >= 0 && lastChunkUploadIndex < generationCompleteIndex)
+        assertTrue(generationCompleteIndex < primaryPromotionIndex)
 
         val downloaded = repository.downloadChunks("uid_alice", FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID).getOrThrow()
         val reassembled = chunker.reassemble(downloaded, committed.payloadSha256).getOrThrow()
         assertArrayEquals(compressed, reassembled)
         val decompressed = codec.decompress(reassembled).getOrThrow().toString(Charsets.UTF_8)
         assertEquals(rawJson, decompressed)
+    }
+
+    @Test
+    fun `corrupt uploaded generation is rejected before completion and keeps previous primary`() = runTest {
+        val gateway = FakeRemoteBackupGateway(authenticatedUid = "uid_alice")
+        val repository = FirestoreCloudBackupRepository(gateway, chunker)
+        val (firstManifest, firstChunks) = buildSnapshot(
+            "snap_verified_1",
+            "uid_alice",
+            ByteArray(24) { 1 },
+            fingerprint = contentFingerprint
+        )
+        assertTrue(repository.uploadBackup("uid_alice", firstManifest, firstChunks).isSuccess)
+        val oldPrimary = gateway.manifests["uid_alice" to FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID]!!
+
+        gateway.corruptUploadedChunksOnRead = true
+        val eventStart = gateway.events.size
+        val (secondManifest, secondChunks) = buildSnapshot(
+            "snap_verified_2",
+            "uid_alice",
+            ByteArray(24) { 2 },
+            fingerprint = "b".repeat(64)
+        )
+        val failed = repository.uploadBackup("uid_alice", secondManifest, secondChunks)
+
+        assertTrue(failed.isFailure)
+        assertEquals(
+            oldPrimary.generationId,
+            gateway.manifests["uid_alice" to FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID]?.generationId
+        )
+        val secondGenerationId = gateway.events.drop(eventStart)
+            .last { it.startsWith("createManifest:gen_") }
+            .substringAfter("createManifest:")
+            .substringBefore(":")
+        assertFalse(gateway.events.drop(eventStart).contains("markComplete:$secondGenerationId"))
+        assertEquals(
+            oldPrimary.contentFingerprint,
+            repository.getLatestCompleteManifest().getOrThrow()?.contentFingerprint
+        )
     }
 
     @Test
@@ -335,7 +379,8 @@ class FirestoreCloudBackupRepositoryTest {
         var chunkCreateError: Exception = RuntimeException("Chunk upload failed"),
         var failMarkFailedError: Exception? = null,
         var failOnMarkPrimaryComplete: Boolean = false,
-        var failOnPrimaryPromotion: Boolean = false
+        var failOnPrimaryPromotion: Boolean = false,
+        var corruptUploadedChunksOnRead: Boolean = false
     ) : RemoteBackupGateway {
 
         val events = mutableListOf<String>()
@@ -508,8 +553,13 @@ class FirestoreCloudBackupRepositoryTest {
             chunks[uid to snapshotId]?.remove(chunkId)
         }
 
-        override suspend fun listChunks(uid: String, snapshotId: String): List<FirestoreBackupChunkDto> =
-            chunks[uid to snapshotId]?.values?.sortedBy { it.index } ?: emptyList()
+        override suspend fun listChunks(uid: String, snapshotId: String): List<FirestoreBackupChunkDto> {
+            val result = chunks[uid to snapshotId]?.values?.sortedBy { it.index } ?: emptyList()
+            if (!corruptUploadedChunksOnRead || result.isEmpty()) return result
+            return result.mapIndexed { index, dto ->
+                if (index == 0) dto.copy(sha256 = "0".repeat(64)) else dto
+            }
+        }
 
         override suspend fun deleteSnapshotDocuments(uid: String, snapshotId: String) {
             events.add("deleteSnapshot:$snapshotId")

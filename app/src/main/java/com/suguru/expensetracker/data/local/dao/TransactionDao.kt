@@ -41,6 +41,9 @@ interface TransactionDao {
     @Query("SELECT category_id AS categoryId, COUNT(*) AS count FROM transactions WHERE type = 'EXPENSE' AND category_id IS NOT NULL GROUP BY category_id")
     suspend fun getExpenseCategoryUsageCounts(): List<CategoryUsageCount>
 
+    @Query("SELECT category_id AS categoryId, COUNT(*) AS count FROM transactions WHERE type = 'INCOME' AND category_id IS NOT NULL GROUP BY category_id")
+    fun observeIncomeCategoryUsageCounts(): Flow<List<CategoryUsageCount>>
+
     @Query("SELECT * FROM transactions WHERE transaction_time >= :startTime AND transaction_time < :endTime ORDER BY transaction_time DESC, id DESC")
     fun observeTransactionsBetween(startTime: Instant, endTime: Instant): Flow<List<TransactionEntity>>
 

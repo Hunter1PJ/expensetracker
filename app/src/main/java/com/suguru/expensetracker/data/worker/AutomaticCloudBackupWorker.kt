@@ -21,24 +21,30 @@ class AutomaticCloudBackupWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val appContainer = (applicationContext as? ExpenseTrackerApplication)?.appContainer
-            ?: return Result.failure()
+        val application = applicationContext as? ExpenseTrackerApplication ?: return Result.failure()
+        val uid = inputData.getString(KEY_UID)?.takeIf { it.isNotBlank() } ?: return Result.failure()
+        val authUid = runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
+            .getOrNull()
+        if (authUid != uid) return Result.success()
+        if (!application.isWorkspaceActive(uid)) return Result.retry()
+
+        // Resolve the database from the work's UID, never from whichever workspace the UI displays.
+        val appContainer = application.containerFor(uid)
+        if (appContainer.workspaceId.firebaseUid != uid) return Result.failure()
         val orchestrator = appContainer.cloudBackupOrchestrator
 
         if (inputData.getBoolean(KEY_AUTOMATIC_RESTORE, false)) {
-            // Resolve identity and preferences at execution time; never bind queued restore work to an old UID.
             val currentUid = orchestrator.currentAuthenticatedUid()
-            val enabled = currentUid?.let { appContainer.autoBackupPreferenceStore.isAutoBackupEnabled(it) } == true
+            if (currentUid != uid) return Result.success()
+            val enabled = appContainer.autoBackupPreferenceStore.isAutoBackupEnabled(uid)
             if (!shouldRunAutomaticRestore(currentUid, enabled)) return Result.success()
-            orchestrator.evaluateOnLaunchOrSignIn(currentUid!!)
-            return Result.success()
+            orchestrator.evaluateOnLaunchOrSignIn(uid)
+            return if (orchestrator.shouldRetryAutomaticRestore()) Result.retry() else Result.success()
         }
 
-        val uid = inputData.getString(KEY_UID)?.takeIf { it.isNotBlank() } ?: return Result.failure()
-        val authUid = orchestrator.currentAuthenticatedUid()
-        if (authUid == null || authUid != uid) return Result.success()
+        val authUidAtExecution = orchestrator.currentAuthenticatedUid()
+        if (authUidAtExecution == null || authUidAtExecution != uid) return Result.success()
 
-        // Execution-time check: verify user auto-backup preference before executing work
         val autoPrefStore = appContainer.autoBackupPreferenceStore
         if (!autoPrefStore.isAutoBackupEnabled(uid)) return Result.success()
 
@@ -56,7 +62,7 @@ class AutomaticCloudBackupWorker(
         const val KEY_UID = "key_uid"
         private const val KEY_AUTOMATIC_RESTORE = "key_automatic_restore"
         private const val WORK_PREFIX = "expense_tracker_auto_backup_"
-        private const val AUTOMATIC_RESTORE_WORK_NAME = "expense_tracker_auto_restore"
+        private const val AUTOMATIC_RESTORE_WORK_PREFIX = "expense_tracker_auto_restore_"
 
         fun uniqueWorkName(uid: String): String {
             return "$WORK_PREFIX${sha256Hex(uid)}"
@@ -89,9 +95,12 @@ class AutomaticCloudBackupWorker(
         internal fun shouldRunAutomaticRestore(currentUid: String?, autoBackupEnabled: Boolean): Boolean =
             !currentUid.isNullOrBlank() && autoBackupEnabled
 
-        internal fun createAutomaticRestoreWorkRequest() =
+        internal fun automaticRestoreWorkName(uid: String): String =
+            AUTOMATIC_RESTORE_WORK_PREFIX + sha256Hex(uid)
+
+        internal fun createAutomaticRestoreWorkRequest(uid: String) =
             OneTimeWorkRequestBuilder<AutomaticCloudBackupWorker>()
-                .setInputData(workDataOf(KEY_AUTOMATIC_RESTORE to true))
+                .setInputData(workDataOf(KEY_AUTOMATIC_RESTORE to true, KEY_UID to uid))
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -100,11 +109,12 @@ class AutomaticCloudBackupWorker(
                 .addTag("expense_tracker_auto_restore")
                 .build()
 
-        fun scheduleAutomaticRestore(context: Context) {
+        fun scheduleAutomaticRestore(context: Context, uid: String) {
+            if (uid.isBlank()) return
             try {
-                val request = createAutomaticRestoreWorkRequest()
+                val request = createAutomaticRestoreWorkRequest(uid)
                 WorkManager.getInstance(context).enqueueUniqueWork(
-                    AUTOMATIC_RESTORE_WORK_NAME,
+                    automaticRestoreWorkName(uid),
                     ExistingWorkPolicy.KEEP,
                     request
                 )
@@ -139,6 +149,7 @@ class AutomaticCloudBackupWorker(
         fun cancelWork(context: Context, uid: String) {
             try {
                 WorkManager.getInstance(context).cancelUniqueWork(uniqueWorkName(uid))
+                WorkManager.getInstance(context).cancelUniqueWork(automaticRestoreWorkName(uid))
             } catch (e: Exception) {
                 // Safely ignore
             }

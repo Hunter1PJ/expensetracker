@@ -3,6 +3,7 @@ package com.suguru.expensetracker.presentation.statistics
 import com.suguru.expensetracker.domain.model.statistics.ComparisonSemantic
 import com.suguru.expensetracker.domain.model.statistics.StatisticsComparisonMode
 import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
+import com.suguru.expensetracker.presentation.util.UiMessage
 import java.time.LocalDate
 
 data class SummaryCardUiModel(
@@ -44,9 +45,9 @@ data class ComparisonMetricUiModel(
     val primaryAmount: String,
     val comparisonAmount: String,
     val formattedDelta: String,
-    val relativeChangeText: String,
+    val relativeChangeText: UiMessage?,
     val semantic: ComparisonSemantic,
-    val contentDescription: String
+    val contentDescription: UiMessage
 )
 
 data class CategoryComparisonUiModel(
@@ -57,9 +58,9 @@ data class CategoryComparisonUiModel(
     val formattedPrimaryAmount: String,
     val formattedComparisonAmount: String,
     val formattedDelta: String,
-    val relativeChangeText: String,
+    val relativeChangeText: UiMessage?,
     val semantic: ComparisonSemantic,
-    val contentDescription: String
+    val contentDescription: UiMessage
 )
 
 data class AlignedTrendPointUiModel(
@@ -78,7 +79,6 @@ data class ComparisonUiModel(
     val mode: StatisticsComparisonMode,
     val primaryDateRangeLabel: String,
     val comparisonDateRangeLabel: String,
-    val rangeHeaderSubtitle: String,
     val incomeMetric: ComparisonMetricUiModel,
     val expenseMetric: ComparisonMetricUiModel,
     val netMetric: ComparisonMetricUiModel,
@@ -105,7 +105,7 @@ data class StatisticsUiState(
     val customStartDate: LocalDate? = null,
     val customEndDate: LocalDate? = null,
     val isCustomRangePickerVisible: Boolean = false,
-    val customRangeError: String? = null,
+    val customRangeError: UiMessage? = null,
     // Advanced Statistics Compare
     val isComparisonEnabled: Boolean = false,
     val comparisonMode: StatisticsComparisonMode = StatisticsComparisonMode.PREVIOUS_PERIOD,

@@ -74,6 +74,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
 import com.suguru.expensetracker.presentation.common.FinanceVisuals
 import com.suguru.expensetracker.presentation.components.AvatarShape
@@ -94,6 +96,15 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerGradients
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
+
+@androidx.annotation.StringRes
+private fun StatisticsPeriodOption.labelResource(): Int = when (this) {
+    StatisticsPeriodOption.THIS_MONTH -> R.string.statistics_period_this_month
+    StatisticsPeriodOption.LAST_MONTH -> R.string.statistics_period_last_month
+    StatisticsPeriodOption.LAST_3_MONTHS -> R.string.statistics_period_last_three_months
+    StatisticsPeriodOption.THIS_YEAR -> R.string.statistics_period_this_year
+    StatisticsPeriodOption.CUSTOM -> R.string.statistics_period_custom
+}
 
 @Composable
 fun StatisticsScreen(
@@ -175,7 +186,8 @@ fun StatisticsScreen(
                 )
             } else if (uiState.isComparisonEnabled) {
                 // COMPARISON MODE VIEW
-                uiState.comparison?.rangeHeaderSubtitle?.let { subtitle ->
+                uiState.comparison?.let { comparison ->
+                    val subtitle = stringResource(R.string.statistics_comparison_range, comparison.primaryDateRangeLabel, comparison.comparisonDateRangeLabel)
                     ComparisonRangeHeaderCard(
                         subtitle = subtitle,
                         modifier = Modifier.fillMaxWidth()
@@ -209,19 +221,19 @@ fun StatisticsScreen(
                                 modifier = Modifier.size(32.dp)
                             )
                             Text(
-                                text = "Couldn't load comparison",
+                                text = stringResource(R.string.statistics_comparison_error),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = ExpenseTrackerTheme.extendedColors.textPrimary
                             )
                             Text(
-                                text = "An error occurred while calculating comparative statistics.",
+                                text = stringResource(R.string.statistics_comparison_error_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.textSecondary
                             )
                             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
                             PrimaryButton(
-                                text = "Retry",
+                                text = stringResource(R.string.ui_retry),
                                 onClick = { viewModel.onPeriodSelected(uiState.selectedPeriod) }
                             )
                         }
@@ -238,8 +250,8 @@ fun StatisticsScreen(
                             contentPadding = PaddingValues(ExpenseTrackerSpacing.xxl)
                         ) {
                             EmptyState(
-                                title = "Nothing to compare yet",
-                                description = "There is no activity recorded in either period for ${uiState.selectedCurrencyCode}.",
+                                title = stringResource(R.string.ui_stats_no_compare),
+                                description = stringResource(R.string.statistics_empty_both_periods, uiState.selectedCurrencyCode),
                                 icon = Icons.Outlined.PieChart,
                                 testTag = "comparison_empty_state_content"
                             )
@@ -283,14 +295,14 @@ fun StatisticsScreen(
                     contentPadding = PaddingValues(ExpenseTrackerSpacing.xxl)
                 ) {
                     val periodDisplay = if (uiState.selectedPeriod == StatisticsPeriodOption.CUSTOM && uiState.customStartDate != null && uiState.customEndDate != null) {
-                        val formatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+                        val formatter = DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(java.util.Locale.getDefault())
                         "${uiState.customStartDate!!.format(formatter)} - ${uiState.customEndDate!!.format(formatter)}"
                     } else {
-                        uiState.selectedPeriod.displayName
+                        stringResource(uiState.selectedPeriod.labelResource())
                     }
                     EmptyState(
-                        title = "No activity for this period",
-                        description = "There are no recorded transactions in $periodDisplay for ${uiState.selectedCurrencyCode}.",
+                        title = stringResource(R.string.ui_stats_no_activity),
+                        description = stringResource(R.string.statistics_empty_period, periodDisplay, uiState.selectedCurrencyCode),
                         icon = Icons.Outlined.PieChart,
                         testTag = "statistics_empty_state"
                     )
@@ -299,10 +311,10 @@ fun StatisticsScreen(
                 // Hero Summary Card
                 uiState.summary?.let { summary ->
                     val periodDisplay = if (uiState.selectedPeriod == StatisticsPeriodOption.CUSTOM && uiState.customStartDate != null && uiState.customEndDate != null) {
-                        val formatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+                        val formatter = DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(java.util.Locale.getDefault())
                         "${uiState.customStartDate!!.format(formatter)} - ${uiState.customEndDate!!.format(formatter)}"
                     } else {
-                        uiState.selectedPeriod.displayName
+                        stringResource(uiState.selectedPeriod.labelResource())
                     }
                     HeroStatisticsCard(
                         summary = summary,
@@ -344,7 +356,7 @@ fun StatisticsScreen(
                 // Expense Categories Breakdown
                 if (uiState.expenseCategories.isNotEmpty()) {
                     CategoryBreakdownCard(
-                        title = "Spending by Category",
+                        title = stringResource(R.string.ui_stats_spending_category),
                         categories = uiState.expenseCategories,
                         isExpense = true,
                         modifier = Modifier
@@ -357,7 +369,7 @@ fun StatisticsScreen(
                 // Income Categories Breakdown
                 if (uiState.incomeCategories.isNotEmpty()) {
                     CategoryBreakdownCard(
-                        title = "Income Sources",
+                        title = stringResource(R.string.ui_stats_income_sources),
                         categories = uiState.incomeCategories,
                         isExpense = false,
                         modifier = Modifier
@@ -400,7 +412,7 @@ private fun StatisticsHeader(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "INSIGHTS",
+            text = stringResource(R.string.statistics_insights_heading),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.5.sp,
@@ -415,7 +427,7 @@ private fun StatisticsHeader(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
         Text(
-            text = "Understand your money flow and category patterns",
+            text = stringResource(R.string.statistics_insights_intro),
             style = MaterialTheme.typography.bodySmall,
             color = ExpenseTrackerTheme.extendedColors.textSecondary
         )
@@ -435,7 +447,7 @@ private fun PeriodSelectorRow(
         items(StatisticsPeriodOption.entries) { period ->
             val isSelected = period == selectedPeriod
             ExpenseTrackerFilterChip(
-                text = period.displayName,
+                text = stringResource(period.labelResource()),
                 selected = isSelected,
                 onClick = { onPeriodSelected(period) },
                 testTag = "period_chip_${period.name.lowercase()}"
@@ -458,7 +470,7 @@ private fun CurrencySelectorRow(
     ) {
         item {
             Text(
-                text = "CURRENCY",
+                text = stringResource(R.string.statistics_currency_heading),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
@@ -493,7 +505,7 @@ private fun StatisticsLoadingState(modifier: Modifier = Modifier) {
             )
             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
             Text(
-                text = "Analyzing finances...",
+                text = stringResource(R.string.statistics_analyzing),
                 style = MaterialTheme.typography.bodySmall,
                 color = ExpenseTrackerTheme.extendedColors.textSecondary
             )
@@ -546,7 +558,7 @@ private fun HeroStatisticsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "NET CASH FLOW",
+                    text = stringResource(R.string.statistics_net_cash_flow),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
@@ -578,7 +590,7 @@ private fun HeroStatisticsCard(
                                 .padding(horizontal = ExpenseTrackerSpacing.sm, vertical = ExpenseTrackerSpacing.xxs)
                         ) {
                             Text(
-                                text = "$transactionCount tx",
+                                text = pluralStringResource(R.plurals.statistics_transaction_count, transactionCount, transactionCount),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ExpenseTrackerTheme.extendedColors.accentViolet
                             )
@@ -623,7 +635,7 @@ private fun HeroStatisticsCard(
             ) {
                 // Income Pill
                 HeroStatPill(
-                    label = "Income",
+                    label = stringResource(R.string.type_income),
                     amount = summary.formattedIncome,
                     isIncome = true,
                     modifier = Modifier
@@ -633,7 +645,7 @@ private fun HeroStatisticsCard(
 
                 // Expense Pill
                 HeroStatPill(
-                    label = "Expense",
+                    label = stringResource(R.string.type_expense),
                     amount = summary.formattedExpense,
                     isIncome = false,
                     modifier = Modifier
@@ -720,12 +732,12 @@ private fun TransfersOnlyBanner(
         ) {
             Icon(
                 imageVector = Icons.Default.Repeat,
-                contentDescription = "Transfers",
+                contentDescription = stringResource(R.string.ui_stats_transfers),
                 tint = ExpenseTrackerTheme.extendedColors.accentIndigo,
                 modifier = Modifier.size(20.dp)
             )
             Text(
-                text = "Only account transfers occurred in this period ($transferCount ${if (transferCount == 1) "transfer" else "transfers"}). Transfers do not affect net income or expenses.",
+                text = pluralStringResource(R.plurals.statistics_transfers_only, transferCount, transferCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = ExpenseTrackerTheme.extendedColors.textSecondary
             )
@@ -756,13 +768,13 @@ private fun TrendChartCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Outlined.ShowChart,
-                        contentDescription = "Trend Chart",
+                        contentDescription = stringResource(R.string.ui_stats_trend_chart),
                         tint = ExpenseTrackerTheme.extendedColors.primaryBright,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.xs))
                     Text(
-                        text = "Cash Flow Trend",
+                        text = stringResource(R.string.statistics_cash_flow_trend),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = ExpenseTrackerTheme.extendedColors.textPrimary
@@ -778,7 +790,7 @@ private fun TrendChartCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Income",
+                        text = stringResource(R.string.type_income),
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
@@ -791,7 +803,7 @@ private fun TrendChartCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Expense",
+                        text = stringResource(R.string.type_expense),
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
@@ -820,7 +832,7 @@ private fun TrendChartCard(
                         )
                         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
                         Text(
-                            text = "No cash-flow activity for this period",
+                            text = stringResource(R.string.statistics_no_cash_flow),
                             style = MaterialTheme.typography.bodyMedium,
                             color = ExpenseTrackerTheme.extendedColors.textMuted
                         )
@@ -1111,7 +1123,7 @@ private fun CategoryProgressRow(
             ) {
                 IconAvatar(
                     icon = FinanceVisuals.getCategoryIcon(category.iconName ?: ""),
-                    contentDescription = category.categoryName,
+                    contentDescription = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else category.categoryName,
                     size = 40.dp,
                     tint = categoryColor,
                     backgroundColor = categoryColor.copy(alpha = 0.16f),
@@ -1124,7 +1136,7 @@ private fun CategoryProgressRow(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = category.categoryName,
+                            text = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else category.categoryName,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = ExpenseTrackerTheme.extendedColors.textPrimary,
@@ -1140,7 +1152,7 @@ private fun CategoryProgressRow(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Archived",
+                                    text = stringResource(R.string.status_archived),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 10.sp,
                                     color = ExpenseTrackerTheme.extendedColors.textMuted
@@ -1152,7 +1164,7 @@ private fun CategoryProgressRow(
                     Spacer(modifier = Modifier.height(2.dp))
 
                     Text(
-                        text = "${category.transactionCount} ${if (category.transactionCount == 1) "transaction" else "transactions"}",
+                        text = pluralStringResource(R.plurals.statistics_category_transaction_count, category.transactionCount, category.transactionCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textMuted
                     )
@@ -1213,13 +1225,13 @@ private fun AccountAnalyticsCard(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.AccountBalance,
-                    contentDescription = "Account Breakdown",
+                    contentDescription = stringResource(R.string.ui_stats_account_breakdown),
                     tint = ExpenseTrackerTheme.extendedColors.accentIndigo,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.xs))
                 Text(
-                    text = "Accounts",
+                    text = stringResource(R.string.home_accounts),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = ExpenseTrackerTheme.extendedColors.textPrimary
@@ -1269,7 +1281,7 @@ private fun AccountAnalyticsCard(
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = "Archived",
+                                            text = stringResource(R.string.status_archived),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontSize = 10.sp,
                                             color = ExpenseTrackerTheme.extendedColors.textMuted
@@ -1282,7 +1294,7 @@ private fun AccountAnalyticsCard(
                         Row(horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    text = "In",
+                                    text = stringResource(R.string.type_income),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = ExpenseTrackerTheme.extendedColors.textMuted
                                 )
@@ -1295,7 +1307,7 @@ private fun AccountAnalyticsCard(
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    text = "Out",
+                                    text = stringResource(R.string.type_expense),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = ExpenseTrackerTheme.extendedColors.textMuted
                                 )
@@ -1330,7 +1342,7 @@ private fun CustomRangePickerDialog(
     onDatesSelected: (LocalDate, LocalDate) -> Unit,
     initialStartDate: LocalDate?,
     initialEndDate: LocalDate?,
-    validationError: String?,
+    validationError: com.suguru.expensetracker.presentation.util.UiMessage?,
     modifier: Modifier = Modifier
 ) {
     var startDate by remember { mutableStateOf(initialStartDate ?: LocalDate.now()) }
@@ -1354,7 +1366,7 @@ private fun CustomRangePickerDialog(
                     .padding(ExpenseTrackerSpacing.xl)
             ) {
                 Text(
-                    text = "Select Custom Range",
+                    text = stringResource(R.string.statistics_custom_range),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -1363,7 +1375,7 @@ private fun CustomRangePickerDialog(
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
 
                 Text(
-                    text = "START DATE",
+                    text = stringResource(R.string.statistics_start_date_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = ExpenseTrackerTheme.extendedColors.accentViolet
@@ -1378,7 +1390,7 @@ private fun CustomRangePickerDialog(
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
 
                 Text(
-                    text = "END DATE",
+                    text = stringResource(R.string.statistics_end_date_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = ExpenseTrackerTheme.extendedColors.accentViolet
@@ -1393,7 +1405,7 @@ private fun CustomRangePickerDialog(
                 if (validationError != null) {
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
                     Text(
-                        text = validationError,
+                        text = validationError.localized(),
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.financialNegative,
                         fontWeight = FontWeight.SemiBold,
@@ -1411,13 +1423,13 @@ private fun CustomRangePickerDialog(
                     )
                 ) {
                     SecondaryButton(
-                        text = "Cancel",
+                        text = stringResource(R.string.ui_cancel),
                         onClick = onDismissRequest,
                         modifier = Modifier.testTag("date_picker_cancel_button")
                     )
 
                     PrimaryButton(
-                        text = "Apply",
+                        text = stringResource(R.string.ui_apply),
                         onClick = { onDatesSelected(startDate, endDate) },
                         modifier = Modifier.testTag("date_picker_apply_button")
                     )
@@ -1445,7 +1457,7 @@ private fun DatePickerSelectorRow(
     ) {
         // Day selector
         DateUnitAdjuster(
-            label = "Day",
+            label = stringResource(R.string.statistics_day),
             value = date.dayOfMonth,
             onIncrement = { onDateChanged(date.plusDays(1)) },
             onDecrement = { onDateChanged(date.minusDays(1)) },
@@ -1464,7 +1476,7 @@ private fun DatePickerSelectorRow(
 
         // Year selector
         DateUnitAdjuster(
-            label = "Year",
+            label = stringResource(R.string.statistics_year),
             value = date.year,
             onIncrement = { onDateChanged(date.plusYears(1)) },
             onDecrement = { onDateChanged(date.minusYears(1)) },

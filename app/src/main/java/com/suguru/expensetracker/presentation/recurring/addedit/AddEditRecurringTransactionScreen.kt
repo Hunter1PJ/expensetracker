@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.RecurrenceFrequency
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
@@ -158,9 +159,9 @@ fun AddEditRecurringTransactionScreenContent(
                         )
                         Text(
                             text = when {
-                                uiState.isReadOnlyTransfer -> "READ-ONLY HISTORICAL RULE"
-                                uiState.isEditMode -> "UPDATE RECURRING SCHEDULE"
-                                else -> "CONFIGURE AUTOMATION RULE"
+                                uiState.isReadOnlyTransfer -> stringResource(R.string.recurring_header_read_only)
+                                uiState.isEditMode -> stringResource(R.string.recurring_header_edit)
+                                else -> stringResource(R.string.recurring_header_add)
                             },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
@@ -190,7 +191,7 @@ fun AddEditRecurringTransactionScreenContent(
     ) { innerPadding ->
         if (uiState.isLoading) {
             LoadingState(
-                message = "Loading schedule configuration...",
+                message = stringResource(R.string.ui_recurring_loading),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
@@ -219,7 +220,7 @@ fun AddEditRecurringTransactionScreenContent(
                     AnimatedVisibility(visible = uiState.errorMessage != null) {
                         uiState.errorMessage?.let { errorText ->
                             ErrorBanner(
-                                message = errorText,
+                                message = errorText.localized(),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .widthIn(max = 540.dp),
@@ -285,20 +286,20 @@ fun AddEditRecurringTransactionScreenContent(
                                 )
 
                                 Text(
-                                    text = "${stringResource(R.string.frequency_label)}: ${formatFrequency(uiState.frequency)}",
+                                    text = stringResource(R.string.recurring_frequency_value, stringResource(R.string.frequency_label), formatFrequency(uiState.frequency)),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
 
                                 Text(
-                                    text = "${stringResource(R.string.start_date_label)}: ${uiState.startDate}",
+                                    text = stringResource(R.string.recurring_start_date_value, stringResource(R.string.start_date_label), uiState.startDate.toString()),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
 
                                 uiState.nextOccurrence?.let { nextDate ->
                                     Text(
-                                        text = "${stringResource(R.string.next_occurrence_label)}: $nextDate",
+                                        text = stringResource(R.string.recurring_next_date_value, stringResource(R.string.next_occurrence_label), nextDate.toString()),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )
@@ -306,7 +307,7 @@ fun AddEditRecurringTransactionScreenContent(
 
                                 uiState.endDate?.let { endDate ->
                                     Text(
-                                        text = "${stringResource(R.string.end_date_label)}: $endDate",
+                                        text = stringResource(R.string.recurring_end_date_value, stringResource(R.string.end_date_label), endDate.toString()),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )
@@ -314,7 +315,7 @@ fun AddEditRecurringTransactionScreenContent(
 
                                 if (uiState.noteInput.isNotBlank()) {
                                     Text(
-                                        text = "${stringResource(R.string.note_label)}: ${uiState.noteInput}",
+                                        text = stringResource(R.string.recurring_note_value, stringResource(R.string.note_label), uiState.noteInput),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )
@@ -332,7 +333,7 @@ fun AddEditRecurringTransactionScreenContent(
                             contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                                SectionHeader(title = "Transaction Type & Amount")
+                                SectionHeader(title = stringResource(R.string.ui_recurring_type_amount))
 
                                 SingleChoiceSegmentedButtonRow(
                                     modifier = Modifier.fillMaxWidth()
@@ -414,8 +415,8 @@ fun AddEditRecurringTransactionScreenContent(
                                     val selectedCategory = uiState.availableCategories.find { it.id == uiState.selectedCategoryId }
                                     val selectedLabel = when {
                                         selectedCategory == null -> ""
-                                        selectedCategory.isArchived -> "${selectedCategory.name} (${stringResource(R.string.status_archived)})"
-                                        else -> selectedCategory.name
+                                        selectedCategory.isArchived -> stringResource(R.string.category_archived_label, com.suguru.expensetracker.presentation.util.categoryDisplayName(selectedCategory), stringResource(R.string.status_archived))
+                                        else -> com.suguru.expensetracker.presentation.util.categoryDisplayName(selectedCategory)
                                     }
                                     OutlinedTextField(
                                         value = selectedLabel,
@@ -442,9 +443,9 @@ fun AddEditRecurringTransactionScreenContent(
                                     ) {
                                         uiState.availableCategories.forEach { category ->
                                             val itemLabel = if (category.isArchived) {
-                                                "${category.name} (${stringResource(R.string.status_archived)})"
+                                                stringResource(R.string.category_archived_label, com.suguru.expensetracker.presentation.util.categoryDisplayName(category), stringResource(R.string.status_archived))
                                             } else {
-                                                category.name
+                                                com.suguru.expensetracker.presentation.util.categoryDisplayName(category)
                                             }
                                             DropdownMenuItem(
                                                 text = {
@@ -474,7 +475,7 @@ fun AddEditRecurringTransactionScreenContent(
                             contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                                SectionHeader(title = "Schedule & Recurrence")
+                                SectionHeader(title = stringResource(R.string.ui_recurring_schedule))
 
                                 // Frequency selector (locked in edit mode to reflect persisted immutable frequency)
                                 var freqExpanded by remember { mutableStateOf(false) }

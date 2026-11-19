@@ -35,17 +35,23 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.suguru.expensetracker.ExpenseTrackerApplication
 import com.suguru.expensetracker.MainActivity
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.AppLanguageManager
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 class AccountBalanceWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appContainer = (context.applicationContext as ExpenseTrackerApplication).appContainer
+        val application = context.applicationContext as ExpenseTrackerApplication
+        val appContainer = application.activeAppContainer.filterNotNull().first()
+        val allowWorkspaceData = application.isActiveWorkspaceCurrent()
         val manager = GlanceAppWidgetManager(context)
         val appWidgetId = manager.getAppWidgetId(id)
         val dataProvider = appContainer.accountBalanceWidgetDataProvider
 
         provideContent {
-            val widgetData by dataProvider.getWidgetData(appWidgetId).collectAsState(
+            val widgetData by dataProvider.getWidgetData(appWidgetId, allowWorkspaceData).collectAsState(
                 initial = AccountBalanceWidgetData.loading()
             )
             WidgetContent(widgetData)
@@ -54,7 +60,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(data: AccountBalanceWidgetData) {
-        val context = LocalContext.current
+        val context = AppLanguageManager.wrap(LocalContext.current)
         val size = LocalSize.current
         val isSmall = size.width < 180.dp
 
@@ -82,7 +88,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                 when (data.state) {
                     WidgetDataState.LOADING -> {
                         Text(
-                            text = "Loading...",
+                            text = context.getString(R.string.widget_loading),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 14.sp,
@@ -92,7 +98,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                     }
                     WidgetDataState.CONFIGURATION_REQUIRED -> {
                         Text(
-                            text = "Set up Widget",
+                            text = context.getString(R.string.widget_select_account),
                             style = TextStyle(
                                 color = accentColor,
                                 fontSize = 14.sp,
@@ -101,7 +107,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
-                            text = "Tap to select account",
+                            text = context.getString(R.string.widget_tap_select_account),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 11.sp
@@ -110,7 +116,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                     }
                     WidgetDataState.ACCOUNT_UNAVAILABLE -> {
                         Text(
-                            text = "Account Unavailable",
+                            text = context.getString(R.string.widget_account_unavailable),
                             style = TextStyle(
                                 color = textPrimary,
                                 fontSize = 13.sp,
@@ -119,7 +125,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
-                            text = "Tap to open app",
+                            text = context.getString(R.string.widget_tap_open_app),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 11.sp
@@ -128,7 +134,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                     }
                     WidgetDataState.ERROR -> {
                         Text(
-                            text = "Error Loading Balance",
+                            text = context.getString(R.string.widget_error_balance),
                             style = TextStyle(
                                 color = textPrimary,
                                 fontSize = 13.sp,
@@ -137,7 +143,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
-                            text = "Tap to retry",
+                            text = context.getString(R.string.widget_tap_retry),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 11.sp
@@ -197,7 +203,7 @@ class AccountBalanceWidget : GlanceAppWidget() {
                                 Spacer(modifier = GlanceModifier.defaultWeight())
                                 if (data.privacyMode) {
                                     Text(
-                                        text = "Privacy Mode Active",
+                                        text = context.getString(R.string.widget_privacy_active),
                                         style = TextStyle(
                                             color = textSecondary,
                                             fontSize = 9.sp

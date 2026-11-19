@@ -122,7 +122,7 @@ fun BudgetsScreen(
             when {
                 uiState.isLoading -> {
                     LoadingState(
-                        message = "Loading active budgets…",
+                        message = stringResource(R.string.ui_budget_loading),
                         testTag = "budgets_loading"
                     )
                 }
@@ -182,7 +182,7 @@ fun BudgetsScreen(
                         item {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = "PLANNING",
+                                    text = stringResource(R.string.ui_budget_planning),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     letterSpacing = 1.5.sp,
@@ -196,7 +196,7 @@ fun BudgetsScreen(
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Stay in control of your spending limits",
+                                    text = stringResource(R.string.budget_spending_limits_intro),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
@@ -212,7 +212,7 @@ fun BudgetsScreen(
                                 ) {
                                     item {
                                         ExpenseTrackerFilterChip(
-                                            text = "All Currencies",
+                                            text = stringResource(R.string.budget_all_currencies),
                                             selected = uiState.selectedCurrencyFilter == null,
                                             onClick = { viewModel.selectCurrencyFilter(null) },
                                             testTag = "currency_chip_all"
@@ -250,8 +250,8 @@ fun BudgetsScreen(
                                     testTag = "budgets_empty_card"
                                 ) {
                                     EmptyState(
-                                        title = "No ${uiState.selectedCurrencyFilter} budgets",
-                                        description = "Create a spending limit for ${uiState.selectedCurrencyFilter} to track your progress.",
+                                        title = stringResource(R.string.ui_budget_currency_empty, checkNotNull(uiState.selectedCurrencyFilter)),
+                                        description = stringResource(R.string.ui_budget_currency_empty_desc, checkNotNull(uiState.selectedCurrencyFilter)),
                                         icon = Icons.Outlined.Savings,
                                         testTag = "budgets_empty_state",
                                         action = {
@@ -275,8 +275,8 @@ fun BudgetsScreen(
                         if (overallBudgets.isNotEmpty()) {
                             item {
                                 SectionHeader(
-                                    title = "Overall Budgets",
-                                    subtitle = "Total spending limits across accounts"
+                                    title = stringResource(R.string.ui_budget_overall),
+                                    subtitle = stringResource(R.string.ui_budget_overall_desc)
                                 )
                             }
                             items(overallBudgets, key = { it.budget.id }) { item ->
@@ -292,8 +292,8 @@ fun BudgetsScreen(
                         if (categoryBudgets.isNotEmpty()) {
                             item {
                                 SectionHeader(
-                                    title = "Category Budgets",
-                                    subtitle = "Category-specific allocations"
+                                    title = stringResource(R.string.ui_budget_category),
+                                    subtitle = stringResource(R.string.ui_budget_category_desc)
                                 )
                             }
                             items(categoryBudgets, key = { it.budget.id }) { item ->
@@ -376,14 +376,14 @@ private fun BudgetOverviewHero(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "BUDGET OVERVIEW",
+                    text = stringResource(R.string.budget_overview_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                 )
 
-                val countText = "${budgets.size} active budget${if (budgets.size != 1) "s" else ""}"
+                val countText = stringResource(R.string.budget_active_count, budgets.size)
                 Box(
                     modifier = Modifier
                         .clip(ExpenseTrackerRadius.chipPill)
@@ -443,7 +443,7 @@ private fun BudgetOverviewHero(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "$percentUsed% total used",
+                        text = stringResource(R.string.budget_percent_total_used, percentUsed),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = when (heroVariant) {
@@ -479,7 +479,7 @@ private fun BudgetOverviewHero(
             } else {
                 // Multi-currency overview without fake summing
                 Text(
-                    text = "${budgets.size} Active Budgets",
+                    text = stringResource(R.string.budget_active_budgets_count, budgets.size),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = ExpenseTrackerTheme.extendedColors.textPrimary
@@ -488,7 +488,7 @@ private fun BudgetOverviewHero(
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
 
                 Text(
-                    text = "Spending limits active across ${availableCurrencies.size} currencies",
+                    text = stringResource(R.string.budget_currency_count_summary, availableCurrencies.size),
                     style = MaterialTheme.typography.bodyMedium,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                 )
@@ -528,7 +528,7 @@ private fun BudgetOverviewHero(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "$currPercent% used",
+                                    text = stringResource(R.string.budget_percent_used, currPercent),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (currRatio > 1f) ExpenseTrackerTheme.extendedColors.financialDanger else ExpenseTrackerTheme.extendedColors.textPrimary
@@ -560,10 +560,10 @@ private fun OverallBudgetCard(
     )
 
     val periodLabel = when (progress.budget.periodType) {
-        BudgetPeriodType.MONTHLY -> "Monthly"
-        BudgetPeriodType.WEEKLY -> "Weekly"
-        BudgetPeriodType.YEARLY -> "Yearly"
-        BudgetPeriodType.CUSTOM -> "Custom"
+        BudgetPeriodType.MONTHLY -> stringResource(R.string.budget_period_monthly_label)
+        BudgetPeriodType.WEEKLY -> stringResource(R.string.budget_period_weekly_label)
+        BudgetPeriodType.YEARLY -> stringResource(R.string.budget_period_yearly_label)
+        BudgetPeriodType.CUSTOM -> stringResource(R.string.budget_period_custom_label)
     }
 
     val dateRangeStr = "${DateTimeFormatterHelper.formatLocalDate(progress.budget.startDate)} – ${DateTimeFormatterHelper.formatLocalDate(progress.budget.endDate)}"
@@ -576,19 +576,19 @@ private fun OverallBudgetCard(
 
     val (statusText, statusBg, statusColor, progressVariant) = when {
         progress.isExceeded -> Quadruple(
-            "Exceeded",
+            stringResource(R.string.budget_status_exceeded),
             ExpenseTrackerTheme.extendedColors.financialDangerContainer,
             ExpenseTrackerTheme.extendedColors.financialDanger,
             ProgressVariant.EXCEEDED
         )
         progress.progressBasisPoints >= 8000 -> Quadruple(
-            "Approaching",
+            stringResource(R.string.budget_status_approaching),
             ExpenseTrackerTheme.extendedColors.financialWarningContainer,
             ExpenseTrackerTheme.extendedColors.financialWarning,
             ProgressVariant.WARNING
         )
         else -> Quadruple(
-            "On Track",
+            stringResource(R.string.budget_status_on_track),
             ExpenseTrackerTheme.extendedColors.financialPositiveContainer,
             ExpenseTrackerTheme.extendedColors.financialPositive,
             ProgressVariant.NORMAL
@@ -598,13 +598,13 @@ private fun OverallBudgetCard(
     val remainingOrOverStr = when {
         progress.isExceeded -> {
             val overMoney = progress.spent - progress.budget.limitAmount
-            "${MoneyParser.format(overMoney, useGrouping = true)} over budget"
+            stringResource(R.string.budget_amount_over, MoneyParser.format(overMoney, useGrouping = true))
         }
         progress.remaining.amountInMinorUnits == 0L && progress.spent.amountInMinorUnits == progress.budget.limitAmount.amountInMinorUnits -> {
-            "Budget fully used"
+            stringResource(R.string.budget_status_fully_used)
         }
         else -> {
-            "${MoneyParser.format(progress.remaining, useGrouping = true)} remaining"
+            stringResource(R.string.budget_amount_remaining, MoneyParser.format(progress.remaining, useGrouping = true))
         }
     }
 
@@ -647,7 +647,7 @@ private fun OverallBudgetCard(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "$periodLabel • $dateRangeStr",
+                            text = stringResource(R.string.budget_period_date_range, periodLabel, dateRangeStr),
                             style = MaterialTheme.typography.bodySmall,
                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                         )
@@ -672,7 +672,7 @@ private fun OverallBudgetCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Options",
+                                contentDescription = stringResource(R.string.ui_budget_options),
                                 tint = ExpenseTrackerTheme.extendedColors.textSecondary
                             )
                         }
@@ -714,14 +714,14 @@ private fun OverallBudgetCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Text(
-                    text = "$spentStr of $limitStr",
+                    text = stringResource(R.string.budget_spent_of_limit, spentStr, limitStr),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Text(
-                    text = "$percentageUsed% used",
+                    text = stringResource(R.string.budget_percent_used, percentageUsed),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = statusColor
@@ -773,13 +773,13 @@ private fun CategoryBudgetCard(
         FinanceVisuals.getCategoryIcon(it)
     } ?: Icons.Outlined.PieChart
 
-    val title = progress.categoryName ?: "Category Budget"
+    val title = progress.categoryName ?: stringResource(R.string.budget_category_fallback)
 
     val periodLabel = when (progress.budget.periodType) {
-        BudgetPeriodType.MONTHLY -> "Monthly"
-        BudgetPeriodType.WEEKLY -> "Weekly"
-        BudgetPeriodType.YEARLY -> "Yearly"
-        BudgetPeriodType.CUSTOM -> "Custom"
+        BudgetPeriodType.MONTHLY -> stringResource(R.string.budget_period_monthly_label)
+        BudgetPeriodType.WEEKLY -> stringResource(R.string.budget_period_weekly_label)
+        BudgetPeriodType.YEARLY -> stringResource(R.string.budget_period_yearly_label)
+        BudgetPeriodType.CUSTOM -> stringResource(R.string.budget_period_custom_label)
     }
 
     val dateRangeStr = "${DateTimeFormatterHelper.formatLocalDate(progress.budget.startDate)} – ${DateTimeFormatterHelper.formatLocalDate(progress.budget.endDate)}"
@@ -792,19 +792,19 @@ private fun CategoryBudgetCard(
 
     val (statusText, statusBg, statusColor, progressVariant) = when {
         progress.isExceeded -> Quadruple(
-            "Exceeded",
+            stringResource(R.string.budget_status_exceeded),
             ExpenseTrackerTheme.extendedColors.financialDangerContainer,
             ExpenseTrackerTheme.extendedColors.financialDanger,
             ProgressVariant.EXCEEDED
         )
         progress.progressBasisPoints >= 8000 -> Quadruple(
-            "Approaching",
+            stringResource(R.string.budget_status_approaching),
             ExpenseTrackerTheme.extendedColors.financialWarningContainer,
             ExpenseTrackerTheme.extendedColors.financialWarning,
             ProgressVariant.WARNING
         )
         else -> Quadruple(
-            "On Track",
+            stringResource(R.string.budget_status_on_track),
             ExpenseTrackerTheme.extendedColors.financialPositiveContainer,
             ExpenseTrackerTheme.extendedColors.financialPositive,
             ProgressVariant.NORMAL
@@ -814,13 +814,13 @@ private fun CategoryBudgetCard(
     val remainingOrOverStr = when {
         progress.isExceeded -> {
             val overMoney = progress.spent - progress.budget.limitAmount
-            "${MoneyParser.format(overMoney, useGrouping = true)} over budget"
+            stringResource(R.string.budget_amount_over, MoneyParser.format(overMoney, useGrouping = true))
         }
         progress.remaining.amountInMinorUnits == 0L && progress.spent.amountInMinorUnits == progress.budget.limitAmount.amountInMinorUnits -> {
-            "Budget fully used"
+            stringResource(R.string.budget_status_fully_used)
         }
         else -> {
-            "${MoneyParser.format(progress.remaining, useGrouping = true)} remaining"
+            stringResource(R.string.budget_amount_remaining, MoneyParser.format(progress.remaining, useGrouping = true))
         }
     }
 
@@ -865,7 +865,7 @@ private fun CategoryBudgetCard(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "$periodLabel • $dateRangeStr",
+                            text = stringResource(R.string.budget_period_date_range, periodLabel, dateRangeStr),
                             style = MaterialTheme.typography.bodySmall,
                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                         )
@@ -890,7 +890,7 @@ private fun CategoryBudgetCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Options",
+                                contentDescription = stringResource(R.string.ui_budget_options),
                                 tint = ExpenseTrackerTheme.extendedColors.textSecondary
                             )
                         }
@@ -932,14 +932,14 @@ private fun CategoryBudgetCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Text(
-                    text = "$spentStr / $limitStr",
+                    text = stringResource(R.string.budget_spent_of_limit, spentStr, limitStr),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Text(
-                    text = "$percentageUsed% used",
+                    text = stringResource(R.string.budget_percent_used, percentageUsed),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = statusColor

@@ -458,7 +458,7 @@ fun ExpenseTrackerApp(
                                     text = if (currentDestination == NavDestination.Home) {
                                         stringResource(R.string.app_name)
                                     } else {
-                                        currentDestination.label
+                                        stringResource(currentDestination.labelRes)
                                     },
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
@@ -524,13 +524,13 @@ fun ExpenseTrackerApp(
                                 icon = {
                                     Icon(
                                         imageVector = destination.icon,
-                                        contentDescription = destination.label,
+                                        contentDescription = stringResource(destination.labelRes),
                                         modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
                                     )
                                 },
                                 label = {
                                     Text(
-                                        text = destination.label,
+                                        text = stringResource(destination.labelRes),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                     )
@@ -744,12 +744,12 @@ private fun StartupProvisioningGate(
                     when (state) {
                         StartupProvisioningState.Loading -> {
                             Text(
-                                text = "Checking app setup",
+                                text = stringResource(R.string.setup_checking),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Preparing your internal setup before the app becomes available.",
+                                text = stringResource(R.string.setup_checking_desc),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -762,12 +762,12 @@ private fun StartupProvisioningGate(
                         }
                         StartupProvisioningState.SettingsRecoveryPending -> {
                             Text(
-                                text = "Restoring settings",
+                                text = stringResource(R.string.setup_restoring),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Your restored data is safe. The app will remain blocked until settings recovery and setup finish.",
+                                text = stringResource(R.string.setup_restoring_desc),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -780,12 +780,12 @@ private fun StartupProvisioningGate(
                         }
                         StartupProvisioningState.RequiresCurrencySelection -> {
                             Text(
-                                text = "One-time setup needed",
+                                text = stringResource(R.string.setup_one_time_title),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "This is a one-time currency selection needed to initialize the app correctly.",
+                                text = stringResource(R.string.setup_one_time_desc),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -814,7 +814,14 @@ private fun StartupProvisioningGate(
                                                 fontWeight = FontWeight.SemiBold
                                             )
                                             Text(
-                                                text = currency.displayName,
+                                                text = when (currency.currencyCode) {
+                                                    "UZS" -> stringResource(R.string.currency_name_uzs)
+                                                    "USD" -> stringResource(R.string.currency_name_usd)
+                                                    "EUR" -> stringResource(R.string.currency_name_eur)
+                                                    "KRW" -> stringResource(R.string.currency_name_krw)
+                                                    "JPY" -> stringResource(R.string.currency_name_jpy)
+                                                    else -> currency.displayName
+                                                },
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -837,18 +844,18 @@ private fun StartupProvisioningGate(
                                     enabled = selectedCurrencyCode != null && !isSubmitting,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text(if (isSubmitting) "Saving..." else "Continue")
+                                    Text(if (isSubmitting) stringResource(R.string.action_saving) else stringResource(R.string.setup_continue))
                                 }
                             }
                         }
                         is StartupProvisioningState.RecoverableError -> {
                             Text(
-                                text = "Setup could not finish",
+                                text = stringResource(R.string.setup_failed_title),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = state.message,
+                                text = stringResource(R.string.setup_error_desc),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -859,17 +866,17 @@ private fun StartupProvisioningGate(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 )
                             ) {
-                                Text("Retry")
+                                Text(stringResource(R.string.ui_retry))
                             }
                         }
                         is StartupProvisioningState.UnrecoverableError -> {
                             Text(
-                                text = "App setup failed",
+                                text = stringResource(R.string.setup_app_failed),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = state.message,
+                                text = stringResource(R.string.setup_error_desc),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -880,11 +887,11 @@ private fun StartupProvisioningGate(
                                     containerColor = MaterialTheme.colorScheme.error
                                 )
                             ) {
-                                Text("Retry")
+                                Text(stringResource(R.string.ui_retry))
                             }
                         }
                         StartupProvisioningState.Ready -> {
-                            Text("Ready")
+                            Text(stringResource(R.string.ui_ready))
                         }
                     }
                 }

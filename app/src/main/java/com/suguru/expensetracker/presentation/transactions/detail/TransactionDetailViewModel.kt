@@ -1,6 +1,7 @@
 package com.suguru.expensetracker.presentation.transactions.detail
 
 import androidx.lifecycle.ViewModel
+import com.suguru.expensetracker.R
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.error.DomainException
 import com.suguru.expensetracker.domain.model.TransactionType
@@ -10,6 +11,7 @@ import com.suguru.expensetracker.domain.usecase.transaction.DeleteTransactionUse
 import com.suguru.expensetracker.domain.usecase.transaction.GetTransactionUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.presentation.util.DateTimeFormatterHelper
+import com.suguru.expensetracker.presentation.util.UiMessage
 import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,7 +51,7 @@ class TransactionDetailViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = "Transaction not found"
+                            errorMessage = UiMessage(R.string.error_transaction_not_found)
                         )
                     }
                     return@launch
@@ -117,7 +119,7 @@ class TransactionDetailViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = e.localizedMessage ?: "Failed to load transaction details"
+                        errorMessage = UiMessage(R.string.error_transaction_load_failed)
                     )
                 }
             }
@@ -151,14 +153,14 @@ class TransactionDetailViewModel(
                 _uiState.update {
                     it.copy(
                         isDeleting = false,
-                        errorMessage = e.message ?: "Failed to delete transaction"
+                        errorMessage = UiMessage(R.string.error_transaction_delete_failed)
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isDeleting = false,
-                        errorMessage = e.localizedMessage ?: "An unexpected error occurred"
+                        errorMessage = UiMessage(R.string.error_transaction_delete_failed)
                     )
                 }
             }

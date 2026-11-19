@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.BudgetPeriodType
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.util.MoneyParser
@@ -135,7 +136,7 @@ fun AddEditBudgetScreen(
         topBar = {
             ExpenseTrackerTopBar(
                 title = screenTitle,
-                subtitle = "PLANNING",
+                subtitle = stringResource(R.string.ui_budget_planning),
                 onNavigateBack = onNavigateBack,
                 testTag = "expense_tracker_top_bar"
             )
@@ -149,7 +150,7 @@ fun AddEditBudgetScreen(
             BackgroundGlowDecoration()
 
             if (uiState.isLoading) {
-                LoadingState(message = "Loading budget details…", testTag = "add_edit_budget_loading")
+                LoadingState(message = stringResource(R.string.ui_budget_loading_details), testTag = "add_edit_budget_loading")
             } else {
                 val scrollState = rememberScrollState()
 
@@ -169,8 +170,8 @@ fun AddEditBudgetScreen(
                     AnimatedVisibility(visible = uiState.validationError != null) {
                         uiState.validationError?.let { errMessage ->
                             ErrorBanner(
-                                message = errMessage,
-                                title = "Validation Error",
+                                message = errMessage.localized(),
+                                title = stringResource(R.string.ui_validation_error),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .widthIn(max = 540.dp),
@@ -187,7 +188,7 @@ fun AddEditBudgetScreen(
                     ) {
                         SectionHeader(
                             title = stringResource(R.string.budget_scope_label),
-                            subtitle = "Choose overall total or category-specific limit"
+                            subtitle = stringResource(R.string.ui_budget_choose_scope)
                         )
 
                         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
@@ -237,14 +238,14 @@ fun AddEditBudgetScreen(
                         ) {
                             SectionHeader(
                                 title = stringResource(R.string.category_label),
-                                subtitle = "Select an expense category to limit"
+                                subtitle = stringResource(R.string.ui_budget_select_category)
                             )
 
                             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
 
                             if (uiState.availableCategories.isEmpty()) {
                                 Text(
-                                    text = "No expense categories found. Please create an expense category first.",
+                                    text = stringResource(R.string.budget_no_categories_prompt),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
@@ -392,7 +393,7 @@ fun AddEditBudgetScreen(
                     ) {
                         SectionHeader(
                             title = stringResource(R.string.budget_period_label),
-                            subtitle = "Duration and recurrence cycle"
+                            subtitle = stringResource(R.string.ui_budget_duration_cycle)
                         )
 
                         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
@@ -426,8 +427,8 @@ fun AddEditBudgetScreen(
                             .widthIn(max = 540.dp)
                     ) {
                         SectionHeader(
-                            title = "Budget Period Dates",
-                            subtitle = "Active timeframe for expense tracking"
+                            title = stringResource(R.string.ui_budget_period_dates),
+                            subtitle = stringResource(R.string.ui_budget_timeframe)
                         )
 
                         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
@@ -548,7 +549,7 @@ fun AddEditBudgetScreen(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))
-                            Text(text = "Saving…", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            Text(text = stringResource(R.string.action_saving), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                         } else {
                             Text(
                                 text = saveBtnText,
@@ -582,7 +583,7 @@ fun AddEditBudgetScreen(
                         showStartDatePicker = false
                     }
                 ) {
-                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.ui_ok), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -612,7 +613,7 @@ fun AddEditBudgetScreen(
                         showEndDatePicker = false
                     }
                 ) {
-                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.ui_ok), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -677,7 +678,7 @@ private fun CategoryChip(
                 modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
             )
             Text(
-                text = category.name,
+                text = com.suguru.expensetracker.presentation.util.categoryDisplayName(category),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 color = if (isSelected) MaterialTheme.colorScheme.onBackground else ExpenseTrackerTheme.extendedColors.textSecondary

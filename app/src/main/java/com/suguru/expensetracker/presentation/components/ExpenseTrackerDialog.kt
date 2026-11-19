@@ -15,6 +15,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.suguru.expensetracker.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +37,7 @@ fun ExpenseTrackerConfirmationDialog(
     onConfirm: () -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
-    dismissText: String = "Cancel",
+    dismissText: String = stringResource(R.string.action_cancel),
     isDestructive: Boolean = false,
     confirmTestTag: String = "confirm_button",
     dismissTestTag: String = "dismiss_button",

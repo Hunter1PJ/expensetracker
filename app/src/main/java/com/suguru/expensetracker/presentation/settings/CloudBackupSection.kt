@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,12 +69,19 @@ import com.suguru.expensetracker.presentation.auth.GoogleSignInButton
 import com.suguru.expensetracker.presentation.auth.authStateFlow
 import com.suguru.expensetracker.presentation.auth.signOutFromGoogle
 import com.suguru.expensetracker.presentation.auth.toCloudAuthUser
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.DangerButton
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.ErrorBanner
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.IconAvatar
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.PrimaryButton
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.SecondaryButton
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.presentation.components.SectionHeader
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
@@ -111,7 +119,7 @@ fun CloudBackupSection(
         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
     ) {
         SectionHeader(
-            title = "Cloud Backup (Google & Firestore)",
+            title = stringResource(com.suguru.expensetracker.R.string.ui_cloud_backup_title),
             testTag = "section_cloud_backup"
         )
 
@@ -171,19 +179,19 @@ private fun CloudBackupSignInCard(
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Connect Google Account",
+                        text = stringResource(com.suguru.expensetracker.R.string.cloud_connect_google),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "Status: Not connected (Google login is optional).",
+                        text = stringResource(com.suguru.expensetracker.R.string.ui_cloud_not_connected),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
                     Text(
-                        text = "Sign in with Google to save compressed backups privately to your Firebase Firestore account and restore across reinstalls.",
+                        text = stringResource(com.suguru.expensetracker.R.string.ui_google_backup_restore_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary,
                         lineHeight = 18.sp
@@ -199,7 +207,7 @@ private fun CloudBackupSignInCard(
                     .padding(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.sm)
             ) {
                 Text(
-                    text = "⚠️ Warning: Without cloud backup, local data will be lost if you uninstall the app or replace your device.",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_backup_warning),
                     style = MaterialTheme.typography.labelSmall,
                     color = ExpenseTrackerTheme.extendedColors.financialWarning,
                     fontWeight = FontWeight.Medium
@@ -236,15 +244,18 @@ private fun AuthenticatedCloudBackupCard(
     val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
     val isAutoBackupEnabled by viewModel.isAutoBackupEnabled.collectAsStateWithLifecycle()
     var showSignOutConfirmation by remember { mutableStateOf(false) }
+    val localizedSuccessMessage = actionState.successMessage?.localized()
+    val localizedErrorMessage = actionState.errorMessage?.localized()
+    val localizedBusyMessage = actionState.busyMessage?.localized()
 
-    LaunchedEffect(actionState.successMessage) {
-        actionState.successMessage?.let { msg ->
+    LaunchedEffect(localizedSuccessMessage) {
+        localizedSuccessMessage?.let { msg ->
             onShowMessage(msg)
             viewModel.clearMessages()
         }
     }
-    LaunchedEffect(actionState.errorMessage) {
-        actionState.errorMessage?.let { err ->
+    LaunchedEffect(localizedErrorMessage) {
+        localizedErrorMessage?.let { err ->
             onShowMessage(err)
             viewModel.clearMessages()
         }
@@ -277,7 +288,7 @@ private fun AuthenticatedCloudBackupCard(
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = user.displayName?.takeIf { it.isNotBlank() } ?: "Google Account Connected",
+                            text = user.displayName?.takeIf { it.isNotBlank() } ?: stringResource(com.suguru.expensetracker.R.string.cloud_google_account_connected),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground,
@@ -300,11 +311,11 @@ private fun AuthenticatedCloudBackupCard(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Logout,
-                        contentDescription = "Sign out",
+                        contentDescription = stringResource(com.suguru.expensetracker.R.string.ui_sign_out),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.size(4.dp))
-                    Text("Sign out")
+                    Text(stringResource(com.suguru.expensetracker.R.string.ui_sign_out))
                 }
             }
 
@@ -315,13 +326,13 @@ private fun AuthenticatedCloudBackupCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Automatic Backup & Restore",
+                        text = stringResource(com.suguru.expensetracker.R.string.cloud_auto_backup_title),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "Automatically back up financial data and restore on new devices",
+                        text = stringResource(com.suguru.expensetracker.R.string.cloud_auto_backup_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
@@ -363,33 +374,57 @@ private fun AuthenticatedCloudBackupCard(
 
             if (isAutoBackupEnabled) {
                 val syncFailure = syncStatus as? com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Failure
-                val backupStatusText = when {
+                val backupStatusRes = when {
                     syncStatus is com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.BackupInProgress ||
-                        (actionState.isBusy && actionState.busyMessage?.contains("Uploading", ignoreCase = true) == true) -> "Backing up"
+                        (actionState.isBusy && actionState.busyMessage?.resourceId == com.suguru.expensetracker.R.string.cloud_busy_uploading_chunks) ->
+                        com.suguru.expensetracker.R.string.cloud_status_backing_up
                     localCloudState.lastFailureCode != null ->
-                        if (!isOnline && localCloudState.lastFailureCode == "NETWORK_UNAVAILABLE") "Waiting for internet" else "Backup failed"
+                        if (!isOnline && localCloudState.lastFailureCode == "NETWORK_UNAVAILABLE") com.suguru.expensetracker.R.string.cloud_status_waiting_network else com.suguru.expensetracker.R.string.cloud_status_failed
                     localCloudState.pendingSnapshotId != null ->
-                        if (!isOnline) "Waiting for internet" else "Backup pending"
-                    localCloudState.lastSuccessfulBackupAtEpochMillis != null -> "Up to date"
-                    else -> if (!isOnline) "Waiting for internet" else "Backup pending"
+                        if (!isOnline) com.suguru.expensetracker.R.string.cloud_status_waiting_network else com.suguru.expensetracker.R.string.cloud_status_pending
+                    localCloudState.lastSuccessfulBackupAtEpochMillis != null -> com.suguru.expensetracker.R.string.cloud_status_uptodate
+                    else -> if (!isOnline) com.suguru.expensetracker.R.string.cloud_status_waiting_network else com.suguru.expensetracker.R.string.cloud_status_pending
                 }
 
-                val hasCompleteSnapshot =
-                    (manifestsState as? CloudSnapshotsUiState.Success)?.manifests
-                        ?.any { it.status == CloudBackupManifestStatus.COMPLETE } == true
-                val snapshotStatusText = when (manifestsState) {
-                    CloudSnapshotsUiState.Loading -> "Checking"
-                    is CloudSnapshotsUiState.Error -> if (!isOnline) "Waiting for internet" else "Unavailable"
-                    is CloudSnapshotsUiState.Success -> if (hasCompleteSnapshot) "Available" else "No cloud snapshot"
+                val activeManifest = (manifestsState as? CloudSnapshotsUiState.Success)
+                    ?.manifests
+                    ?.firstOrNull { it.status == CloudBackupManifestStatus.COMPLETE }
+                val restoreStatus = com.suguru.expensetracker.domain.model.CloudRestoreStatusResolver.resolve(
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatusInput(
+                        activeManifest = activeManifest,
+                        isLoading = manifestsState !is CloudSnapshotsUiState.Success,
+                        restoreInProgress =
+                            syncStatus is com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.RestoreInProgress ||
+                                (actionState.isBusy && actionState.busyMessage?.resourceId == com.suguru.expensetracker.R.string.cloud_busy_restoring),
+                        pendingRestore = localCloudState.pendingRestore,
+                        isOnline = isOnline,
+                        transientFailure =
+                            actionState.restoreResult is CloudRestoreResult.Failure ||
+                                syncFailure?.code?.contains("RESTORE") == true,
+                        lastFailureCode = localCloudState.lastRestoreFailureCode,
+                        lastFailureGenerationId = localCloudState.lastRestoreFailureGenerationId,
+                        lastFailureFingerprint = localCloudState.lastRestoreFailureFingerprint,
+                        restoredGenerationId = localCloudState.lastSuccessfulRestoreGenerationId,
+                        restoredFingerprint = localCloudState.lastSuccessfulRestoreFingerprint
+                    )
+                )
+                val restoreStatusRes = when (restoreStatus) {
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.UP_TO_DATE -> com.suguru.expensetracker.R.string.cloud_status_uptodate
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.NEW_BACKUP_AVAILABLE -> com.suguru.expensetracker.R.string.cloud_status_new_backup
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.RESTORING -> com.suguru.expensetracker.R.string.cloud_status_restoring
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.WAITING_FOR_INTERNET -> com.suguru.expensetracker.R.string.cloud_status_waiting_network
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.RESTORE_FAILED -> com.suguru.expensetracker.R.string.cloud_status_restore_failed
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.CHECKING -> com.suguru.expensetracker.R.string.cloud_status_checking
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.NO_CLOUD_BACKUP -> com.suguru.expensetracker.R.string.cloud_status_no_backup
                 }
-                val restoreStatusText = when {
-                    syncStatus is com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.RestoreInProgress ||
-                        (actionState.isBusy && actionState.busyMessage?.contains("Restor", ignoreCase = true) == true) -> "Restoring"
-                    actionState.restoreResult is CloudRestoreResult.Failure || syncFailure?.code?.contains("RESTORE") == true -> "Restore failed"
-                    actionState.restoreResult is CloudRestoreResult.Success ||
-                        localCloudState.lastSuccessfulRestoreAtEpochMillis != null -> "Restored successfully"
-                    !isOnline && hasCompleteSnapshot -> "Waiting for internet"
-                    else -> "Not restored on this device"
+                val restoreDescriptionRes = when (restoreStatus) {
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.UP_TO_DATE -> com.suguru.expensetracker.R.string.cloud_restore_desc_uptodate
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.NEW_BACKUP_AVAILABLE -> com.suguru.expensetracker.R.string.cloud_restore_desc_new
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.RESTORING -> com.suguru.expensetracker.R.string.cloud_restore_desc_restoring
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.WAITING_FOR_INTERNET -> com.suguru.expensetracker.R.string.cloud_restore_desc_waiting
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.RESTORE_FAILED -> com.suguru.expensetracker.R.string.cloud_restore_desc_failed
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.CHECKING -> com.suguru.expensetracker.R.string.cloud_restore_desc_checking
+                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.NO_CLOUD_BACKUP -> com.suguru.expensetracker.R.string.cloud_restore_desc_none
                 }
 
                 Box(
@@ -406,19 +441,20 @@ private fun AuthenticatedCloudBackupCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Cloud Backup:",
+                                text = stringResource(com.suguru.expensetracker.R.string.cloud_backup_label),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
-                                text = backupStatusText,
+                                text = stringResource(backupStatusRes),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = when (backupStatusText) {
-                                    "Up to date" -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                    "Backing up" -> MaterialTheme.colorScheme.primary
-                                    "Backup pending", "Waiting for internet" -> ExpenseTrackerTheme.extendedColors.financialWarning
+                                color = when (backupStatusRes) {
+                                    com.suguru.expensetracker.R.string.cloud_status_uptodate -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                    com.suguru.expensetracker.R.string.cloud_status_backing_up -> MaterialTheme.colorScheme.primary
+                                    com.suguru.expensetracker.R.string.cloud_status_pending,
+                                    com.suguru.expensetracker.R.string.cloud_status_waiting_network -> ExpenseTrackerTheme.extendedColors.financialWarning
                                     else -> MaterialTheme.colorScheme.error
                                 }
                             )
@@ -430,72 +466,48 @@ private fun AuthenticatedCloudBackupCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Cloud snapshot:",
+                                text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_label),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
-                                text = snapshotStatusText,
+                                text = stringResource(restoreStatusRes),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = when (snapshotStatusText) {
-                                    "Available" -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                    "Checking" -> MaterialTheme.colorScheme.primary
-                                    "Waiting for internet" -> ExpenseTrackerTheme.extendedColors.financialWarning
+                                color = when (restoreStatus) {
+                                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.UP_TO_DATE -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.RESTORING -> MaterialTheme.colorScheme.primary
+                                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.RESTORE_FAILED -> MaterialTheme.colorScheme.error
+                                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.WAITING_FOR_INTERNET,
+                                    com.suguru.expensetracker.domain.model.CloudRestoreStatus.NEW_BACKUP_AVAILABLE -> ExpenseTrackerTheme.extendedColors.financialWarning
                                     else -> ExpenseTrackerTheme.extendedColors.textSecondary
                                 }
                             )
                         }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Last restore:",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = restoreStatusText,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = when (restoreStatusText) {
-                                    "Restored successfully" -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                    "Restoring" -> MaterialTheme.colorScheme.primary
-                                    "Restore failed" -> MaterialTheme.colorScheme.error
-                                    "Waiting for internet" -> ExpenseTrackerTheme.extendedColors.financialWarning
-                                    else -> ExpenseTrackerTheme.extendedColors.textSecondary
-                                }
-                            )
-                        }
+                        Text(
+                            text = stringResource(restoreDescriptionRes),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
 
                         localCloudState.lastSuccessfulBackupAtEpochMillis?.let { lastCloudTime ->
                             Text(
-                                text = "Last cloud backup: ${formatInstant(Instant.ofEpochMilli(lastCloudTime))}",
+                                text = stringResource(com.suguru.expensetracker.R.string.cloud_last_backup, formatInstant(Instant.ofEpochMilli(lastCloudTime))),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ExpenseTrackerTheme.extendedColors.textSecondary
                             )
                         }
 
-                        localCloudState.lastSuccessfulRestoreAtEpochMillis?.let { restoredAt ->
-                            Text(
-                                text = "Last restored: ${formatInstant(Instant.ofEpochMilli(restoredAt))}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ExpenseTrackerTheme.extendedColors.textSecondary
-                            )
-                        }
+                        Text(
+                            text = stringResource(com.suguru.expensetracker.R.string.cloud_last_restored, localCloudState.lastSuccessfulRestoreAtEpochMillis?.let { formatInstant(Instant.ofEpochMilli(it)) } ?: stringResource(com.suguru.expensetracker.R.string.cloud_never)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                        )
 
-                        localCloudState.lastFailureCode?.let { failureCode ->
-                            val failureMessage =
-                                (syncStatus as? com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Failure)
-                                    ?.message
-                                    ?.takeIf { it.isNotBlank() }
+                        localCloudState.lastFailureCode?.let {
                             Text(
-                                text = failureMessage ?: "Last issue: ${failureCode.lowercase().replace('_', ' ')}",
+                                text = stringResource(com.suguru.expensetracker.R.string.cloud_last_issue),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -514,21 +526,17 @@ private fun AuthenticatedCloudBackupCard(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             text = if (lastCloudTime != null) {
-                                "Last cloud backup: ${formatInstant(Instant.ofEpochMilli(lastCloudTime))}"
+                                stringResource(com.suguru.expensetracker.R.string.cloud_last_backup_info, formatInstant(Instant.ofEpochMilli(lastCloudTime)))
                             } else {
-                                "No cloud backup recorded on this device yet."
+                                stringResource(com.suguru.expensetracker.R.string.cloud_no_backup_yet)
                             },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                         )
-                        localCloudState.lastFailureCode?.let { failureCode ->
-                            val failureMessage =
-                                (syncStatus as? com.suguru.expensetracker.data.backup.AutomaticBackupSyncStatus.Failure)
-                                    ?.message
-                                    ?.takeIf { it.isNotBlank() }
+                        localCloudState.lastFailureCode?.let {
                             Text(
-                                text = failureMessage ?: "Last issue: ${failureCode.lowercase().replace('_', ' ')}",
+                                text = stringResource(com.suguru.expensetracker.R.string.cloud_last_issue),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -546,7 +554,7 @@ private fun AuthenticatedCloudBackupCard(
                             strokeWidth = 2.dp
                         )
                         Text(
-                            text = actionState.busyMessage!!,
+                            text = localizedBusyMessage.orEmpty(),
                             style = MaterialTheme.typography.bodySmall,
                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                         )
@@ -554,7 +562,7 @@ private fun AuthenticatedCloudBackupCard(
                 }
 
                 PrimaryButton(
-                    text = if (actionState.isBusy) "Working..." else "Backup Now",
+                    text = if (actionState.isBusy) stringResource(com.suguru.expensetracker.R.string.cloud_working) else stringResource(com.suguru.expensetracker.R.string.cloud_backup_now),
                     onClick = { viewModel.backUpNow() },
                     enabled = !actionState.isBusy,
                     leadingIcon = Icons.Default.CloudUpload,
@@ -566,7 +574,7 @@ private fun AuthenticatedCloudBackupCard(
             HorizontalDivider(color = ExpenseTrackerTheme.extendedColors.borderSubtle)
 
             Text(
-                text = "Cloud Information",
+                text = stringResource(com.suguru.expensetracker.R.string.cloud_information),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -584,12 +592,12 @@ private fun AuthenticatedCloudBackupCard(
                     }
                 }
                 is CloudSnapshotsUiState.Error -> {
-                    ErrorBanner(message = state.message)
+                    ErrorBanner(message = stringResource(com.suguru.expensetracker.R.string.cloud_load_snapshots_failed))
                 }
                 is CloudSnapshotsUiState.Success -> {
                     if (state.manifests.isEmpty()) {
                         Text(
-                            text = "No cloud snapshots stored yet. Tap Back Up to Cloud to create your first snapshot.",
+                            text = stringResource(com.suguru.expensetracker.R.string.cloud_empty_snapshots),
                             style = MaterialTheme.typography.bodySmall,
                             color = ExpenseTrackerTheme.extendedColors.textMuted
                         )
@@ -626,18 +634,18 @@ private fun AuthenticatedCloudBackupCard(
             },
             title = {
                 Text(
-                    text = "Data Conflict Detected",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_conflict_title),
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                     Text(
-                        text = "This device has local edits, but your Google account already has a different cloud backup. Please choose how to proceed:",
+                        text = stringResource(com.suguru.expensetracker.R.string.cloud_conflict_desc),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "Cloud snapshot from ${formatInstant(conflict.remoteManifest.completedAt ?: conflict.remoteManifest.createdAt)}",
+                        text = stringResource(com.suguru.expensetracker.R.string.cloud_snapshot_from, formatInstant(conflict.remoteManifest.completedAt ?: conflict.remoteManifest.createdAt)),
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
@@ -645,14 +653,14 @@ private fun AuthenticatedCloudBackupCard(
             },
             confirmButton = {
                 PrimaryButton(
-                    text = "Restore Cloud Snapshot",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_snapshot_title),
                     onClick = { viewModel.resolveConflictRestore(conflict.remoteManifest) },
                     testTag = "conflict_restore_cloud_button"
                 )
             },
             dismissButton = {
                 SecondaryButton(
-                    text = "Keep Local & Back Up",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_keep_local_backup),
                     onClick = { viewModel.resolveConflictKeepLocal() },
                     testTag = "conflict_keep_local_button"
                 )
@@ -673,13 +681,13 @@ private fun AuthenticatedCloudBackupCard(
             },
             title = {
                 Text(
-                    text = "Restoring Cloud Backup",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_restoring_title),
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = actionState.busyMessage ?: "Restoring data to this device...",
+                    text = localizedBusyMessage ?: stringResource(com.suguru.expensetracker.R.string.cloud_restore_desc_restoring),
                     style = MaterialTheme.typography.bodyMedium,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                 )
@@ -703,18 +711,18 @@ private fun AuthenticatedCloudBackupCard(
             },
             title = {
                 Text(
-                    text = "Restore cloud snapshot?",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_confirm_title),
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                     Text(
-                        text = "Cloud backup data will be restored to this device. Any existing local data will be replaced by the snapshot.",
+                        text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_confirm_desc),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "Snapshot from ${formatInstant(manifest.completedAt ?: manifest.createdAt)}",
+                        text = stringResource(com.suguru.expensetracker.R.string.cloud_snapshot_from, formatInstant(manifest.completedAt ?: manifest.createdAt)),
                         style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
@@ -722,7 +730,7 @@ private fun AuthenticatedCloudBackupCard(
             },
             confirmButton = {
                 PrimaryButton(
-                    text = "Restore",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_action),
                     onClick = { viewModel.confirmPendingRestore() },
                     leadingIcon = Icons.Default.CloudDownload,
                     testTag = "confirm_cloud_restore_button"
@@ -730,7 +738,7 @@ private fun AuthenticatedCloudBackupCard(
             },
             dismissButton = {
                 SecondaryButton(
-                    text = "Cancel",
+                    text = stringResource(com.suguru.expensetracker.R.string.ui_cancel),
                     onClick = { viewModel.cancelPendingRestore() },
                     testTag = "cancel_cloud_restore_button"
                 )
@@ -755,19 +763,19 @@ private fun AuthenticatedCloudBackupCard(
                     },
                     title = {
                         Text(
-                            text = "Data successfully restored to this device.",
+                            text = stringResource(com.suguru.expensetracker.R.string.cloud_restored_title),
                             fontWeight = FontWeight.Bold
                         )
                     },
                     text = {
                         Text(
-                            text = "All accounts, transactions, and categories have been updated from your cloud backup snapshot (${formatInstant(result.manifest.completedAt ?: result.manifest.createdAt)}).",
+                            text = stringResource(com.suguru.expensetracker.R.string.cloud_restored_desc, formatInstant(result.manifest.completedAt ?: result.manifest.createdAt)),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     confirmButton = {
                         PrimaryButton(
-                            text = "Next",
+                            text = stringResource(com.suguru.expensetracker.R.string.cloud_next),
                             onClick = { viewModel.dismissRestoreResult() },
                             testTag = "restore_success_next_button"
                         )
@@ -789,18 +797,18 @@ private fun AuthenticatedCloudBackupCard(
                     },
                     title = {
                         Text(
-                            text = "Restoration failed",
+                            text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_failed_title),
                             fontWeight = FontWeight.Bold
                         )
                     },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                             Text(
-                                text = "Unable to restore data from cloud backup to this device:",
+                                text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_failed_desc),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Text(
-                                text = result.reason,
+                                text = stringResource(com.suguru.expensetracker.R.string.cloud_restore_failed_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -808,7 +816,7 @@ private fun AuthenticatedCloudBackupCard(
                     },
                     confirmButton = {
                         PrimaryButton(
-                            text = "Next",
+                            text = stringResource(com.suguru.expensetracker.R.string.cloud_next),
                             onClick = { viewModel.dismissRestoreResult() },
                             testTag = "restore_failure_next_button"
                         )
@@ -825,19 +833,19 @@ private fun AuthenticatedCloudBackupCard(
             containerColor = ExpenseTrackerTheme.extendedColors.surface,
             title = {
                 Text(
-                    text = "Sign out?",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_signout_confirm),
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = "Are you sure you want to sign out of your Google account? Your financial data stored on this device will remain available.",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_signout_desc),
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
             confirmButton = {
                 PrimaryButton(
-                    text = "Sign Out",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_signout_action),
                     onClick = {
                         showSignOutConfirmation = false
                         signOutFromGoogle(
@@ -850,7 +858,7 @@ private fun AuthenticatedCloudBackupCard(
             },
             dismissButton = {
                 SecondaryButton(
-                    text = "Cancel",
+                    text = stringResource(com.suguru.expensetracker.R.string.ui_cancel),
                     onClick = { showSignOutConfirmation = false },
                     testTag = "cancel_sign_out_button"
                 )
@@ -908,7 +916,7 @@ private fun CloudManifestRow(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "${manifest.status.name} • $sizeText • ${manifest.chunkCount} chunk(s)",
+                    text = stringResource(com.suguru.expensetracker.R.string.cloud_manifest_chunks, stringResource(when(manifest.status) { CloudBackupManifestStatus.COMPLETE -> com.suguru.expensetracker.R.string.cloud_snapshot_status_complete; CloudBackupManifestStatus.UPLOADING -> com.suguru.expensetracker.R.string.cloud_snapshot_status_uploading; CloudBackupManifestStatus.FAILED -> com.suguru.expensetracker.R.string.cloud_snapshot_status_failed }), sizeText, manifest.chunkCount),
                     style = MaterialTheme.typography.labelSmall,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                 )
@@ -920,7 +928,7 @@ private fun CloudManifestRow(
                 enabled = !isBusy,
                 modifier = Modifier.testTag("restore_cloud_snapshot_${manifest.snapshotId}")
             ) {
-                Text("Restore Now")
+                Text(stringResource(com.suguru.expensetracker.R.string.ui_restore_now))
             }
         }
     }
@@ -938,7 +946,7 @@ private fun CloudBackupUnavailableCard(modifier: Modifier = Modifier) {
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
     ) {
         Text(
-            text = "Cloud backup is unavailable in this test environment.",
+            text = stringResource(com.suguru.expensetracker.R.string.cloud_unavailable_test),
             style = MaterialTheme.typography.bodySmall,
             color = ExpenseTrackerTheme.extendedColors.textSecondary
         )
@@ -947,7 +955,7 @@ private fun CloudBackupUnavailableCard(modifier: Modifier = Modifier) {
 
 private fun formatInstant(instant: Instant): String {
     return try {
-        val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - hh:mm a")
+        val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - HH:mm", java.util.Locale.getDefault())
         instant.atZone(ZoneId.systemDefault()).format(formatter)
     } catch (_: Exception) {
         instant.toString()

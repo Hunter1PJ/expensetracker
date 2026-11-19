@@ -8,7 +8,13 @@ import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioning
 import com.suguru.expensetracker.presentation.startup.StartupProvisioningState
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabase
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabaseProvider
+import com.suguru.expensetracker.data.local.WorkspaceId
+import androidx.datastore.preferences.preferencesDataStoreFile
 import com.suguru.expensetracker.domain.parser.DeterministicTransactionParser
+import com.suguru.expensetracker.presentation.auth.authStateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import com.suguru.expensetracker.data.repository.RoomAccountRepository
 import com.suguru.expensetracker.data.repository.RoomBudgetRepository
 import com.suguru.expensetracker.data.repository.RoomCategoryRepository
@@ -56,36 +62,135 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 private val Context.dataStore by androidx.datastore.preferences.preferencesDataStore(name = "expense_tracker_settings")
+private val workspaceSettingsStores = java.util.concurrent.ConcurrentHashMap<String, androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+
+private fun workspaceSettingsDataStore(context: Context, workspaceId: WorkspaceId): androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> =
+    workspaceSettingsStores.getOrPut(workspaceId.storageKey) {
+        androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            migrations = if (workspaceId == WorkspaceId.Guest) {
+                listOf<androidx.datastore.core.DataMigration<androidx.datastore.preferences.core.Preferences>>(
+                    LegacySettingsDataMigration(context.dataStore)
+                )
+            } else {
+                emptyList()
+            },
+            produceFile = {
+                context.applicationContext.preferencesDataStoreFile("expense_tracker_settings_${workspaceId.storageKey}")
+            }
+        )
+    }
+
+private class LegacySettingsDataMigration(
+    private val legacyStore: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>
+) : androidx.datastore.core.DataMigration<androidx.datastore.preferences.core.Preferences> {
+    private val migratedKeyNames = setOf(
+        "theme_mode",
+        "preferred_currency_code",
+        "week_start",
+        "date_format",
+        "time_format",
+        "show_currency_code",
+        "confirm_before_delete",
+        "last_backup_at",
+        "last_backup_file_name"
+    )
+
+    override suspend fun shouldMigrate(currentData: androidx.datastore.preferences.core.Preferences): Boolean =
+        currentData.asMap().isEmpty() &&
+            legacyStore.data.first().asMap().keys.any { it.name in migratedKeyNames }
+
+    override suspend fun migrate(currentData: androidx.datastore.preferences.core.Preferences): androidx.datastore.preferences.core.Preferences {
+        val legacy = legacyStore.data.first()
+        val migrated = androidx.datastore.preferences.core.mutablePreferencesOf()
+        fun copyString(name: String) {
+            val key = androidx.datastore.preferences.core.stringPreferencesKey(name)
+            legacy[key]?.let { migrated[key] = it }
+        }
+        fun copyBoolean(name: String) {
+            val key = androidx.datastore.preferences.core.booleanPreferencesKey(name)
+            legacy[key]?.let { migrated[key] = it }
+        }
+        listOf(
+            "theme_mode", "preferred_currency_code", "week_start", "date_format",
+            "time_format", "last_backup_at", "last_backup_file_name"
+        ).forEach(::copyString)
+        listOf("show_currency_code", "confirm_before_delete").forEach(::copyBoolean)
+        return migrated
+    }
+
+    override suspend fun cleanUp() = Unit
+}
 
 /**
- * Application-level dependency container providing singleton database and repository instances.
- * Repositories are exposed via their clean domain interfaces.
+ * Dependency container for one financial workspace. Its Room repositories and use cases are bound
+ * to that workspace's database for the lifetime of this container.
  */
-class AppContainer(private val context: Context) {
+class AppContainer(
+    private val context: Context,
+    val workspaceId: WorkspaceId = WorkspaceId.Guest
+) {
 
     private val _provisioningState = kotlinx.coroutines.flow.MutableStateFlow<StartupProvisioningState>(StartupProvisioningState.Loading)
     val provisioningState: kotlinx.coroutines.flow.StateFlow<StartupProvisioningState> = _provisioningState
     private val _startupAiInvalidKey = kotlinx.coroutines.flow.MutableStateFlow(false)
     val startupAiInvalidKey: kotlinx.coroutines.flow.StateFlow<Boolean> = _startupAiInvalidKey
+    @Volatile private var startupAiInvalidUid: String? = null
+    private val firebaseAuth by lazy { com.google.firebase.auth.FirebaseAuth.getInstance() }
+    private fun currentAiUid(): String? = runCatching { firebaseAuth.currentUser?.uid }.getOrNull()
+    val authenticatedAiUidFlow: Flow<String?> by lazy {
+        firebaseAuth.authStateFlow().map { it?.uid }
+    }
+    val activeAiProfileFlow: Flow<String> by lazy {
+        authenticatedAiUidFlow.map { it ?: com.suguru.expensetracker.domain.ai.AiRepository.GUEST_PROFILE_ID }
+    }
 
-    fun reportStartupAiInvalidKey() { _startupAiInvalidKey.value = true }
-    fun consumeStartupAiInvalidKey() { _startupAiInvalidKey.value = false }
+    @Synchronized
+    fun reportStartupAiInvalidKey(uid: String) {
+        if (uid.isNotBlank() && currentAiUid() == uid) {
+            startupAiInvalidUid = uid
+            _startupAiInvalidKey.value = true
+        }
+    }
+
+    @Synchronized
+    fun consumeStartupAiInvalidKey() {
+        startupAiInvalidUid = null
+        _startupAiInvalidKey.value = false
+    }
+
     private val provisioningMutex = Mutex()
     private val categoryInitializationMutex = Mutex()
     private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val database: ExpenseTrackerDatabase = ExpenseTrackerDatabaseProvider.getDatabase(context)
+    init {
+        startupScope.launch {
+            authenticatedAiUidFlow.collect { uid ->
+                if (startupAiInvalidUid != null && startupAiInvalidUid != uid) {
+                    consumeStartupAiInvalidKey()
+                }
+            }
+        }
+    }
+
+    val database: ExpenseTrackerDatabase =
+        ExpenseTrackerDatabaseProvider.getDatabase(context, workspaceId)
 
     private val onDataMutated: () -> Unit = {
-        startupScope.launch {
-            try {
+        val ownerUid = workspaceId.firebaseUid
+        val signedInUid = currentAiUid()
+        if (ownerUid != null && ownerUid == signedInUid) {
+            startupScope.launch {
                 cloudBackupOrchestrator.onLocalDataMutated()
-            } catch (_: Exception) {}
+            }
         }
     }
 
     val settingsRepository: com.suguru.expensetracker.domain.repository.SettingsRepository by lazy {
-        com.suguru.expensetracker.data.repository.DataStoreSettingsRepository(context.dataStore, onDataMutated)
+        com.suguru.expensetracker.data.repository.DataStoreSettingsRepository(
+            workspaceSettingsDataStore(context, workspaceId),
+            onDataMutated
+        )
     }
 
     val cloudBackupFingerprintStore: com.suguru.expensetracker.domain.repository.CloudBackupFingerprintStore by lazy {
@@ -133,17 +238,31 @@ class AppContainer(private val context: Context) {
                 com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.scheduleDebounced(context, uid)
             },
             onScheduleAutomaticRestore = { uid ->
-                com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.scheduleAutomaticRestore(context)
+                com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.scheduleAutomaticRestore(context, uid)
             },
             onCancelBackupWork = { uid ->
                 com.suguru.expensetracker.data.worker.AutomaticCloudBackupWorker.cancelWork(context, uid)
+            },
+            authenticatedUidProvider = {
+                val authenticatedUid = runCatching {
+                    com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                }.getOrNull()
+                authenticatedUid?.takeIf { it == workspaceId.firebaseUid }
+            },
+            activeWorkspaceUidProvider = {
+                (context.applicationContext as? com.suguru.expensetracker.ExpenseTrackerApplication)
+                    ?.activeAppContainer?.value?.workspaceId?.firebaseUid
             }
         )
     }
 
     // AI BYOK Foundation
     val secureKeyStorage: com.suguru.expensetracker.data.security.SecureKeyStorage by lazy {
-        com.suguru.expensetracker.data.security.AndroidKeystoreSecureStorage(context.applicationContext)
+        com.suguru.expensetracker.data.security.AndroidKeystoreSecureStorage(
+            context = context.applicationContext,
+            currentUidProvider = { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid },
+            uidScopedMode = true
+        )
     }
 
     val geminiApiClient: com.suguru.expensetracker.data.ai.gemini.GeminiApiClient by lazy {
@@ -160,7 +279,9 @@ class AppContainer(private val context: Context) {
             secureKeyStorage = secureKeyStorage,
             dataStore = context.dataStore,
             offlineParser = DeterministicTransactionParser(),
-            isOnline = ::hasValidatedInternetConnection
+            isOnline = ::hasValidatedInternetConnection,
+            currentUidProvider = ::currentAiUid,
+            authenticatedUidFlow = authenticatedAiUidFlow
         )
     }
 
@@ -494,7 +615,7 @@ class AppContainer(private val context: Context) {
     }
 
     fun createSettingsViewModel(): com.suguru.expensetracker.presentation.settings.SettingsViewModel {
-        val invalidKeyDetected = _startupAiInvalidKey.value
+        val invalidKeyDetected = _startupAiInvalidKey.value && startupAiInvalidUid == currentAiUid()
         return com.suguru.expensetracker.presentation.settings.SettingsViewModel(
             settingsRepository = settingsRepository,
             aiRepository = aiRepository,
@@ -613,7 +734,13 @@ class AppContainer(private val context: Context) {
             autoBackupPreferenceStore = autoBackupPreferenceStore,
             orchestrator = cloudBackupOrchestrator,
             widgetRefreshCoordinator = widgetRefreshCoordinator,
-            onPendingSettingsRecovery = { ensureInternalDefaultAccountProvisioning() }
+            onPendingSettingsRecovery = { ensureInternalDefaultAccountProvisioning() },
+            isWorkspaceIdentityCurrent = { requestedUid ->
+                requestedUid == workspaceId.firebaseUid &&
+                    (context.applicationContext as? com.suguru.expensetracker.ExpenseTrackerApplication)
+                        ?.isWorkspaceActive(requestedUid) == true
+            },
+            authenticatedUidProvider = { runCatching { firebaseAuth.currentUser?.uid }.getOrNull() }
         )
     }
 
@@ -630,7 +757,8 @@ class AppContainer(private val context: Context) {
         com.suguru.expensetracker.widget.balance.AccountBalanceWidgetDataProvider(
             accountRepository = accountRepository,
             getAccountBalanceUseCase = getAccountBalanceUseCase,
-            widgetConfigurationRepository = widgetConfigurationRepository
+            widgetConfigurationRepository = widgetConfigurationRepository,
+            activeWorkspaceKey = workspaceId.storageKey
         )
     }
 
@@ -639,7 +767,8 @@ class AppContainer(private val context: Context) {
             budgetRepository = budgetRepository,
             categoryRepository = categoryRepository,
             observeActiveBudgetProgressUseCase = observeActiveBudgetProgressUseCase,
-            widgetConfigurationRepository = widgetConfigurationRepository
+            widgetConfigurationRepository = widgetConfigurationRepository,
+            activeWorkspaceKey = workspaceId.storageKey
         )
     }
 }

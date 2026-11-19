@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.DangerButton
@@ -223,7 +224,7 @@ fun TransactionDetailScreenContent(
                                 modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
                             )
                             Text(
-                                text = uiState.errorMessage,
+                                text = uiState.errorMessage.localized(),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
@@ -336,7 +337,7 @@ fun TransactionDetailScreenContent(
                                 DetailInfoRow(
                                     icon = Icons.Default.AccountBalance,
                                     label = stringResource(R.string.from_account_label),
-                                    value = uiState.sourceAccount?.name ?: "Unknown Account",
+                                    value = uiState.sourceAccount?.name ?: stringResource(R.string.label_unknown_account),
                                     isArchived = uiState.isSourceAccountArchived,
                                     testTag = "detail_source_account"
                                 )
@@ -344,7 +345,7 @@ fun TransactionDetailScreenContent(
                                 DetailInfoRow(
                                     icon = Icons.AutoMirrored.Filled.CompareArrows,
                                     label = stringResource(R.string.to_account_label),
-                                    value = uiState.destinationAccount?.name ?: "Unknown Account",
+                                    value = uiState.destinationAccount?.name ?: stringResource(R.string.label_unknown_account),
                                     isArchived = uiState.isDestinationAccountArchived,
                                     testTag = "detail_dest_account"
                                 )
@@ -353,7 +354,7 @@ fun TransactionDetailScreenContent(
                                 DetailInfoRow(
                                     icon = Icons.Default.Category,
                                     label = stringResource(R.string.category_label),
-                                    value = uiState.category?.name ?: "Uncategorized",
+                                    value = uiState.category?.name ?: stringResource(R.string.pdf_empty_category),
                                     isArchived = uiState.isCategoryArchived,
                                     testTag = "detail_category"
                                 )
@@ -405,13 +406,13 @@ fun TransactionDetailScreenContent(
                                 )
                                 Column {
                                     Text(
-                                        text = "Recurring Transaction",
+                                        text = stringResource(R.string.transaction_recurring_title),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onBackground
                                     )
                                     Text(
-                                        text = "Generated automatically from a recurring schedule",
+                                        text = stringResource(R.string.transaction_recurring_desc),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )

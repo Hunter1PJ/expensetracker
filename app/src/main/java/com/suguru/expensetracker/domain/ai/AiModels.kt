@@ -53,6 +53,14 @@ interface AiProvider {
         prompt: String,
         config: AiConfiguration
     ): AiResult<ExtractedFinancialPayload>
+
+    /** Uses the UID-scoped key captured by the repository for this operation. */
+    suspend fun extractFinancialTransactions(
+        prompt: String,
+        config: AiConfiguration,
+        apiKey: String
+    ): AiResult<ExtractedFinancialPayload> =
+        extractFinancialTransactions(prompt, config)
 }
 
 /**

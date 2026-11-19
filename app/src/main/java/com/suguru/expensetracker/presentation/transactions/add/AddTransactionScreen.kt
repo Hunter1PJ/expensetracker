@@ -37,8 +37,6 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.AlertDialog
@@ -80,7 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
-import com.suguru.expensetracker.domain.model.Account
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.util.TransactionTimestampPolicy
@@ -124,8 +122,6 @@ fun AddTransactionScreen(
         onTimeSelected = viewModel::onTimeSelected,
         onDismissError = viewModel::onDismissError,
         onSaveTransaction = { viewModel.saveTransaction() },
-        onTransferSourceSelected = viewModel::onTransferSourceSelected,
-        onTransferDestinationSelected = viewModel::onTransferDestinationSelected,
         modifier = modifier
     )
 }
@@ -142,8 +138,6 @@ fun AddTransactionScreenContent(
     onTransactionTimeChanged: (Instant) -> Unit,
     onDismissError: () -> Unit,
     onSaveTransaction: () -> Unit,
-    onTransferSourceSelected: (Long) -> Unit = {},
-    onTransferDestinationSelected: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
     onDateSelected: ((Long) -> Unit)? = null,
     onTimeSelected: ((Int, Int) -> Unit)? = null
@@ -263,7 +257,7 @@ fun AddTransactionScreenContent(
                         // Missing amount warning
                         if (uiState.aiAmountWarning != null) {
                             Text(
-                                text = "• " + stringResource(R.string.ai_missing_amount_warning),
+                                text = "• " + uiState.aiAmountWarning.localized(),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = ExpenseTrackerTheme.extendedColors.financialWarning,
@@ -290,7 +284,7 @@ fun AddTransactionScreenContent(
 
                         uiState.aiWarnings.forEach { warning ->
                             Text(
-                                text = "• $warning",
+                                text = "• ${warning.localized()}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.financialWarning
                             )
@@ -319,6 +313,7 @@ fun AddTransactionScreenContent(
                         is AddTransactionError.InvalidAmount -> stringResource(R.string.error_invalid_amount)
                         is AddTransactionError.AmountMustBePositive -> stringResource(R.string.error_amount_positive)
                         is AddTransactionError.AccountRequired -> stringResource(R.string.error_account_required)
+                        is AddTransactionError.TransferUnavailable -> stringResource(R.string.transfer_unavailable_single_account)
                         is AddTransactionError.CategoryRequired -> stringResource(R.string.error_category_required)
                         is AddTransactionError.DestinationRequired -> stringResource(R.string.error_destination_required)
                         is AddTransactionError.SameSourceAndDestination -> stringResource(R.string.error_same_accounts)
@@ -327,6 +322,9 @@ fun AddTransactionScreenContent(
                         is AddTransactionError.CategoryArchived -> stringResource(R.string.error_category_archived)
                         is AddTransactionError.IncompatibleCategory -> stringResource(R.string.error_incompatible_category)
                         is AddTransactionError.InvalidTransactionTime -> stringResource(R.string.error_transaction_time_invalid)
+                        AddTransactionError.TransactionNotFound -> stringResource(R.string.error_transaction_not_found)
+                        AddTransactionError.TransferReadOnly -> stringResource(R.string.error_transaction_transfer_read_only)
+                        AddTransactionError.AiTransferDraftUnavailable -> stringResource(R.string.ai_warning_transfer_unavailable)
                         is AddTransactionError.Unknown -> err.message ?: stringResource(R.string.error_unknown)
                     }
 
@@ -369,8 +367,7 @@ fun AddTransactionScreenContent(
             ) {
                 val types = listOf(
                     TransactionType.EXPENSE to stringResource(R.string.type_expense),
-                    TransactionType.INCOME to stringResource(R.string.type_income),
-                    TransactionType.TRANSFER to stringResource(R.string.type_transfer)
+                    TransactionType.INCOME to stringResource(R.string.type_income)
                 )
 
                 types.forEachIndexed { index, (type, label) ->
@@ -467,41 +464,7 @@ fun AddTransactionScreenContent(
                 }
             }
 
-            // Transfers use explicitly selected active source and destination accounts.
-            if (uiState.transactionType == TransactionType.TRANSFER) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp),
-                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                ) {
-                    SectionHeader(title = stringResource(R.string.from_account_label))
-                    TransferAccountSelector(
-                        selectedAccount = uiState.transferSourceAccount,
-                        accounts = uiState.activeAccounts.filter { it.internalKey != "default" },
-                        onAccountSelected = onTransferSourceSelected,
-                        testTag = "transfer_source_account_selector"
-                    )
-                    SectionHeader(title = stringResource(R.string.to_account_label))
-                    TransferAccountSelector(
-                        selectedAccount = uiState.transferDestinationAccount,
-                        accounts = uiState.activeAccounts.filter { account ->
-                            account.internalKey != "default" &&
-                                account.id != uiState.transferSourceAccount?.id &&
-                                account.initialBalance.currencyCode == uiState.transferSourceAccount?.initialBalance?.currencyCode
-                        },
-                        onAccountSelected = onTransferDestinationSelected,
-                        testTag = "transfer_destination_account_selector"
-                    )
-                    if (uiState.activeAccounts.count { it.internalKey != "default" } < 2) {
-                        Text(
-                            text = stringResource(R.string.transfer_requires_two_accounts),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ExpenseTrackerTheme.extendedColors.textSecondary
-                        )
-                    }
-                }
-            } else if (!uiState.hasDefaultAccount) {
+            if (!uiState.hasDefaultAccount) {
                 EmptyState(
                     title = stringResource(R.string.no_accounts_title),
                     description = stringResource(R.string.no_accounts_desc),
@@ -592,7 +555,7 @@ fun AddTransactionScreenContent(
 
                     val localDateTime = uiState.transactionTime.atZone(ZoneId.systemDefault())
                     val formattedDate = remember(uiState.transactionTime) {
-                        localDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                        localDateTime.format(DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(java.util.Locale.getDefault()))
                     }
                     val formattedTime = remember(uiState.transactionTime) {
                         localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -724,7 +687,7 @@ fun AddTransactionScreenContent(
                         showDatePicker = false
                     }
                 ) {
-                    Text(text = "OK")
+                    Text(text = stringResource(R.string.action_ok))
                 }
             },
             dismissButton = {
@@ -757,7 +720,7 @@ fun AddTransactionScreenContent(
                         onTransactionTimeChanged(localDate.atTime(timePickerState.hour, timePickerState.minute).atZone(ZoneId.systemDefault()).toInstant())
                     }
                     showTimePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.ui_ok)) }
             },
             dismissButton = {
                 TextButton(onClick = { showTimePicker = false }) {
@@ -811,7 +774,7 @@ private fun CategoryChip(
                 modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
             )
             Text(
-                text = category.name,
+                text = com.suguru.expensetracker.presentation.util.categoryDisplayName(category),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
@@ -828,34 +791,4 @@ private fun CategoryChip(
     }
 }
 
-@Composable
-private fun TransferAccountSelector(
-    selectedAccount: Account?,
-    accounts: List<Account>,
-    onAccountSelected: (Long) -> Unit,
-    testTag: String
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        TextButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().testTag(testTag)
-        ) {
-            Text(selectedAccount?.name ?: stringResource(R.string.account_label))
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            accounts.forEach { account ->
-                DropdownMenuItem(
-                    text = { Text(account.name) },
-                    onClick = {
-                        onAccountSelected(account.id)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-}
+

@@ -13,8 +13,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.suguru.expensetracker.R
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 class QuickAddWidgetConfigureActivity : ComponentActivity() {
@@ -77,14 +79,14 @@ class QuickAddWidgetConfigureActivity : ComponentActivity() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Add Quick Add Widget",
+                text = stringResource(R.string.widget_config_quick_add_title),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "This widget provides quick launcher actions to log expenses and incomes directly from your home screen.",
+                text = stringResource(R.string.widget_config_quick_add_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -99,7 +101,7 @@ class QuickAddWidgetConfigureActivity : ComponentActivity() {
                         .weight(1f)
                         .testTag("btn_cancel")
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.widget_config_cancel))
                 }
                 Button(
                     onClick = onConfirm,
@@ -109,7 +111,7 @@ class QuickAddWidgetConfigureActivity : ComponentActivity() {
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Confirm")
+                    Text(stringResource(R.string.widget_config_confirm))
                 }
             }
         }

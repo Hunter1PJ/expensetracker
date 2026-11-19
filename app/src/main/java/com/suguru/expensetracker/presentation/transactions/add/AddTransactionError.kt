@@ -10,6 +10,7 @@ sealed interface AddTransactionError {
     data object InvalidAmount : AddTransactionError
     data object AmountMustBePositive : AddTransactionError
     data object AccountRequired : AddTransactionError
+    data object TransferUnavailable : AddTransactionError
     data object CategoryRequired : AddTransactionError
     data object DestinationRequired : AddTransactionError
     data object SameSourceAndDestination : AddTransactionError
@@ -18,6 +19,9 @@ sealed interface AddTransactionError {
     data object CategoryArchived : AddTransactionError
     data object IncompatibleCategory : AddTransactionError
     data object InvalidTransactionTime : AddTransactionError
+    data object TransactionNotFound : AddTransactionError
+    data object TransferReadOnly : AddTransactionError
+    data object AiTransferDraftUnavailable : AddTransactionError
     data class Unknown(val message: String? = null) : AddTransactionError
 
     companion object {
@@ -38,12 +42,12 @@ sealed interface AddTransactionError {
                         msg.contains("destination", ignoreCase = true) && msg.contains("specify", ignoreCase = true) -> DestinationRequired
                         msg.contains("different", ignoreCase = true) -> SameSourceAndDestination
                         msg.contains("currencies", ignoreCase = true) -> CurrencyMismatch
-                        else -> Unknown(msg)
+                        else -> Unknown()
                     }
                 }
                 is DomainException.InvalidAccount -> AccountRequired
                 is DomainException.InvalidCategory -> CategoryRequired
-                else -> Unknown(exception.message)
+                else -> Unknown()
             }
         }
     }

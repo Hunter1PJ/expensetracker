@@ -131,7 +131,7 @@ fun AddCategoryScreenContent(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = if (uiState.isEditMode) "UPDATE CATEGORY CONFIGURATION" else "CONFIGURE NEW CATEGORY",
+                            text = stringResource(if (uiState.isEditMode) R.string.category_edit_subtitle else R.string.category_add_subtitle),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.2.sp,

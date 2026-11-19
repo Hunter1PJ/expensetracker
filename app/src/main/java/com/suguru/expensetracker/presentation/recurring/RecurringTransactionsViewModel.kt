@@ -1,6 +1,8 @@
 package com.suguru.expensetracker.presentation.recurring
 
 import androidx.lifecycle.ViewModel
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.UiMessage
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.model.Account
 import com.suguru.expensetracker.domain.model.Category
@@ -103,9 +105,9 @@ class RecurringTransactionsViewModel(
 
         val statusDetail = when {
             isTransfer || !rule.isActive -> null
-            category == null -> "Category missing"
-            category.isArchived -> "Category is archived"
-            sourceAccount == null || sourceAccount.isArchived -> "Schedule configuration unavailable"
+            category == null -> UiMessage(R.string.recurring_status_category_missing)
+            category.isArchived -> UiMessage(R.string.recurring_status_category_archived)
+            sourceAccount == null || sourceAccount.isArchived -> UiMessage(R.string.recurring_status_setup_unavailable)
             else -> null
         }
 

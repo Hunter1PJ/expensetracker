@@ -35,7 +35,10 @@ sealed interface SettingsUiState {
         val isAiFeatureEnabled: Boolean = true,
         val isAiConfigured: Boolean = false,
         val maskedApiKey: String? = null,
-        val keyVerificationState: KeyVerificationState = KeyVerificationState.Idle
+        val keyVerificationState: KeyVerificationState = KeyVerificationState.Idle,
+        val isSignedIn: Boolean = false,
+        val isAiProfileAvailable: Boolean = true,
+        val hasLegacyApiKey: Boolean = false
     ) : SettingsUiState
     data class Error(val message: String) : SettingsUiState
 }
@@ -51,6 +54,7 @@ sealed interface KeyVerificationState {
 sealed interface SettingsEvent {
     object ApiKeySaved : SettingsEvent
     object ApiKeyVerified : SettingsEvent
+    object LegacyKeyMigrated : SettingsEvent
 }
 
 class SettingsViewModel(
@@ -65,17 +69,30 @@ class SettingsViewModel(
     private var verificationJob: Job? = null
 
     val events = _events.receiveAsFlow()
+    private val isSignedInFlow = aiRepository?.isAuthenticated ?: kotlinx.coroutines.flow.flowOf(false)
+    private val isAiProfileAvailableFlow = aiRepository?.isAiProfileAvailable ?: kotlinx.coroutines.flow.flowOf(false)
+    private val hasLegacyKeyFlow = aiRepository?.hasUnassignedLegacyKey ?: kotlinx.coroutines.flow.flowOf(false)
 
     init {
         if (initialInvalidApiKey) {
             _keyVerificationState.value = KeyVerificationState.Invalid(AiError.InvalidApiKey)
         }
-        loadMaskedKey()
-    }
-
-    private fun loadMaskedKey() {
         viewModelScope.launch {
-            _maskedKeyFlow.value = aiRepository?.getMaskedApiKey()
+            var lastProfile: String? = null
+            var firstEmission = true
+            (aiRepository?.activeAiProfileId ?: kotlinx.coroutines.flow.flowOf(null))
+                .collect { profile ->
+                    if (firstEmission || profile != lastProfile) {
+                        firstEmission = false
+                        lastProfile = profile
+                        cancelVerification()
+                        _maskedKeyFlow.value = null
+                        _keyVerificationState.value = KeyVerificationState.Idle
+                        if (!profile.isNullOrBlank()) {
+                            _maskedKeyFlow.value = aiRepository?.getMaskedApiKey()
+                        }
+                    }
+                }
         }
     }
 
@@ -93,7 +110,7 @@ class SettingsViewModel(
         }
     }
 
-    val uiState: StateFlow<SettingsUiState> = combine(
+    private val baseUiState = combine(
         settingsRepository.settings,
         aiRepository?.isAiFeatureEnabled ?: kotlinx.coroutines.flow.flowOf(false),
         aiRepository?.isAiConfigured ?: kotlinx.coroutines.flow.flowOf(false),
@@ -109,6 +126,20 @@ class SettingsViewModel(
             maskedApiKey = maskedKey,
             keyVerificationState = verifyState
         )
+    }
+    val uiState: StateFlow<SettingsUiState> = combine(
+        baseUiState,
+        isSignedInFlow,
+        isAiProfileAvailableFlow,
+        hasLegacyKeyFlow
+    ) { base, signedIn, profileAvailable, legacyKey ->
+        if (base is SettingsUiState.Success) {
+            base.copy(
+                isSignedIn = signedIn,
+                isAiProfileAvailable = profileAvailable,
+                hasLegacyApiKey = signedIn && legacyKey
+            )
+        } else base
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -173,6 +204,8 @@ class SettingsViewModel(
 
     // AI BYOK Methods
     fun setAiFeatureEnabled(enabled: Boolean) {
+        val profileAvailable = (uiState.value as? SettingsUiState.Success)?.isAiProfileAvailable == true
+        if (enabled && !profileAvailable) return
         if (!enabled) cancelVerification()
         viewModelScope.launch {
             aiRepository?.setAiFeatureEnabled(enabled)
@@ -180,6 +213,7 @@ class SettingsViewModel(
     }
 
     fun saveGeminiApiKey(apiKey: String) {
+        if ((uiState.value as? SettingsUiState.Success)?.isAiProfileAvailable != true) return
         if (apiKey.trim().isBlank()) return
         cancelVerification()
         viewModelScope.launch {
@@ -197,6 +231,7 @@ class SettingsViewModel(
     }
 
     fun verifySavedGeminiApiKey() {
+        if ((uiState.value as? SettingsUiState.Success)?.isAiProfileAvailable != true) return
         val aiRepo = aiRepository ?: return
         if (_keyVerificationState.value is KeyVerificationState.Verifying || verificationJob?.isActive == true) return
 
@@ -244,7 +279,25 @@ class SettingsViewModel(
         job?.cancel()
     }
 
+    fun migrateLegacyGeminiApiKey() {
+        if ((uiState.value as? SettingsUiState.Success)?.isSignedIn != true) return
+        viewModelScope.launch {
+            when (aiRepository?.migrateLegacyKeyToCurrentUid(confirmed = true)) {
+                is AiResult.Success -> {
+                    _maskedKeyFlow.value = aiRepository.getMaskedApiKey()
+                    _keyVerificationState.value = KeyVerificationState.Idle
+                    _events.send(SettingsEvent.LegacyKeyMigrated)
+                    if ((uiState.value as? SettingsUiState.Success)?.isAiFeatureEnabled == true) {
+                        verifySavedGeminiApiKey()
+                    }
+                }
+                is AiResult.Failure, null -> Unit
+            }
+        }
+    }
+
     fun deleteGeminiApiKey() {
+        if ((uiState.value as? SettingsUiState.Success)?.isAiProfileAvailable != true) return
         cancelVerification()
         viewModelScope.launch {
             aiRepository?.deleteApiKey()

@@ -1,7 +1,9 @@
 package com.suguru.expensetracker.presentation.settings
 
+import android.app.Application
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.squareup.moshi.Moshi
+import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.AppSettings
 import com.suguru.expensetracker.domain.model.BackupAccount
@@ -56,9 +58,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 
+private class CloudBackupTestApplication : Application()
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], application = CloudBackupTestApplication::class)
 class CloudBackupViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
@@ -102,7 +106,31 @@ class CloudBackupViewModelTest {
             BackupContentFingerprint.compute(backupRepo.currentBackup),
             fpStore.getLastUploadedFingerprint("uid_1")
         )
-        assertTrue(vm.actionState.value.successMessage?.contains("completed") == true)
+        assertEquals(R.string.cloud_backup_success, vm.actionState.value.successMessage?.resourceId)
+    }
+
+    @Test
+    fun `manual backup is blocked while auth and active workspace disagree`() = runTest(testDispatcher) {
+        val remote = FakeRemoteRepo()
+        val backupRepo = FakeBackupRepo(nonEmptyBackup())
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            isWorkspaceIdentityCurrent = { false },
+            authenticatedUidProvider = { "uid_1" },
+            workDispatcher = testDispatcher
+        )
+
+        vm.backUpNow()
+        advanceUntilIdle()
+
+        assertTrue(remote.uploadedManifests.isEmpty())
+        assertEquals(R.string.cloud_workspace_changing, vm.actionState.value.errorMessage?.resourceId)
     }
 
     @Test
@@ -233,6 +261,14 @@ class CloudBackupViewModelTest {
         val cloudData = nonEmptyBackup()
         val snapshot = createCloudSnapshot(backupRepo, cloudData)
         remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
+        val stateStore = FakeStateStore()
+        stateStore.setState(
+            "uid_1",
+            CloudBackupState(
+                lastRestoreFailureAtEpochMillis = 1L,
+                lastRestoreFailureCode = "RESTORE_FAILED"
+            )
+        )
 
         val vm = CloudBackupViewModel(
             currentUserId = "uid_1",
@@ -240,7 +276,7 @@ class CloudBackupViewModelTest {
             createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
             restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
             backupRepository = backupRepo,
-            cloudBackupStateStore = FakeStateStore(),
+            cloudBackupStateStore = stateStore,
             cloudBackupFingerprintStore = FakeFingerprintStore(),
             workDispatcher = testDispatcher
         )
@@ -258,17 +294,22 @@ class CloudBackupViewModelTest {
         val result = vm.actionState.value.restoreResult
         assertTrue(result is CloudRestoreResult.Success)
         assertEquals(snapshot.first.snapshotId, (result as CloudRestoreResult.Success).manifest.snapshotId)
+        assertNull(stateStore.getState("uid_1").lastRestoreFailureCode)
+        assertNotNull(stateStore.getState("uid_1").lastSuccessfulRestoreAtEpochMillis)
+        assertEquals(snapshot.first.generationId, stateStore.getState("uid_1").lastSuccessfulRestoreGenerationId)
+        assertEquals(snapshot.first.contentFingerprint, stateStore.getState("uid_1").lastSuccessfulRestoreFingerprint)
 
         vm.dismissRestoreResult()
         assertNull(vm.actionState.value.restoreResult)
     }
 
     @Test
-    fun `restore failure displays error result with failure reason`() = runTest(testDispatcher) {
+    fun `manual restore aborts before Room commit when workspace changes during download`() = runTest(testDispatcher) {
         val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
-        val remote = FakeRemoteRepo()
+        var workspaceCurrent = true
+        val remote = FakeRemoteRepo(onDownload = { workspaceCurrent = false })
         val snapshot = createCloudSnapshot(backupRepo, nonEmptyBackup())
-        // Chunks missing -> download failure
+        remote.chunksBySnapshot[snapshot.first.snapshotId] = snapshot.second
         val vm = CloudBackupViewModel(
             currentUserId = "uid_1",
             remoteRepository = remote,
@@ -276,6 +317,35 @@ class CloudBackupViewModelTest {
             restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
             backupRepository = backupRepo,
             cloudBackupStateStore = FakeStateStore(),
+            cloudBackupFingerprintStore = FakeFingerprintStore(),
+            isWorkspaceIdentityCurrent = { workspaceCurrent },
+            authenticatedUidProvider = { "uid_1" },
+            workDispatcher = testDispatcher
+        )
+
+        vm.requestRestoreSnapshot(snapshot.first)
+        vm.confirmPendingRestore()
+        advanceUntilIdle()
+
+        assertEquals(0, backupRepo.restoreCalls)
+        assertTrue(vm.actionState.value.restoreResult is CloudRestoreResult.Failure)
+        assertTrue((vm.actionState.value.restoreResult as CloudRestoreResult.Failure).reason.contains("workspace changed"))
+    }
+
+    @Test
+    fun `restore failure displays error result with failure reason`() = runTest(testDispatcher) {
+        val backupRepo = FakeBackupRepo(effectivelyEmptyBackup())
+        val remote = FakeRemoteRepo()
+        val snapshot = createCloudSnapshot(backupRepo, nonEmptyBackup())
+        val stateStore = FakeStateStore()
+        // Chunks missing -> download failure
+        val vm = CloudBackupViewModel(
+            currentUserId = "uid_1",
+            remoteRepository = remote,
+            createFullBackupUseCase = CreateFullBackupUseCase(backupRepo),
+            restoreBackupUseCase = RestoreBackupUseCase(backupRepo),
+            backupRepository = backupRepo,
+            cloudBackupStateStore = stateStore,
             cloudBackupFingerprintStore = FakeFingerprintStore(),
             workDispatcher = testDispatcher
         )
@@ -291,6 +361,8 @@ class CloudBackupViewModelTest {
         val result = vm.actionState.value.restoreResult
         assertTrue(result is CloudRestoreResult.Failure)
         assertTrue((result as CloudRestoreResult.Failure).reason.isNotBlank())
+        assertEquals("UPLOAD_FAILED", stateStore.getState("uid_1").lastRestoreFailureCode)
+        assertNotNull(stateStore.getState("uid_1").lastRestoreFailureAtEpochMillis)
 
         vm.dismissRestoreResult()
         assertNull(vm.actionState.value.restoreResult)
@@ -498,7 +570,8 @@ class CloudBackupViewModelTest {
             compressedBytes = compressed.size.toLong(),
             uncompressedBytes = json.size.toLong(),
             payloadSha256 = chunked.payloadSha256,
-            contentFingerprint = BackupContentFingerprint.compute(backup)
+            contentFingerprint = BackupContentFingerprint.compute(backup),
+            generationId = "gen_restore_1"
         )
         return manifest to chunked.chunks
     }
@@ -574,7 +647,8 @@ class CloudBackupViewModelTest {
 
     private class FakeRemoteRepo(
         private val uploadResultOverride: Result<CloudBackupManifest>? = null,
-        private val observeFlowOverride: Flow<List<CloudBackupManifest>>? = null
+        private val observeFlowOverride: Flow<List<CloudBackupManifest>>? = null,
+        private val onDownload: () -> Unit = {}
     ) : CloudBackupRemoteRepository {
         val uploadedManifests = mutableListOf<CloudBackupManifest>()
         val chunksBySnapshot = mutableMapOf<String, List<CloudBackupPayloadChunk>>()
@@ -610,6 +684,7 @@ class CloudBackupViewModelTest {
             userId: String,
             snapshotId: String
         ): Result<List<CloudBackupPayloadChunk>> {
+            onDownload()
             val chunks = chunksBySnapshot[snapshotId]
                 ?: return Result.failure(IllegalStateException("Missing snapshot"))
             return Result.success(chunks)

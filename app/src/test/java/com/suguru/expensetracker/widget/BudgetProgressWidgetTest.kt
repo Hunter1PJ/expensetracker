@@ -98,6 +98,26 @@ class BudgetProgressWidgetTest {
         assertEquals(2L, config2?.budgetId)
     }
 
+    @Test
+    fun configurationForAnotherWorkspaceDoesNotReadBudgetData() = runBlocking {
+        fakeWidgetConfigRepository.saveBudgetProgressConfiguration(
+            401,
+            1L,
+            false,
+            workspaceKey = "user-a"
+        )
+        val scopedProvider = BudgetProgressWidgetDataProvider(
+            fakeBudgetRepository,
+            fakeCategoryRepository,
+            observeActiveBudgetProgressUseCase,
+            fakeWidgetConfigRepository,
+            activeWorkspaceKey = "user-b"
+        )
+
+        val data = scopedProvider.getWidgetData(401).first { it.state != BudgetWidgetState.LOADING }
+        assertEquals(BudgetWidgetState.BUDGET_UNAVAILABLE, data.state)
+    }
+
     // --- TEST 5: Privacy Mode Masking ---
     @Test
     fun testPrivacyModeMasksBudgetAmounts() = runBlocking {
@@ -135,9 +155,9 @@ class BudgetProgressWidgetTest {
         
         assertEquals(BudgetWidgetState.READY, data.state)
         assertEquals("Groceries", data.title)
-        assertEquals("Amounts Hidden", data.spentFormatted)
-        assertEquals("Amounts Hidden", data.limitFormatted)
-        assertEquals("Amounts Hidden", data.remainingFormatted)
+        assertEquals("", data.spentFormatted)
+        assertEquals("", data.limitFormatted)
+        assertEquals("", data.remainingFormatted)
         assertEquals("40%", data.progressLabel)
         assertEquals(4000, data.progressBasisPoints)
     }
@@ -215,7 +235,7 @@ class BudgetProgressWidgetTest {
         val data = dataProvider.getWidgetData(202).first { it.state != BudgetWidgetState.LOADING }
         
         assertEquals(BudgetWidgetState.READY, data.state)
-        assertEquals("Overall Budget", data.title)
+        assertEquals("", data.title)
         assertEquals("$800.00", data.spentFormatted)
         assertEquals("$1,000.00", data.limitFormatted)
         assertEquals("$200.00", data.remainingFormatted)
@@ -356,6 +376,7 @@ class BudgetProgressWidgetTest {
     class FakeTransactionRepository : com.suguru.expensetracker.domain.repository.TransactionRepository {
         private val transactions = MutableStateFlow<Map<Long, Transaction>>(emptyMap())
         override fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>> = kotlinx.coroutines.flow.flowOf(emptyMap())
+        override fun observeIncomeCategoryUsageCounts(): Flow<Map<Long, Int>> = kotlinx.coroutines.flow.flowOf(emptyMap())
         override fun observeAllTransactions(): Flow<List<Transaction>> = transactions.map { it.values.toList() }
         override fun observeRecentTransactions(limit: Int): Flow<List<Transaction>> = transactions.map { it.values.take(limit) }
         override suspend fun getRecentTransactions(limit: Int): List<Transaction> = transactions.value.values.take(limit)
@@ -412,7 +433,7 @@ class BudgetProgressWidgetTest {
         override fun getAllConfigurations(): Flow<List<com.suguru.expensetracker.widget.configuration.AccountWidgetConfiguration>> =
             configs.map { it.values.toList() }
 
-        override suspend fun saveConfiguration(appWidgetId: Int, accountId: Long, privacyMode: Boolean) {}
+        override suspend fun saveConfiguration(appWidgetId: Int, accountId: Long, privacyMode: Boolean, workspaceKey: String) {}
 
         override suspend fun deleteConfiguration(appWidgetId: Int) {}
 
@@ -422,8 +443,8 @@ class BudgetProgressWidgetTest {
         override fun getAllBudgetProgressConfigurations(): Flow<List<BudgetProgressWidgetConfiguration>> =
             budgetConfigs.map { it.values.toList() }
 
-        override suspend fun saveBudgetProgressConfiguration(appWidgetId: Int, budgetId: Long, privacyMode: Boolean) {
-            budgetConfigs.value = budgetConfigs.value + (appWidgetId to BudgetProgressWidgetConfiguration(appWidgetId, budgetId, privacyMode))
+        override suspend fun saveBudgetProgressConfiguration(appWidgetId: Int, budgetId: Long, privacyMode: Boolean, workspaceKey: String) {
+            budgetConfigs.value = budgetConfigs.value + (appWidgetId to BudgetProgressWidgetConfiguration(appWidgetId, budgetId, privacyMode, workspaceKey))
         }
 
         override suspend fun deleteBudgetProgressConfiguration(appWidgetId: Int) {

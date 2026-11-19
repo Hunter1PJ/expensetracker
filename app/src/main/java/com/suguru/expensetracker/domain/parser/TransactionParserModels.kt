@@ -53,7 +53,8 @@ data class TransactionCandidate(
     val warnings: List<ParseWarning> = emptyList(),
     val isUnitPriceInterpretation: Boolean = false,
     val parseError: String? = null,
-    val source: CandidateSource = CandidateSource.OFFLINE_PARSER
+    val source: CandidateSource = CandidateSource.OFFLINE_PARSER,
+    val suggestedTitleIsFallback: Boolean = false
 )
 
 /**

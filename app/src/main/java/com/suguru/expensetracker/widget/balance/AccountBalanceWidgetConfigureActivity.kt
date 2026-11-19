@@ -16,11 +16,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.ExpenseTrackerApplication
 import com.suguru.expensetracker.MainActivity
+import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.model.Account
+import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 import kotlinx.coroutines.launch
 
@@ -96,7 +99,8 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                                         widgetConfigurationRepository.saveConfiguration(
                                             appWidgetId = appWidgetId,
                                             accountId = acc.id,
-                                            privacyMode = privacyMode
+                                            privacyMode = privacyMode,
+                                            workspaceKey = appContainer.workspaceId.storageKey
                                         )
                                         // 2. Refresh widget immediately
                                         widgetRefreshCoordinator.refreshAccountBalanceWidgets(acc.id)
@@ -131,13 +135,13 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "No accounts yet",
+                text = stringResource(R.string.widget_config_no_accounts),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Create an account in ExpenseTracker before adding this widget.",
+                text = stringResource(R.string.widget_config_create_account),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -148,7 +152,7 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                     .fillMaxWidth()
                     .testTag("open_app_button")
             ) {
-                Text("Open ExpenseTracker")
+                Text(stringResource(R.string.widget_config_open_app))
             }
         }
     }
@@ -170,7 +174,7 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                 .testTag("config_screen")
         ) {
             Text(
-                text = "Add Account Balance Widget",
+                text = stringResource(R.string.widget_config_account_balance_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -178,7 +182,7 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
             )
 
             Text(
-                text = "Select Account",
+                text = stringResource(R.string.widget_config_select_account),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -223,8 +227,18 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Bold
                                 )
+                                val typeLabel = stringResource(
+                                    when (account.type) {
+                                        AccountType.CASH -> R.string.account_type_cash
+                                        AccountType.BANK -> R.string.account_type_bank
+                                        AccountType.CARD -> R.string.account_type_card
+                                        AccountType.SAVINGS -> R.string.account_type_savings
+                                        AccountType.INVESTMENT -> R.string.account_type_investment
+                                        AccountType.OTHER -> R.string.account_type_other
+                                    }
+                                )
                                 Text(
-                                    text = "${account.type.name} • ${account.initialBalance.currencyCode}",
+                                    text = "$typeLabel • ${account.initialBalance.currencyCode}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -250,12 +264,12 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Privacy Mode",
+                                text = stringResource(R.string.widget_config_privacy_mode),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Hide the balance amount on your Home Screen.",
+                                text = stringResource(R.string.widget_config_hide_balance),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -268,7 +282,7 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Home Screen widgets may be visible to anyone using your unlocked device.",
+                        text = stringResource(R.string.widget_config_visibility_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -288,7 +302,7 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                         .weight(1f)
                         .testTag("btn_cancel")
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.widget_config_cancel))
                 }
                 Button(
                     onClick = onSave,
@@ -299,7 +313,7 @@ class AccountBalanceWidgetConfigureActivity : ComponentActivity() {
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Widget")
+                    Text(stringResource(R.string.widget_config_add_widget))
                 }
             }
         }

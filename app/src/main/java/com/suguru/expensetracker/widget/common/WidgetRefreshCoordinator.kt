@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.updateAll
 import com.suguru.expensetracker.widget.balance.AccountBalanceWidget
+import com.suguru.expensetracker.widget.quickadd.QuickAddWidget
 import com.suguru.expensetracker.widget.configuration.WidgetConfigurationRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,10 @@ class GlanceWidgetRefreshCoordinator(
             }
             try {
                 com.suguru.expensetracker.widget.budget.BudgetProgressWidget().updateAll(context)
+            } catch (_: Exception) {
+            }
+            try {
+                QuickAddWidget().updateAll(context)
             } catch (_: Exception) {
             }
         }

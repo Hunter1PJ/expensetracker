@@ -135,7 +135,7 @@ fun TransactionsScreenContent(
                         .padding(top = ExpenseTrackerSpacing.sm, bottom = ExpenseTrackerSpacing.sm)
                 ) {
                     Text(
-                        text = "ACTIVITY",
+                        text = stringResource(R.string.transaction_activity_heading),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp,
@@ -150,7 +150,7 @@ fun TransactionsScreenContent(
                     )
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                     Text(
-                        text = "Track where your money goes",
+                        text = stringResource(R.string.transaction_activity_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
@@ -221,7 +221,7 @@ fun TransactionsScreenContent(
                         uiState.categories.forEach { category ->
                             val isSelected = uiState.selectedCategoryId == category.id
                             ExpenseTrackerFilterChip(
-                                text = category.name,
+                                text = com.suguru.expensetracker.presentation.util.categoryDisplayName(category),
                                 selected = isSelected,
                                 onClick = { onCategoryFilterChanged(category.id) },
                                 testTag = "category_filter_${category.id}"
@@ -334,7 +334,13 @@ fun TransactionsScreenContent(
                     ) {
                         uiState.groupedTransactions.forEach { dateGroup ->
                             item(key = "header_${dateGroup.date}") {
-                                DateGroupHeader(title = dateGroup.headerTitle)
+                                val today = java.time.LocalDate.now()
+                                val title = when (dateGroup.date) {
+                                    today -> stringResource(R.string.date_today)
+                                    today.minusDays(1) -> stringResource(R.string.date_yesterday)
+                                    else -> dateGroup.headerTitle
+                                }
+                                DateGroupHeader(title = title)
                             }
 
                             item(key = "group_${dateGroup.date}") {
@@ -348,8 +354,15 @@ fun TransactionsScreenContent(
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         dateGroup.transactions.forEachIndexed { index, item ->
                                             FinancialListRow(
-                                                title = item.title,
-                                                subtitle = item.subtitle.takeIf { it.isNotBlank() },
+                                                title = item.title.ifBlank {
+                                                    when (item.type) {
+                                                        TransactionType.EXPENSE -> stringResource(R.string.type_expense)
+                                                        TransactionType.INCOME -> stringResource(R.string.type_income)
+                                                        TransactionType.TRANSFER -> stringResource(R.string.type_transfer)
+                                                    }
+                                                },
+                                                subtitle = item.subtitle.takeIf { it.isNotBlank() }
+                                                    ?: if (item.type == TransactionType.TRANSFER) stringResource(R.string.type_transfer) else null,
                                                 trailingSubtitle = item.timeFormatted,
                                                 amountText = item.formattedAmount,
                                                 amountColor = when (item.isPositive) {

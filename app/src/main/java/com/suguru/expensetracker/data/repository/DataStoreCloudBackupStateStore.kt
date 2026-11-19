@@ -74,6 +74,9 @@ class DataStoreCloudBackupStateStore(
                 keys.lastSuccessfulSnapshotId,
                 state.lastSuccessfulSnapshotId
             )
+            setOrRemoveString(preferences, keys.lastSuccessfulRestoreGenerationId, state.lastSuccessfulRestoreGenerationId)
+            setOrRemoveString(preferences, keys.lastSuccessfulRestoreFingerprint, state.lastSuccessfulRestoreFingerprint)
+            preferences[keys.pendingRestore] = state.pendingRestore
             setOrRemoveString(
                 preferences,
                 keys.pendingSnapshotId,
@@ -99,6 +102,18 @@ class DataStoreCloudBackupStateStore(
                 keys.lastFailureCode,
                 state.lastFailureCode
             )
+            setOrRemoveLong(
+                preferences,
+                keys.lastRestoreFailureAtEpochMillis,
+                state.lastRestoreFailureAtEpochMillis
+            )
+            setOrRemoveString(
+                preferences,
+                keys.lastRestoreFailureCode,
+                state.lastRestoreFailureCode
+            )
+            setOrRemoveString(preferences, keys.lastRestoreFailureGenerationId, state.lastRestoreFailureGenerationId)
+            setOrRemoveString(preferences, keys.lastRestoreFailureFingerprint, state.lastRestoreFailureFingerprint)
         }
     }
 
@@ -150,6 +165,10 @@ class DataStoreCloudBackupStateStore(
             ?.takeIf { it >= 0L }
         val lastSuccessfulSnapshotId = (rawMap[keys.lastSuccessfulSnapshotId] as? String)
             ?.takeIf { CloudBackupState.isValidSnapshotId(it) }
+        val lastSuccessfulRestoreGenerationId = (rawMap[keys.lastSuccessfulRestoreGenerationId] as? String)
+            ?.takeIf { CloudBackupState.isValidSnapshotId(it) }
+        val lastSuccessfulRestoreFingerprint = (rawMap[keys.lastSuccessfulRestoreFingerprint] as? String)
+            ?.takeIf { Regex("^[0-9a-f]{64}$").matches(it) }
 
         val rawPendingSnapshotId = (rawMap[keys.pendingSnapshotId] as? String)
             ?.takeIf { CloudBackupState.isValidSnapshotId(it) }
@@ -170,15 +189,32 @@ class DataStoreCloudBackupStateStore(
         val lastFailureAtEpochMillis = if (hasValidFailurePair) rawFailureAtEpochMillis else null
         val lastFailureCode = if (hasValidFailurePair) rawFailureCode else null
 
+        val rawRestoreFailureAt = (rawMap[keys.lastRestoreFailureAtEpochMillis] as? Long)
+            ?.takeIf { it >= 0L }
+        val rawRestoreFailureCode = (rawMap[keys.lastRestoreFailureCode] as? String)
+            ?.takeIf { CloudBackupState.isValidFailureCode(it) }
+        val hasValidRestoreFailurePair = rawRestoreFailureAt != null && rawRestoreFailureCode != null
+        val lastRestoreFailureGenerationId = (rawMap[keys.lastRestoreFailureGenerationId] as? String)
+            ?.takeIf { CloudBackupState.isValidSnapshotId(it) }
+        val lastRestoreFailureFingerprint = (rawMap[keys.lastRestoreFailureFingerprint] as? String)
+            ?.takeIf { Regex("^[0-9a-f]{64}$").matches(it) }
+
         return CloudBackupState(
             lastSuccessfulBackupAtEpochMillis = lastSuccessfulBackupAtEpochMillis,
             lastSuccessfulRestoreAtEpochMillis = lastSuccessfulRestoreAtEpochMillis,
             lastSuccessfulSnapshotId = lastSuccessfulSnapshotId,
+            lastSuccessfulRestoreGenerationId = lastSuccessfulRestoreGenerationId,
+            lastSuccessfulRestoreFingerprint = lastSuccessfulRestoreFingerprint,
+            pendingRestore = (rawMap[keys.pendingRestore] as? Boolean) ?: false,
             pendingSnapshotId = pendingSnapshotId,
             pendingSinceEpochMillis = pendingSinceEpochMillis,
             lastAttemptAtEpochMillis = lastAttemptAtEpochMillis,
             lastFailureAtEpochMillis = lastFailureAtEpochMillis,
-            lastFailureCode = lastFailureCode
+            lastFailureCode = lastFailureCode,
+            lastRestoreFailureAtEpochMillis = if (hasValidRestoreFailurePair) rawRestoreFailureAt else null,
+            lastRestoreFailureCode = if (hasValidRestoreFailurePair) rawRestoreFailureCode else null,
+            lastRestoreFailureGenerationId = if (hasValidRestoreFailurePair) lastRestoreFailureGenerationId else null,
+            lastRestoreFailureFingerprint = if (hasValidRestoreFailurePair) lastRestoreFailureFingerprint else null
         )
     }
 
@@ -186,21 +222,35 @@ class DataStoreCloudBackupStateStore(
         val lastSuccessfulBackupAtEpochMillis: Preferences.Key<Long>,
         val lastSuccessfulRestoreAtEpochMillis: Preferences.Key<Long>,
         val lastSuccessfulSnapshotId: Preferences.Key<String>,
+        val lastSuccessfulRestoreGenerationId: Preferences.Key<String>,
+        val lastSuccessfulRestoreFingerprint: Preferences.Key<String>,
+        val pendingRestore: Preferences.Key<Boolean>,
         val pendingSnapshotId: Preferences.Key<String>,
         val pendingSinceEpochMillis: Preferences.Key<Long>,
         val lastAttemptAtEpochMillis: Preferences.Key<Long>,
         val lastFailureAtEpochMillis: Preferences.Key<Long>,
-        val lastFailureCode: Preferences.Key<String>
+        val lastFailureCode: Preferences.Key<String>,
+        val lastRestoreFailureAtEpochMillis: Preferences.Key<Long>,
+        val lastRestoreFailureCode: Preferences.Key<String>,
+        val lastRestoreFailureGenerationId: Preferences.Key<String>,
+        val lastRestoreFailureFingerprint: Preferences.Key<String>
     ) {
         val allKeys: List<Preferences.Key<*>> = listOf(
             lastSuccessfulBackupAtEpochMillis,
             lastSuccessfulRestoreAtEpochMillis,
             lastSuccessfulSnapshotId,
+            lastSuccessfulRestoreGenerationId,
+            lastSuccessfulRestoreFingerprint,
+            pendingRestore,
             pendingSnapshotId,
             pendingSinceEpochMillis,
             lastAttemptAtEpochMillis,
             lastFailureAtEpochMillis,
-            lastFailureCode
+            lastFailureCode,
+            lastRestoreFailureAtEpochMillis,
+            lastRestoreFailureCode,
+            lastRestoreFailureGenerationId,
+            lastRestoreFailureFingerprint
         )
     }
 
@@ -214,11 +264,18 @@ class DataStoreCloudBackupStateStore(
                 lastSuccessfulBackupAtEpochMillis = longPreferencesKey("${uidPrefix}last_successful_backup_at"),
                 lastSuccessfulRestoreAtEpochMillis = longPreferencesKey("${uidPrefix}last_successful_restore_at"),
                 lastSuccessfulSnapshotId = stringPreferencesKey("${uidPrefix}last_successful_snapshot_id"),
+                lastSuccessfulRestoreGenerationId = stringPreferencesKey("${uidPrefix}last_successful_restore_generation_id"),
+                lastSuccessfulRestoreFingerprint = stringPreferencesKey("${uidPrefix}last_successful_restore_fingerprint"),
+                pendingRestore = androidx.datastore.preferences.core.booleanPreferencesKey("${uidPrefix}pending_restore"),
                 pendingSnapshotId = stringPreferencesKey("${uidPrefix}pending_snapshot_id"),
                 pendingSinceEpochMillis = longPreferencesKey("${uidPrefix}pending_since"),
                 lastAttemptAtEpochMillis = longPreferencesKey("${uidPrefix}last_attempt_at"),
                 lastFailureAtEpochMillis = longPreferencesKey("${uidPrefix}last_failure_at"),
-                lastFailureCode = stringPreferencesKey("${uidPrefix}last_failure_code")
+                lastFailureCode = stringPreferencesKey("${uidPrefix}last_failure_code"),
+                lastRestoreFailureAtEpochMillis = longPreferencesKey("${uidPrefix}last_restore_failure_at"),
+                lastRestoreFailureCode = stringPreferencesKey("${uidPrefix}last_restore_failure_code"),
+                lastRestoreFailureGenerationId = stringPreferencesKey("${uidPrefix}last_restore_failure_generation_id"),
+                lastRestoreFailureFingerprint = stringPreferencesKey("${uidPrefix}last_restore_failure_fingerprint")
             )
         }
 

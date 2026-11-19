@@ -63,12 +63,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.presentation.export.localizedPdfReportLabels
 import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.IconAvatar
 import com.suguru.expensetracker.presentation.components.InteractiveCard
@@ -93,9 +95,13 @@ fun AdvancedExportScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val pdfReportLabels = remember(context) { localizedPdfReportLabels(context) }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val localizedSuccessMessage = uiState.successMessage?.let { stringResource(it.resourceId) }
+    val localizedErrorMessage = uiState.errorMessage?.let { stringResource(it.resourceId) }
+    val localizedProgressMessage = uiState.exportProgressMessage?.let { stringResource(it.resourceId) }
 
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
@@ -109,11 +115,11 @@ fun AdvancedExportScreen(
             scope.launch {
                 try {
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        viewModel.executeExportToStream(stream)
+                        viewModel.executeExportToStream(stream, pdfLabels = pdfReportLabels)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     withContext(Dispatchers.Main) {
-                        snackbarHostState.showSnackbar("Export write failed: ${e.localizedMessage}")
+                        snackbarHostState.showSnackbar(context.getString(com.suguru.expensetracker.R.string.ui_export_write_failed))
                         viewModel.onExportCancelled()
                     }
                 }
@@ -130,11 +136,11 @@ fun AdvancedExportScreen(
             scope.launch {
                 try {
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        viewModel.executeExportToStream(stream)
+                        viewModel.executeExportToStream(stream, pdfLabels = pdfReportLabels)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     withContext(Dispatchers.Main) {
-                        snackbarHostState.showSnackbar("Export write failed: ${e.localizedMessage}")
+                        snackbarHostState.showSnackbar(context.getString(com.suguru.expensetracker.R.string.ui_export_write_failed))
                         viewModel.onExportCancelled()
                     }
                 }
@@ -144,15 +150,15 @@ fun AdvancedExportScreen(
         }
     }
 
-    LaunchedEffect(uiState.successMessage) {
-        uiState.successMessage?.let { msg ->
+    LaunchedEffect(localizedSuccessMessage) {
+        localizedSuccessMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.clearMessages()
         }
     }
 
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let { msg ->
+    LaunchedEffect(localizedErrorMessage) {
+        localizedErrorMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.clearMessages()
         }
@@ -168,7 +174,7 @@ fun AdvancedExportScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Financial Export",
+                        text = stringResource(com.suguru.expensetracker.R.string.title_financial_export),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -181,7 +187,7 @@ fun AdvancedExportScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(com.suguru.expensetracker.R.string.ui_back),
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
@@ -219,20 +225,20 @@ fun AdvancedExportScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "DATA PORTABILITY & REPORTS",
+                        text = stringResource(com.suguru.expensetracker.R.string.export_overview_heading),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         letterSpacing = 1.2.sp
                     )
                     Text(
-                        text = "Export Transactions & Reports",
+                        text = stringResource(com.suguru.expensetracker.R.string.export_overview_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "Generate spreadsheets or audit-ready PDF statements using your private local financial records.",
+                        text = stringResource(com.suguru.expensetracker.R.string.export_overview_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
@@ -245,12 +251,12 @@ fun AdvancedExportScreen(
                         .widthIn(max = 560.dp),
                     verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
                 ) {
-                    SectionHeader(title = "Choose Export Format")
+                    SectionHeader(title = stringResource(com.suguru.expensetracker.R.string.ui_export_choose_format))
 
                     FormatOptionCard(
-                        title = "Basic CSV Export (All Records)",
-                        subtitle = "Spreadsheet-compatible CSV file containing all transactions without filters.",
-                        badgeText = "FREE",
+                        title = stringResource(com.suguru.expensetracker.R.string.ui_export_basic_csv),
+                        subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_basic_csv_desc),
+                        badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
                         badgeColor = MaterialTheme.colorScheme.primary,
                         icon = Icons.Default.TableChart,
                         isSelected = uiState.selectedFormat == ExportFormat.BASIC_CSV,
@@ -259,9 +265,9 @@ fun AdvancedExportScreen(
                     )
 
                     FormatOptionCard(
-                        title = "Filtered CSV Export (Custom Selection)",
-                        subtitle = "Spreadsheet CSV filtered by custom date ranges, specific accounts, categories, and types.",
-                        badgeText = "FREE",
+                        title = stringResource(com.suguru.expensetracker.R.string.ui_export_filtered_csv),
+                        subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_filtered_csv_desc),
+                        badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
                         badgeColor = MaterialTheme.colorScheme.primary,
                         icon = Icons.Default.FilterList,
                         isSelected = uiState.selectedFormat == ExportFormat.ADVANCED_CSV,
@@ -270,9 +276,9 @@ fun AdvancedExportScreen(
                     )
 
                     FormatOptionCard(
-                        title = "PDF Financial Report",
-                        subtitle = "Multi-page printable statement with currency totals, category distributions, and ledger.",
-                        badgeText = "FREE",
+                        title = stringResource(com.suguru.expensetracker.R.string.ui_export_pdf),
+                        subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_pdf_desc),
+                        badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
                         badgeColor = MaterialTheme.colorScheme.primary,
                         icon = Icons.Default.PictureAsPdf,
                         isSelected = uiState.selectedFormat == ExportFormat.PDF_REPORT,
@@ -294,14 +300,14 @@ fun AdvancedExportScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            SectionHeader(title = "Filter Parameters")
+                            SectionHeader(title = stringResource(com.suguru.expensetracker.R.string.ui_export_filter_params))
                             if (uiState.filter.isFiltered) {
                                 TextButton(
                                     onClick = { viewModel.clearFilters() },
                                     modifier = Modifier.testTag("clear_export_filters_button")
                                 ) {
                                     Text(
-                                        text = "Reset",
+                                        text = stringResource(com.suguru.expensetracker.R.string.action_reset),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -332,7 +338,7 @@ fun AdvancedExportScreen(
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Date Period",
+                                        text = stringResource(com.suguru.expensetracker.R.string.budget_period_label),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onBackground
@@ -354,7 +360,7 @@ fun AdvancedExportScreen(
                         // Transaction Types Filter Chips
                         Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                             Text(
-                                text = "Transaction Type",
+                                text = stringResource(com.suguru.expensetracker.R.string.export_transaction_type),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = ExpenseTrackerTheme.extendedColors.textSecondary
@@ -385,7 +391,7 @@ fun AdvancedExportScreen(
                         if (uiState.availableCurrencies.size > 1) {
                             Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                                 Text(
-                                    text = "Currencies",
+                                    text = stringResource(com.suguru.expensetracker.R.string.currency_label),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
@@ -413,7 +419,7 @@ fun AdvancedExportScreen(
                         if (uiState.availableAccounts.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                                 Text(
-                                    text = "Accounts",
+                                    text = stringResource(com.suguru.expensetracker.R.string.account_label),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
@@ -441,7 +447,7 @@ fun AdvancedExportScreen(
                         if (uiState.availableCategories.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                                 Text(
-                                    text = "Categories",
+                                    text = stringResource(com.suguru.expensetracker.R.string.category_label),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
@@ -475,11 +481,11 @@ fun AdvancedExportScreen(
                     verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
                 ) {
                     PrimaryButton(
-                        text = if (uiState.isWritingFile) "Exporting..." else {
+                        text = if (uiState.isWritingFile) stringResource(com.suguru.expensetracker.R.string.export_progress_action) else {
                             when (uiState.selectedFormat) {
-                                ExportFormat.BASIC_CSV -> "Export Full CSV"
-                                ExportFormat.ADVANCED_CSV -> "Export Filtered CSV"
-                                ExportFormat.PDF_REPORT -> "Generate PDF Report"
+                                ExportFormat.BASIC_CSV -> stringResource(com.suguru.expensetracker.R.string.export_action_full_csv)
+                                ExportFormat.ADVANCED_CSV -> stringResource(com.suguru.expensetracker.R.string.export_action_filtered_csv)
+                                ExportFormat.PDF_REPORT -> stringResource(com.suguru.expensetracker.R.string.export_action_pdf_report)
                             }
                         },
                         onClick = { viewModel.onExportRequested() },
@@ -502,7 +508,7 @@ fun AdvancedExportScreen(
                             )
                             Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))
                             Text(
-                                text = uiState.exportProgressMessage ?: "Generating file...",
+                                text = localizedProgressMessage ?: stringResource(com.suguru.expensetracker.R.string.ui_export_generating),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.textSecondary
                             )
@@ -529,14 +535,14 @@ fun AdvancedExportScreen(
             },
             title = {
                 Text(
-                    text = "Save Financial Export",
+                    text = stringResource(com.suguru.expensetracker.R.string.export_save_title),
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                     Text(
-                        text = "You are about to export financial records to:",
+                        text = stringResource(com.suguru.expensetracker.R.string.export_confirm_path),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
@@ -546,7 +552,7 @@ fun AdvancedExportScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "• Exported files contain sensitive transaction records.\n• Save only to trusted locations on your device.\n• Storage Access Framework ensures no broad permissions are granted.",
+                        text = stringResource(com.suguru.expensetracker.R.string.export_privacy_warning),
                         style = MaterialTheme.typography.labelSmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary,
                         lineHeight = 16.sp
@@ -555,7 +561,7 @@ fun AdvancedExportScreen(
             },
             confirmButton = {
                 PrimaryButton(
-                    text = "Choose Location",
+                    text = stringResource(com.suguru.expensetracker.R.string.export_choose_location),
                     onClick = {
                         val format = uiState.pendingExportAction ?: uiState.selectedFormat
                         viewModel.proceedWithSafExport()
@@ -573,7 +579,7 @@ fun AdvancedExportScreen(
                     onClick = { viewModel.dismissPrivacyWarning() },
                     modifier = Modifier.testTag("cancel_export_dialog_button")
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(com.suguru.expensetracker.R.string.ui_cancel))
                 }
             }
         )
@@ -598,21 +604,21 @@ fun AdvancedExportScreen(
                     },
                     modifier = Modifier.testTag("confirm_date_range_picker")
                 ) {
-                    Text("Apply")
+                    Text(stringResource(com.suguru.expensetracker.R.string.ui_apply))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { showDatePickerDialog = false }
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(com.suguru.expensetracker.R.string.ui_cancel))
                 }
             }
         ) {
             DateRangePicker(
                 state = dateRangePickerState,
-                title = { Text("Select Date Range", modifier = Modifier.padding(16.dp)) },
-                headline = { Text("Filter export period", modifier = Modifier.padding(horizontal = 16.dp)) },
+                title = { Text(stringResource(com.suguru.expensetracker.R.string.ui_select_date_range), modifier = Modifier.padding(16.dp)) },
+                headline = { Text(stringResource(com.suguru.expensetracker.R.string.ui_filter_export_period), modifier = Modifier.padding(horizontal = 16.dp)) },
                 showModeToggle = false
             )
         }

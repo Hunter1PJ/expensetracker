@@ -2,6 +2,7 @@ package com.suguru.expensetracker.presentation.transactions.add
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.error.DomainException
 import com.suguru.expensetracker.domain.model.CategoryType
 import com.suguru.expensetracker.domain.model.Transaction
@@ -14,6 +15,7 @@ import com.suguru.expensetracker.domain.parser.ParseWarning
 import com.suguru.expensetracker.domain.parser.TransactionCandidate
 import com.suguru.expensetracker.domain.util.TransactionTimestampError
 import com.suguru.expensetracker.domain.util.TransactionTimestampPolicy
+import com.suguru.expensetracker.presentation.util.uiMessage
 import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,27 +62,7 @@ class AddTransactionViewModel(
         viewModelScope.launch {
             observeActiveAccountsUseCase().collect { accounts ->
                 val defaultAccount = accounts.firstOrNull { it.internalKey == INTERNAL_DEFAULT_ACCOUNT_KEY }
-                _uiState.update { state ->
-                    val transferAccounts = accounts.filter { it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY }
-                    val sourceId = state.selectedTransferSourceAccountId
-                        ?.takeIf { id -> transferAccounts.any { it.id == id } }
-                        ?: transferAccounts.firstOrNull()?.id
-                    val source = accounts.firstOrNull { it.id == sourceId }
-                    val destinationId = state.selectedTransferDestinationAccountId
-                        ?.takeIf { id -> transferAccounts.any { candidate ->
-                            candidate.id == id && candidate.id != sourceId &&
-                                candidate.initialBalance.currencyCode == source?.initialBalance?.currencyCode
-                        } }
-                        ?: transferAccounts.firstOrNull { candidate ->
-                            candidate.id != sourceId && candidate.initialBalance.currencyCode == source?.initialBalance?.currencyCode
-                        }?.id
-                    state.copy(
-                        defaultAccount = defaultAccount,
-                        activeAccounts = accounts,
-                        selectedTransferSourceAccountId = sourceId,
-                        selectedTransferDestinationAccountId = destinationId
-                    )
-                }
+                _uiState.update { it.copy(defaultAccount = defaultAccount) }
             }
         }
     }
@@ -134,9 +116,6 @@ class AddTransactionViewModel(
             _uiState.update { state ->
                 AddTransactionUiState(
                     defaultAccount = state.defaultAccount,
-                    activeAccounts = state.activeAccounts,
-                    selectedTransferSourceAccountId = state.selectedTransferSourceAccountId,
-                    selectedTransferDestinationAccountId = state.selectedTransferDestinationAccountId,
                     categories = state.categories,
                     selectedCategoryId = state.categories.firstOrNull()?.id,
                     transactionType = TransactionType.EXPENSE,
@@ -145,7 +124,7 @@ class AddTransactionViewModel(
                     transactionTime = clock.instant(),
                     isAiAssisted = false,
                     candidateSource = null,
-                    error = AddTransactionError.Unknown(AI_TRANSFER_DRAFT_MESSAGE),
+                    error = AddTransactionError.AiTransferDraftUnavailable,
                     isSavedSuccessfully = false
                 )
             }
@@ -159,21 +138,21 @@ class AddTransactionViewModel(
         } ?: ""
 
         val amountWarning = if (candidate.amount == null) {
-            "Amount was not detected in the AI draft. Please enter an amount."
+            uiMessage(R.string.ai_warning_missing_amount)
         } else null
 
-        val warnings = mutableListOf<String>()
+        val warnings = mutableListOf<com.suguru.expensetracker.presentation.util.UiMessage>()
         if (candidate.warnings.contains(ParseWarning.UNSUPPORTED_CURRENCY)) {
-            warnings.add("Currency may be unconfirmed. Please verify the amount.")
+            warnings.add(uiMessage(R.string.ai_warning_currency_unconfirmed))
         }
         if (candidate.warnings.contains(ParseWarning.UNIT_PRICE_AMBIGUITY)) {
-            warnings.add("Total amount was calculated from unit price or quantity.")
+            warnings.add(uiMessage(R.string.ai_warning_unit_price))
         }
         if (candidate.warnings.contains(ParseWarning.AMBIGUOUS_TYPE)) {
-            warnings.add("Transaction type was ambiguous. Defaulted to ${candidate.transactionType.name}.")
+            warnings.add(uiMessage(if (candidate.transactionType == TransactionType.INCOME) R.string.ai_warning_ambiguous_income else R.string.ai_warning_ambiguous_expense))
         }
         if (candidate.warnings.contains(ParseWarning.INVALID_AMOUNT)) {
-            warnings.add("Detected amount string was invalid. Please enter manually.")
+            warnings.add(uiMessage(R.string.ai_warning_invalid_amount))
         }
 
         val resolvedInstant = try {
@@ -198,7 +177,7 @@ class AddTransactionViewModel(
                 transactionType = candidate.transactionType,
                 amount = amountStr,
                 selectedCategoryId = selectedCatId,
-                note = candidate.suggestedTitle,
+                note = candidate.suggestedTitle.takeUnless { candidate.suggestedTitleIsFallback }.orEmpty(),
                 transactionTime = resolvedInstant,
                 isAiAssisted = true,
                 aiAmountWarning = amountWarning,
@@ -233,9 +212,6 @@ class AddTransactionViewModel(
         _uiState.update { state ->
             AddTransactionUiState(
                 defaultAccount = state.defaultAccount,
-                activeAccounts = state.activeAccounts,
-                selectedTransferSourceAccountId = state.selectedTransferSourceAccountId,
-                selectedTransferDestinationAccountId = state.selectedTransferDestinationAccountId,
                 categories = state.categories,
                 selectedCategoryId = state.categories.firstOrNull()?.id,
                 transactionType = TransactionType.EXPENSE,
@@ -270,53 +246,11 @@ class AddTransactionViewModel(
 
     fun onTransactionTypeChanged(type: TransactionType) {
         _uiState.update { state ->
-            if (type != TransactionType.TRANSFER) {
-                state.copy(transactionType = type, error = null)
-            } else {
-                val source = state.transferSourceAccount
-                    ?: state.activeAccounts.firstOrNull { it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY }
-                val destination = state.transferDestinationAccount?.takeIf {
-                    it.id != source?.id && it.initialBalance.currencyCode == source?.initialBalance?.currencyCode
-                } ?: state.activeAccounts.firstOrNull {
-                    it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY &&
-                        it.id != source?.id && it.initialBalance.currencyCode == source?.initialBalance?.currencyCode
-                }
-                state.copy(
-                    transactionType = type,
-                    selectedTransferSourceAccountId = source?.id,
-                    selectedTransferDestinationAccountId = destination?.id,
-                    selectedCategoryId = null,
-                    error = null
-                )
-            }
-        }
-    }
-
-    fun onTransferSourceSelected(accountId: Long) {
-        _uiState.update { state ->
-            val source = state.activeAccounts.firstOrNull {
-                it.id == accountId && it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY
-            } ?: return@update state
-            val destinationId = state.transferDestinationAccount
-                ?.takeIf { it.id != source.id && it.initialBalance.currencyCode == source.initialBalance.currencyCode }
-                ?.id ?: state.activeAccounts.firstOrNull {
-                    it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY &&
-                        it.id != source.id && it.initialBalance.currencyCode == source.initialBalance.currencyCode
-                }?.id
             state.copy(
-                selectedTransferSourceAccountId = source.id,
-                selectedTransferDestinationAccountId = destinationId,
+                transactionType = type,
+                selectedCategoryId = if (type == TransactionType.TRANSFER) null else state.selectedCategoryId,
                 error = null
             )
-        }
-    }
-
-    fun onTransferDestinationSelected(accountId: Long) {
-        _uiState.update { state ->
-            val destination = state.activeAccounts.firstOrNull {
-                it.id == accountId && it.internalKey != INTERNAL_DEFAULT_ACCOUNT_KEY
-            } ?: return@update state
-            state.copy(selectedTransferDestinationAccountId = destination.id, error = null)
         }
     }
 
@@ -376,15 +310,16 @@ class AddTransactionViewModel(
             null -> Unit
         }
 
-        val isTransfer = state.transactionType == TransactionType.TRANSFER
-        val sourceAccount = if (isTransfer) state.transferSourceAccount else state.defaultAccount
-        val destinationAccount = if (isTransfer) state.transferDestinationAccount else null
-        if (sourceAccount == null || (isTransfer && destinationAccount == null)) {
+        if (state.transactionType == TransactionType.TRANSFER) {
+            _uiState.update { it.copy(error = AddTransactionError.TransferUnavailable) }
+            return
+        }
+        val sourceAccount = state.defaultAccount
+        if (sourceAccount == null) {
             _uiState.update { it.copy(error = AddTransactionError.AccountRequired) }
             return
         }
 
-        // Expenses and income use the internal ledger currency; transfers use their source currency.
         val parseResult = MoneyParser.parse(state.amount, sourceAccount.initialBalance.currencyCode)
         if (parseResult.isFailure) {
             _uiState.update { it.copy(error = AddTransactionError.InvalidAmount) }
@@ -397,8 +332,7 @@ class AddTransactionViewModel(
             return
         }
 
-        // Transfers have no category; expense and income require one.
-        if (!isTransfer && state.selectedCategoryId == null) {
+        if (state.selectedCategoryId == null) {
             _uiState.update { it.copy(error = AddTransactionError.CategoryRequired) }
             return
         }
@@ -407,8 +341,8 @@ class AddTransactionViewModel(
             type = state.transactionType,
             amount = money,
             accountId = sourceAccount.id,
-            destinationAccountId = destinationAccount?.id,
-            categoryId = if (isTransfer) null else state.selectedCategoryId,
+            destinationAccountId = null,
+            categoryId = state.selectedCategoryId,
             note = state.note.trim().ifEmpty { null },
             transactionTime = state.transactionTime
         )
@@ -419,19 +353,17 @@ class AddTransactionViewModel(
             try {
                 createTransactionUseCase(transaction)
                 widgetRefreshCoordinator?.refreshAccountBalanceWidgets(sourceAccount.id)
-                destinationAccount?.let { widgetRefreshCoordinator?.refreshAccountBalanceWidgets(it.id) }
                 _uiState.update { it.copy(isSaving = false, isSavedSuccessfully = true, error = null) }
                 onSuccess()
             } catch (e: DomainException) {
                 _uiState.update { it.copy(isSaving = false, error = AddTransactionError.fromDomainException(e)) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isSaving = false, error = AddTransactionError.Unknown(e.localizedMessage ?: e.message)) }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isSaving = false, error = AddTransactionError.Unknown()) }
             }
         }
     }
 
     private companion object {
         const val INTERNAL_DEFAULT_ACCOUNT_KEY = "default"
-        const val AI_TRANSFER_DRAFT_MESSAGE = "AI transfer drafts need manual account selection."
     }
 }

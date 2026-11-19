@@ -150,6 +150,7 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val events = mutableListOf<SettingsEvent>()
         backgroundScope.launch { viewModel.events.collect { events.add(it) } }
+        backgroundScope.launch { viewModel.uiState.collect {} }
         testDispatcher.scheduler.runCurrent()
 
         viewModel.saveGeminiApiKey("new-key")
@@ -211,6 +212,8 @@ class SettingsViewModelTest {
         viewModel.uiState.value as SettingsUiState.Success
 
     private class FakeAiRepository : AiRepository {
+        override val isAuthenticated: Flow<Boolean> = flowOf(true)
+        override val authenticatedUid: Flow<String?> = flowOf("test_uid")
         override val isAiConfigured: Flow<Boolean> = flowOf(true)
         private val verified = MutableStateFlow(false)
         override val isKeyVerified: Flow<Boolean> = verified

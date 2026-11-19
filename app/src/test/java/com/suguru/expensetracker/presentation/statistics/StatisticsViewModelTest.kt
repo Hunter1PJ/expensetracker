@@ -1,5 +1,7 @@
 package com.suguru.expensetracker.presentation.statistics
 
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.UiMessage
 import com.suguru.expensetracker.domain.fake.FakeAccountRepository
 import com.suguru.expensetracker.domain.fake.FakeCategoryRepository
 import com.suguru.expensetracker.domain.fake.FakeTransactionRepository
@@ -246,7 +248,7 @@ class StatisticsViewModelTest {
 
         val state = viewModel.uiState.value
         assertNotNull(state.customRangeError)
-        assertEquals("Start date must be on or before end date.", state.customRangeError)
+        assertEquals(UiMessage(R.string.error_budget_date_range_invalid), state.customRangeError)
         assertEquals(StatisticsPeriodOption.THIS_MONTH, state.selectedPeriod)
 
         job.cancel()

@@ -1,5 +1,6 @@
 package com.suguru.expensetracker.presentation.budgets.addedit
 
+import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.fake.FakeAccountRepository
 import com.suguru.expensetracker.domain.fake.FakeBudgetRepository
 import com.suguru.expensetracker.domain.fake.FakeCategoryRepository
@@ -149,6 +150,6 @@ class AddEditBudgetViewModelTest {
 
         val state = viewModel.uiState.value
         assertNotNull(state.validationError)
-        assertTrue(state.validationError!!.contains("already exists"))
+        assertEquals(R.string.error_budget_overlapping, state.validationError!!.resourceId)
     }
 }

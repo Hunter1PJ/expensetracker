@@ -1,6 +1,8 @@
 package com.suguru.expensetracker.presentation.recurring.addedit
 
 import androidx.lifecycle.ViewModel
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.UiMessage
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.error.DomainException
 import com.suguru.expensetracker.domain.model.Account
@@ -43,7 +45,7 @@ data class AddEditRecurringUiState(
     val noteInput: String = "",
     val isActive: Boolean = true,
     val isSaving: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiMessage? = null,
     val isSuccess: Boolean = false,
     val availableCategories: List<Category> = emptyList(),
     val readOnlyAmountFormatted: String = ""
@@ -64,10 +66,8 @@ class AddEditRecurringTransactionViewModel(
 
     private companion object {
         const val INTERNAL_DEFAULT_ACCOUNT_KEY = "default"
-        const val TRANSFER_NOT_SUPPORTED_MESSAGE =
-            "Recurring transfers are not supported."
-        const val TRANSFER_READ_ONLY_MESSAGE =
-            "Historical recurring transfer rules are read-only and cannot be edited, converted, or reactivated."
+        val TRANSFER_NOT_SUPPORTED_MESSAGE = UiMessage(R.string.error_recurring_transfer_unsupported)
+        val TRANSFER_READ_ONLY_MESSAGE = UiMessage(R.string.recurring_transfer_readonly_desc)
     }
 
     private val _uiState = MutableStateFlow(
@@ -140,7 +140,7 @@ class AddEditRecurringTransactionViewModel(
                         it.copy(
                             isLoading = false,
                             isRuleLoaded = false,
-                            errorMessage = "Recurring rule not found"
+                            errorMessage = UiMessage(R.string.recurring_rule_missing)
                         )
                     }
                     return@launch
@@ -223,7 +223,7 @@ class AddEditRecurringTransactionViewModel(
                     it.copy(
                         isLoading = false,
                         isRuleLoaded = false,
-                        errorMessage = e.localizedMessage ?: "Failed to load recurring rule"
+                        errorMessage = UiMessage(R.string.recurring_rule_load_failed)
                     )
                 }
             }
@@ -315,7 +315,7 @@ class AddEditRecurringTransactionViewModel(
 
         val existing = persistedRule
         if (state.isEditMode && (existing == null || !state.isRuleLoaded)) {
-            _uiState.update { it.copy(errorMessage = "Recurring rule not found") }
+            _uiState.update { it.copy(errorMessage = UiMessage(R.string.recurring_rule_missing)) }
             return
         }
 
@@ -328,7 +328,7 @@ class AddEditRecurringTransactionViewModel(
         } else {
             val activeDefault = defaultAccount
             if (activeDefault == null) {
-                _uiState.update { it.copy(errorMessage = "Default setup is still initializing. Please try again.") }
+                _uiState.update { it.copy(errorMessage = UiMessage(R.string.recurring_setup_pending)) }
                 return
             }
             resolvedAccountId = activeDefault.id
@@ -337,18 +337,18 @@ class AddEditRecurringTransactionViewModel(
 
         val parseResult = MoneyParser.parse(state.amountInput, resolvedCurrencyCode)
         if (parseResult.isFailure) {
-            _uiState.update { it.copy(errorMessage = parseResult.exceptionOrNull()?.message ?: "Invalid monetary amount") }
+            _uiState.update { it.copy(errorMessage = UiMessage(R.string.recurring_amount_invalid)) }
             return
         }
         val money = parseResult.getOrThrow()
         if (money.amountInMinorUnits <= 0L) {
-            _uiState.update { it.copy(errorMessage = "Amount must be greater than zero") }
+            _uiState.update { it.copy(errorMessage = UiMessage(R.string.error_amount_positive)) }
             return
         }
 
         val finalEndDate = if (state.hasEndDate) state.endDate else null
         if (finalEndDate != null && finalEndDate < state.startDate) {
-            _uiState.update { it.copy(errorMessage = "End date cannot be before start date") }
+            _uiState.update { it.copy(errorMessage = UiMessage(R.string.error_recurring_start_after_end)) }
             return
         }
 
@@ -388,9 +388,9 @@ class AddEditRecurringTransactionViewModel(
                 }
                 _uiState.update { it.copy(isSaving = false, isSuccess = true) }
             } catch (e: DomainException) {
-                _uiState.update { it.copy(isSaving = false, errorMessage = e.message) }
+                _uiState.update { it.copy(isSaving = false, errorMessage = UiMessage(R.string.recurring_rule_save_failed)) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isSaving = false, errorMessage = e.message ?: "Failed to save rule") }
+                _uiState.update { it.copy(isSaving = false, errorMessage = UiMessage(R.string.recurring_rule_save_failed)) }
             }
         }
     }

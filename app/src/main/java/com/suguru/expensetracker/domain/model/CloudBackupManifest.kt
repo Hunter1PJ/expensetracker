@@ -36,7 +36,9 @@ data class CloudBackupManifest(
     val payloadSha256: String,
     val contentFingerprint: String,
     val failedAt: Instant? = null,
-    val failureCode: String? = null
+    val failureCode: String? = null,
+    /** Active immutable generation referenced by the stable primary restore point. */
+    val generationId: String? = null
 ) {
     /**
      * Validates this manifest against all domain integrity rules without mutating or normalizing

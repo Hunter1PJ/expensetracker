@@ -11,6 +11,8 @@ import com.suguru.expensetracker.domain.usecase.backup.CreateFullBackupUseCase
 import com.suguru.expensetracker.domain.usecase.backup.RestoreBackupUseCase
 import com.suguru.expensetracker.domain.usecase.transaction.ExportTransactionsToCsvUseCase
 import com.suguru.expensetracker.widget.common.WidgetRefreshCoordinator
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.UiMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,9 +26,9 @@ import java.time.format.DateTimeFormatter
 
 data class DataStorageUiState(
     val isLoading: Boolean = false,
-    val message: String? = null,
-    val error: String? = null,
-    val successMessage: String? = null,
+    val message: UiMessage? = null,
+    val error: UiMessage? = null,
+    val successMessage: UiMessage? = null,
     val lastBackupAt: String? = null,
     val lastBackupFileName: String? = null,
     val backupJsonToWrite: String? = null,
@@ -65,7 +67,7 @@ class DataStorageViewModel(
 
     fun createBackup() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = "Preparing backup...") }
+            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = UiMessage(R.string.data_progress_backup)) }
             try {
                 val backup = createFullBackupUseCase()
                 val json = backupRepository.serializeBackup(backup)
@@ -86,7 +88,7 @@ class DataStorageViewModel(
                     it.copy(
                         isLoading = false,
                         message = null,
-                        error = "Failed to create backup: ${e.localizedMessage}"
+                        error = UiMessage(R.string.data_backup_failed)
                     )
                 }
             }
@@ -101,7 +103,7 @@ class DataStorageViewModel(
                 it.copy(
                     backupJsonToWrite = null,
                     backupFileName = null,
-                    successMessage = "Backup created successfully and saved to file!"
+                    successMessage = UiMessage(R.string.data_backup_success)
                 )
             }
         }
@@ -118,7 +120,7 @@ class DataStorageViewModel(
 
     fun exportCsv() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = "Exporting transactions to CSV...") }
+            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = UiMessage(R.string.data_progress_csv)) }
             try {
                 val csv = exportTransactionsToCsvUseCase()
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -138,7 +140,7 @@ class DataStorageViewModel(
                     it.copy(
                         isLoading = false,
                         message = null,
-                        error = "CSV export failed: ${e.localizedMessage}"
+                        error = UiMessage(R.string.data_csv_failed)
                     )
                 }
             }
@@ -150,7 +152,7 @@ class DataStorageViewModel(
             it.copy(
                 csvStringToWrite = null,
                 csvFileName = null,
-                successMessage = "Transactions exported successfully as CSV!"
+                successMessage = UiMessage(R.string.data_csv_success)
             )
         }
     }
@@ -166,7 +168,7 @@ class DataStorageViewModel(
 
     fun inspectBackupForRestore(json: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = "Inspecting backup...") }
+            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = UiMessage(R.string.data_progress_inspect)) }
             try {
                 val result = backupRepository.deserializeBackup(json)
                 if (result.isSuccess) {
@@ -183,7 +185,7 @@ class DataStorageViewModel(
                         it.copy(
                             isLoading = false,
                             message = null,
-                            error = "Invalid backup file: ${result.exceptionOrNull()?.localizedMessage ?: "Format mismatch"}"
+                            error = UiMessage(R.string.data_backup_invalid)
                         )
                     }
                 }
@@ -192,7 +194,7 @@ class DataStorageViewModel(
                     it.copy(
                         isLoading = false,
                         message = null,
-                        error = "Failed to parse backup file: ${e.localizedMessage}"
+                        error = UiMessage(R.string.data_backup_invalid)
                     )
                 }
             }
@@ -202,7 +204,7 @@ class DataStorageViewModel(
     fun confirmAndRestore() {
         val backup = _uiState.value.pendingRestoreBackup ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = "Restoring from backup...") }
+            _uiState.update { it.copy(isLoading = true, error = null, successMessage = null, message = UiMessage(R.string.data_progress_restore)) }
             val result = restoreBackupUseCase(backup)
             when {
                 result.isFailure -> {
@@ -211,7 +213,7 @@ class DataStorageViewModel(
                             isLoading = false,
                             message = null,
                             pendingRestoreBackup = null,
-                            error = "Restore failed: ${result.exceptionOrNull()?.localizedMessage ?: "Unknown database error"}"
+                            error = UiMessage(R.string.data_restore_failed)
                         )
                     }
                 }
@@ -222,7 +224,7 @@ class DataStorageViewModel(
                             isLoading = false,
                             message = null,
                             pendingRestoreBackup = null,
-                            successMessage = "Database imported successfully. Settings recovery is running; app navigation remains blocked until it finishes."
+                            successMessage = UiMessage(R.string.data_restore_pending_success)
                         )
                     }
                     onPendingSettingsRecovery()
@@ -234,7 +236,7 @@ class DataStorageViewModel(
                             isLoading = false,
                             message = null,
                             pendingRestoreBackup = null,
-                            successMessage = "Database restored successfully! All data has been updated."
+                            successMessage = UiMessage(R.string.data_restore_success)
                         )
                     }
                 }

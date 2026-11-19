@@ -68,7 +68,7 @@ class DeterministicTransactionParser(
         }
 
         val finalType = type ?: TransactionType.EXPENSE // Default fallback to expense if ambiguous
-        val title = cleanTitle(line, amountResult.rawAmountToken)
+        val (title, titleIsFallback) = cleanTitle(line, amountResult.rawAmountToken)
 
         // Extract category/account suggestions based on keywords
         val category = detectCategory(normalized, finalType)
@@ -77,6 +77,7 @@ class DeterministicTransactionParser(
         return TransactionCandidate(
             rawText = line,
             suggestedTitle = title,
+            suggestedTitleIsFallback = titleIsFallback,
             transactionType = finalType,
             amount = amountResult.amount,
             date = date,
@@ -400,7 +401,7 @@ class DeterministicTransactionParser(
         }
     }
 
-    private fun cleanTitle(line: String, amountRawToken: String?): String {
+    private fun cleanTitle(line: String, amountRawToken: String?): Pair<String, Boolean> {
         var result = line
         if (!amountRawToken.isNullOrBlank()) {
             result = result.replace(amountRawToken, "", ignoreCase = true)
@@ -409,6 +410,6 @@ class DeterministicTransactionParser(
             "(?i)\\b(bugun|kecha|oldingi kun|вчера|позавчера|yesterday|today|sarfladim|sarf|to'ladim|toladim|toledim|oldim|o'tkazdim|otkazdim|купил|купила|потратил|потратила|оплатил|оплатила|получил|получила|перевел|перевела|spent|paid|bought|received|so'm|som|сум|сўм|usd|eur|rub|руб|рублей|\\$|€|\\bна\\b|\\bза\\b|\\bfor\\b|\\bon\\b)\\b"
         )
         result = result.replace(cleanRegex, "").trim().replace(Regex("\\s+"), " ")
-        return result.ifBlank { "Transaction" }
+        return if (result.isBlank()) "Transaction" to true else result to false
     }
 }

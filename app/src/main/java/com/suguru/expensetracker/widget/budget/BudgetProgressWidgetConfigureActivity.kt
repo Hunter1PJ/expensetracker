@@ -16,10 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.ExpenseTrackerApplication
 import com.suguru.expensetracker.MainActivity
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.domain.model.BudgetPeriodType
 import com.suguru.expensetracker.domain.model.budget.BudgetProgress
 import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
@@ -103,7 +106,8 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                                         widgetConfigurationRepository.saveBudgetProgressConfiguration(
                                             appWidgetId = appWidgetId,
                                             budgetId = progress.budget.id,
-                                            privacyMode = privacyMode
+                                            privacyMode = privacyMode,
+                                            workspaceKey = appContainer.workspaceId.storageKey
                                         )
                                         widgetRefreshCoordinator.refreshBudgetWidgets(progress.budget.id)
                                         
@@ -136,13 +140,13 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "No active budgets yet",
+                text = stringResource(R.string.widget_config_no_budgets),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Create an active budget in ExpenseTracker before adding this widget.",
+                text = stringResource(R.string.widget_config_create_budget),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -153,7 +157,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                     .fillMaxWidth()
                     .testTag("open_app_button")
             ) {
-                Text("Open Budgets")
+                Text(stringResource(R.string.widget_config_open_budgets))
             }
         }
     }
@@ -176,7 +180,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                 .testTag("config_screen")
         ) {
             Text(
-                text = "Track Budget Progress",
+                text = stringResource(R.string.widget_config_budget_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -184,7 +188,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
             )
 
             Text(
-                text = "Select Active Budget",
+                text = stringResource(R.string.widget_config_select_budget),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -198,9 +202,16 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(budgetProgressList) { progress ->
-                    val categoryName = progress.budget.categoryId?.let { categoryMap[it] } ?: "Overall Budget"
+                    val categoryName = progress.budget.categoryId?.let { categoryMap[it] } ?: stringResource(R.string.widget_config_overall_budget)
                     val limitFormatted = MoneyParser.format(progress.budget.limitAmount, includeSymbol = true, useGrouping = true)
-                    val periodText = progress.budget.periodType.name.lowercase().replaceFirstChar { it.uppercase() }
+                    val periodText = stringResource(
+                        when (progress.budget.periodType) {
+                            BudgetPeriodType.MONTHLY -> R.string.budget_period_monthly
+                            BudgetPeriodType.WEEKLY -> R.string.budget_period_weekly
+                            BudgetPeriodType.YEARLY -> R.string.budget_period_yearly
+                            BudgetPeriodType.CUSTOM -> R.string.budget_period_custom
+                        }
+                    )
 
                     Card(
                         modifier = Modifier
@@ -233,7 +244,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Limit: $limitFormatted • $periodText",
+                                    text = stringResource(R.string.widget_config_limit_period, limitFormatted, periodText),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -258,12 +269,12 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Privacy Mode",
+                                text = stringResource(R.string.widget_config_privacy_mode),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Hide spending and limit numbers on the Home Screen.",
+                                text = stringResource(R.string.widget_config_hide_spending),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -276,7 +287,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Home Screen widgets may be visible to anyone using your unlocked device.",
+                        text = stringResource(R.string.widget_config_visibility_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -295,7 +306,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                         .weight(1f)
                         .testTag("btn_cancel")
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.widget_config_cancel))
                 }
                 Button(
                     onClick = onSave,
@@ -306,7 +317,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Widget")
+                    Text(stringResource(R.string.widget_config_add_widget))
                 }
             }
         }

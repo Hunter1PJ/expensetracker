@@ -63,7 +63,8 @@ data class FirestoreBackupManifestDto(
             payloadSha256 = payloadSha256,
             contentFingerprint = contentFingerprint,
             failedAt = failedInstant,
-            failureCode = failureCode
+            failureCode = failureCode,
+            generationId = generationId
         )
         return manifest.validate().getOrNull()
     }

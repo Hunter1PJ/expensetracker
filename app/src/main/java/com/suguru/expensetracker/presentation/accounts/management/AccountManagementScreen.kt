@@ -121,7 +121,7 @@ fun AccountManagementContent(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "PORTFOLIO & BALANCES",
+                            text = stringResource(R.string.account_portfolio_heading),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.2.sp,
@@ -296,7 +296,7 @@ private fun AccountPortfolioOverviewCard(
         ) {
             Column {
                 Text(
-                    text = "ACTIVE ACCOUNTS",
+                    text = stringResource(R.string.account_active_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.1.sp,
@@ -304,7 +304,7 @@ private fun AccountPortfolioOverviewCard(
                 )
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                 Text(
-                    text = "${accounts.size} ${if (accounts.size == 1) "Account" else "Accounts"}",
+                    text = stringResource(R.string.account_count, accounts.size),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -341,7 +341,7 @@ private fun AccountItemCard(
     val account = item.account
     val icon = FinanceVisuals.getAccountIcon(account.iconName)
     val accentColor = FinanceVisuals.parseColorHex(account.colorHex)
-    val typeLabel = FinanceVisuals.getAccountTypeLabel(account.type)
+    val typeLabel = stringResource(FinanceVisuals.getAccountTypeLabelRes(account.type))
 
     ExpenseTrackerCard(
         modifier = modifier

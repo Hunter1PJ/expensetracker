@@ -1,6 +1,7 @@
 package com.suguru.expensetracker.presentation.home
 
 import androidx.lifecycle.ViewModel
+import com.suguru.expensetracker.R
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.ai.AiRepository
@@ -15,6 +16,7 @@ import com.suguru.expensetracker.domain.usecase.dashboard.ObserveDashboardSummar
 import com.suguru.expensetracker.domain.usecase.dashboard.ObserveRecentTransactionsUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.presentation.common.FinanceVisuals
+import com.suguru.expensetracker.presentation.util.UiMessage
 import com.suguru.expensetracker.presentation.util.DateTimeFormatterHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -81,7 +83,7 @@ class HomeViewModel(
                 candidates = aiData.candidates
             )
         }.catch { error ->
-            emit(HomeUiState(isLoading = false, errorMessage = error.message ?: "An unexpected error occurred"))
+            emit(HomeUiState(isLoading = false, errorMessage = UiMessage(R.string.error_unknown)))
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -174,8 +176,7 @@ class HomeViewModel(
                 id = account.id,
                 name = account.name,
                 type = account.type,
-                typeName = FinanceVisuals.getAccountTypeLabel(account.type),
-                currencyCode = account.initialBalance.currencyCode,
+                    currencyCode = account.initialBalance.currencyCode,
                 iconName = account.iconName,
                 colorHex = account.colorHex,
                 balanceFormatted = MoneyParser.format(acctSummary.balance, includeSymbol = true, useGrouping = true)
@@ -197,17 +198,17 @@ class HomeViewModel(
             }
 
             val title = when (tx.type) {
-                TransactionType.INCOME -> detail.category?.name ?: "Income"
-                TransactionType.EXPENSE -> detail.category?.name ?: "Expense"
+                TransactionType.INCOME -> detail.category?.name.orEmpty()
+                TransactionType.EXPENSE -> detail.category?.name.orEmpty()
                 TransactionType.TRANSFER -> {
-                    val fromName = detail.account?.name ?: "Account"
-                    val toName = detail.destinationAccount?.name ?: "Account"
+                    val fromName = detail.account?.name.orEmpty()
+                    val toName = detail.destinationAccount?.name.orEmpty()
                     "$fromName → $toName"
                 }
             }
 
             val subtitle = when (tx.type) {
-                TransactionType.TRANSFER -> tx.note ?: "Transfer"
+                TransactionType.TRANSFER -> tx.note.orEmpty()
                 else -> {
                     val accountName = detail.account?.name ?: ""
                     if (!tx.note.isNullOrBlank()) {

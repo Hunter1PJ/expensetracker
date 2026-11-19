@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.fake.FakeAccountRepository
 import com.suguru.expensetracker.domain.fake.FakeCategoryRepository
 import com.suguru.expensetracker.domain.fake.FakeRecurringTransactionRepository
@@ -271,8 +272,7 @@ class RecurringTransactionsViewModelTest {
         val state = viewModel.uiState.first { it is RecurringTransactionsUiState.Success } as RecurringTransactionsUiState.Success
         val uiModel = state.rules.single()
         assertEquals(RecurringStatus.NEEDS_ATTENTION, uiModel.status)
-        assertEquals("Schedule configuration unavailable", uiModel.statusDetail)
-        assertFalse(uiModel.statusDetail!!.contains("account", ignoreCase = true))
+        assertEquals(R.string.recurring_status_setup_unavailable, uiModel.statusDetail?.resourceId)
     }
 
     @Test

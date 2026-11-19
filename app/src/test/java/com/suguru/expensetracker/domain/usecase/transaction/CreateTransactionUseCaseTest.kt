@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -257,7 +258,7 @@ class CreateTransactionUseCaseTest {
     }
 
     @Test
-    fun createNewTransfer_withValidAccounts_preservesSourceAndDestination() = runBlocking<Unit> {
+    fun createNewTransfer_isRejectedWithoutWritingARecord() = runBlocking<Unit> {
         // Arrange
         accountRepository = FakeAccountRepository()
         categoryRepository = FakeCategoryRepository()
@@ -276,8 +277,6 @@ class CreateTransactionUseCaseTest {
         val destinationId = accountRepository.insertAccount(
             Account(name = "Destination", type = AccountType.BANK, initialBalance = Money(0L, "USD"))
         )
-        getTransactionUseCase = GetTransactionUseCase(transactionRepository)
-
         val transferTransaction = Transaction(
             id = 0L,
             type = TransactionType.TRANSFER,
@@ -288,13 +287,11 @@ class CreateTransactionUseCaseTest {
             transactionTime = java.time.Instant.now()
         )
 
-        val transferId = createTransactionUseCase(transferTransaction)
-        val savedTransfer = getTransactionUseCase(transferId)
-        assertNotNull(savedTransfer)
-        assertEquals(TransactionType.TRANSFER, savedTransfer?.type)
-        assertEquals(sourceId, savedTransfer?.accountId)
-        assertEquals(destinationId, savedTransfer?.destinationAccountId)
-        assertNull(savedTransfer?.categoryId)
+        val failure = runCatching { createTransactionUseCase(transferTransaction) }.exceptionOrNull()
+
+        assertTrue(failure is DomainException.InvalidTransfer)
+        assertTrue(transactionRepository.getTransactionsByAccount(sourceId).isEmpty())
+        assertTrue(transactionRepository.getTransactionsByAccount(destinationId).isEmpty())
     }
 
     @Test

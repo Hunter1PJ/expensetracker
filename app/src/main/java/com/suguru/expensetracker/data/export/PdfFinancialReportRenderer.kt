@@ -38,6 +38,7 @@ class PdfFinancialReportRenderer {
     fun renderReportToStream(
         reportData: FinancialReportData,
         outputStream: OutputStream,
+        labels: PdfFinancialReportLabels,
         zoneId: ZoneId = ZoneId.systemDefault()
     ) {
         val document = PdfDocument()
@@ -50,56 +51,56 @@ class PdfFinancialReportRenderer {
             val titlePaint = Paint().apply {
                 color = Color.rgb(24, 28, 36)
                 textSize = 18f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
                 isAntiAlias = true
             }
 
             val subtitlePaint = Paint().apply {
                 color = Color.rgb(100, 110, 130)
                 textSize = 10f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                typeface = Typeface.create("sans-serif", Typeface.NORMAL)
                 isAntiAlias = true
             }
 
             val headerPaint = Paint().apply {
                 color = Color.rgb(30, 36, 50)
                 textSize = 12f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
                 isAntiAlias = true
             }
 
             val bodyPaint = Paint().apply {
                 color = Color.rgb(40, 45, 55)
                 textSize = 9f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                typeface = Typeface.create("sans-serif", Typeface.NORMAL)
                 isAntiAlias = true
             }
 
             val bodyBoldPaint = Paint().apply {
                 color = Color.rgb(30, 36, 50)
                 textSize = 9f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
                 isAntiAlias = true
             }
 
             val incomePaint = Paint().apply {
                 color = Color.rgb(16, 140, 75) // Rich Green
                 textSize = 9f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
                 isAntiAlias = true
             }
 
             val expensePaint = Paint().apply {
                 color = Color.rgb(205, 45, 45) // Rich Red
                 textSize = 9f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
                 isAntiAlias = true
             }
 
             val transferPaint = Paint().apply {
                 color = Color.rgb(70, 95, 200) // Rich Blue
                 textSize = 9f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
                 isAntiAlias = true
             }
 
@@ -117,18 +118,18 @@ class PdfFinancialReportRenderer {
             var currentY = margin + 15f
 
             fun drawHeaderAndMetadata() {
-                canvas.drawText("ExpenseTracker Financial Report", margin, currentY, titlePaint)
+                canvas.drawText(labels.text("title"), margin, currentY, titlePaint)
                 currentY += 16f
 
-                val generatedStr = "Generated on: ${dateTimeFormatter.format(reportData.generatedAt.atZone(zoneId))}"
+                val generatedStr = labels.text("generatedOn", dateTimeFormatter.format(reportData.generatedAt.atZone(zoneId)))
                 val rangeStr = if (reportData.filter.startDate != null && reportData.filter.endDate != null) {
-                    "Period: ${reportData.filter.startDate} to ${reportData.filter.endDate}"
+                    labels.text("periodRange", reportData.filter.startDate.toString(), reportData.filter.endDate.toString())
                 } else if (reportData.filter.startDate != null) {
-                    "Period: From ${reportData.filter.startDate}"
+                    labels.text("periodFrom", reportData.filter.startDate.toString())
                 } else if (reportData.filter.endDate != null) {
-                    "Period: All Time"
+                    labels.text("periodAll")
                 } else {
-                    "Period: All Time"
+                    labels.text("periodAll")
                 }
 
                 canvas.drawText("$rangeStr  •  $generatedStr", margin, currentY, subtitlePaint)
@@ -138,12 +139,12 @@ class PdfFinancialReportRenderer {
                 if (reportData.filter.isFiltered) {
                     val filterDetails = mutableListOf<String>()
                     if (reportData.filter.transactionTypes.isNotEmpty()) {
-                        filterDetails.add("Types: ${reportData.filter.transactionTypes.joinToString { it.name }}")
+                        filterDetails.add(labels.text("filterTypes", reportData.filter.transactionTypes.joinToString { type -> when (type) { TransactionType.EXPENSE -> labels.text("expense"); TransactionType.INCOME -> labels.text("income"); TransactionType.TRANSFER -> labels.text("transfer") } }))
                     }
                     if (reportData.filter.currencyCodes.isNotEmpty()) {
-                        filterDetails.add("Currencies: ${reportData.filter.currencyCodes.joinToString()}")
+                        filterDetails.add(labels.text("filterCurrencies", reportData.filter.currencyCodes.joinToString()))
                     }
-                    val filterSummaryStr = "Filters: ${filterDetails.joinToString(" | ").ifEmpty { "Custom Date/Selection" }}"
+                    val filterSummaryStr = labels.text("filters", filterDetails.joinToString(" | ").ifEmpty { labels.text("filterCustom") })
                     canvas.drawText(filterSummaryStr, margin, currentY, subtitlePaint)
                     currentY += 14f
                 }
@@ -155,8 +156,8 @@ class PdfFinancialReportRenderer {
             fun drawFooter(pageNum: Int) {
                 val footerY = pageHeight - margin + 10f
                 canvas.drawLine(margin, footerY - 14f, margin + contentWidth, footerY - 14f, linePaint)
-                canvas.drawText("ExpenseTracker  •  Confidential Financial Record", margin, footerY, subtitlePaint)
-                val pageStr = "Page $pageNum"
+                canvas.drawText(labels.text("footer"), margin, footerY, subtitlePaint)
+                val pageStr = labels.text("page", pageNum)
                 val pageMeasure = subtitlePaint.measureText(pageStr)
                 canvas.drawText(pageStr, margin + contentWidth - pageMeasure, footerY, subtitlePaint)
             }
@@ -176,30 +177,30 @@ class PdfFinancialReportRenderer {
 
             // 1. Currency Summaries Section
             if (reportData.currencySummaries.isNotEmpty()) {
-                canvas.drawText("Financial Summary by Currency", margin, currentY, headerPaint)
+                canvas.drawText(labels.text("summaryHeading"), margin, currentY, headerPaint)
                 currentY += 14f
 
                 for (summary in reportData.currencySummaries) {
                     if (currentY + 65f > pageHeight - margin - 30f) {
                         startNewPage()
-                        canvas.drawText("Financial Summary by Currency (cont.)", margin, currentY, headerPaint)
+                        canvas.drawText(labels.text("summaryContinued"), margin, currentY, headerPaint)
                         currentY += 14f
                     }
 
                     // Background card for currency
                     canvas.drawRoundRect(margin, currentY, margin + contentWidth, currentY + 54f, 6f, 6f, bgBoxPaint)
 
-                    val currTitle = "${summary.currencyCode} Totals (${summary.transactionCount} transactions)"
+                    val currTitle = labels.text("currencyTotals", summary.currencyCode, summary.transactionCount)
                     canvas.drawText(currTitle, margin + 12f, currentY + 16f, bodyBoldPaint)
 
                     val incomeStr = "+ ${MoneyParser.format(summary.totalIncome, includeSymbol = true, useGrouping = true)}"
                     val expenseStr = "- ${MoneyParser.format(summary.totalExpense, includeSymbol = true, useGrouping = true)}"
-                    val netStr = "Net: ${MoneyParser.format(summary.netAmount, includeSymbol = true, useGrouping = true, showExplicitSign = true)}"
+                    val netStr = labels.text("net", MoneyParser.format(summary.netAmount, includeSymbol = true, useGrouping = true, showExplicitSign = true))
 
-                    canvas.drawText("Income: ", margin + 12f, currentY + 36f, bodyPaint)
+                    canvas.drawText(labels.text("income") + ": ", margin + 12f, currentY + 36f, bodyPaint)
                     canvas.drawText(incomeStr, margin + 55f, currentY + 36f, incomePaint)
 
-                    canvas.drawText("Expense: ", margin + 180f, currentY + 36f, bodyPaint)
+                    canvas.drawText(labels.text("expense") + ": ", margin + 180f, currentY + 36f, bodyPaint)
                     canvas.drawText(expenseStr, margin + 225f, currentY + 36f, expensePaint)
 
                     val netPaint = if (summary.netAmount.isNegative) expensePaint else incomePaint
@@ -221,17 +222,17 @@ class PdfFinancialReportRenderer {
                         startNewPage()
                     }
 
-                    canvas.drawText("Category Breakdown ($curr)", margin, currentY, headerPaint)
+                    canvas.drawText(labels.text("categoryBreakdown", curr), margin, currentY, headerPaint)
                     currentY += 14f
 
                     if (expenseCats.isNotEmpty()) {
-                        canvas.drawText("Top Expenses:", margin, currentY, bodyBoldPaint)
+                        canvas.drawText(labels.text("topExpenses"), margin, currentY, bodyBoldPaint)
                         currentY += 12f
                         for (cat in expenseCats.take(5)) {
                             if (currentY + 14f > pageHeight - margin - 30f) {
                                 startNewPage()
                             }
-                            val catLabel = "• ${cat.categoryName} (${cat.transactionCount} txs)"
+                            val catLabel = "• ${cat.categoryName} (${labels.text("categoryCount", cat.transactionCount)})"
                             val catAmount = MoneyParser.format(cat.totalAmount, includeSymbol = true, useGrouping = true)
                             canvas.drawText(catLabel, margin + 10f, currentY, bodyPaint)
                             val amountMeasure = bodyBoldPaint.measureText(catAmount)
@@ -244,13 +245,13 @@ class PdfFinancialReportRenderer {
                         if (currentY + 20f > pageHeight - margin - 30f) {
                             startNewPage()
                         }
-                        canvas.drawText("Top Incomes:", margin, currentY, bodyBoldPaint)
+                        canvas.drawText(labels.text("topIncomes"), margin, currentY, bodyBoldPaint)
                         currentY += 12f
                         for (cat in incomeCats.take(5)) {
                             if (currentY + 14f > pageHeight - margin - 30f) {
                                 startNewPage()
                             }
-                            val catLabel = "• ${cat.categoryName} (${cat.transactionCount} txs)"
+                            val catLabel = "• ${cat.categoryName} (${labels.text("categoryCount", cat.transactionCount)})"
                             val catAmount = MoneyParser.format(cat.totalAmount, includeSymbol = true, useGrouping = true)
                             canvas.drawText(catLabel, margin + 10f, currentY, bodyPaint)
                             val amountMeasure = bodyBoldPaint.measureText(catAmount)
@@ -267,7 +268,7 @@ class PdfFinancialReportRenderer {
                 startNewPage()
             }
 
-            canvas.drawText("Transactions Ledger (${reportData.totalTransactionsCount} records)", margin, currentY, headerPaint)
+            canvas.drawText(labels.text("ledgerTitle", reportData.totalTransactionsCount), margin, currentY, headerPaint)
             currentY += 16f
 
             // Table Column Positions
@@ -280,18 +281,21 @@ class PdfFinancialReportRenderer {
 
             fun drawTableHeader() {
                 canvas.drawRect(margin, currentY - 10f, margin + contentWidth, currentY + 6f, bgBoxPaint)
-                canvas.drawText("Date", colDate + 4f, currentY, bodyBoldPaint)
-                canvas.drawText("Type", colType, currentY, bodyBoldPaint)
-                canvas.drawText("Category", colCategory, currentY, bodyBoldPaint)
-                canvas.drawText("Account", colAccount, currentY, bodyBoldPaint)
-                canvas.drawText("Amount", colAmount, currentY, bodyBoldPaint)
-                canvas.drawText("Note", colNote, currentY, bodyBoldPaint)
+                canvas.drawText(labels.text("columnDate"), colDate + 4f, currentY, bodyBoldPaint)
+                canvas.drawText(labels.text("columnType"), colType, currentY, bodyBoldPaint)
+                canvas.drawText(labels.text("columnCategory"), colCategory, currentY, bodyBoldPaint)
+                canvas.drawText(labels.text("columnAccount"), colAccount, currentY, bodyBoldPaint)
+                canvas.drawText(labels.text("columnAmount"), colAmount, currentY, bodyBoldPaint)
+                canvas.drawText(labels.text("columnNote"), colNote, currentY, bodyBoldPaint)
                 currentY += 14f
                 canvas.drawLine(margin, currentY - 4f, margin + contentWidth, currentY - 4f, linePaint)
                 currentY += 6f
             }
 
             drawTableHeader()
+            if (reportData.transactions.isEmpty()) {
+                canvas.drawText(labels.text("emptyTransactions"), colDate + 4f, currentY, bodyPaint)
+            }
 
             for (tx in reportData.transactions) {
                 // Check if space remains for this row (approx 18 points)
@@ -302,11 +306,11 @@ class PdfFinancialReportRenderer {
 
                 val dateStr = dateFormatter.format(tx.transactionTime.atZone(zoneId))
                 val typeStr = when (tx.type) {
-                    TransactionType.EXPENSE -> "Expense"
-                    TransactionType.INCOME -> "Income"
-                    TransactionType.TRANSFER -> "Transfer"
+                    TransactionType.EXPENSE -> labels.text("expense")
+                    TransactionType.INCOME -> labels.text("income")
+                    TransactionType.TRANSFER -> labels.text("transfer")
                 }
-                val categoryStr = tx.categoryName ?: (if (tx.type == TransactionType.TRANSFER) "—" else "Uncategorized")
+                val categoryStr = tx.categoryName ?: (if (tx.type == TransactionType.TRANSFER) "—" else labels.text("uncategorized"))
                 val accountStr = if (tx.type == TransactionType.TRANSFER) {
                     "${tx.sourceAccountName} → ${tx.destinationAccountName ?: ""}"
                 } else {

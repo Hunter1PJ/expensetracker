@@ -21,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.suguru.expensetracker.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
@@ -34,7 +36,7 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 fun ErrorBanner(
     message: String,
     modifier: Modifier = Modifier,
-    title: String? = "Error",
+    title: String? = stringResource(R.string.error_generic_title),
     onRetry: (() -> Unit)? = null,
     testTag: String = "error_banner"
 ) {
@@ -84,7 +86,7 @@ fun ErrorBanner(
                 Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))
                 TextButton(onClick = onRetry) {
                     Text(
-                        text = "Retry",
+                        text = stringResource(R.string.action_retry),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = ExpenseTrackerTheme.extendedColors.financialDanger

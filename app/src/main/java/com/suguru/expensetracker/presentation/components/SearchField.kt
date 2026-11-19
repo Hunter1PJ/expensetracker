@@ -13,6 +13,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
@@ -48,7 +49,7 @@ fun ExpenseTrackerSearchField(
         leadingIcon = {
             Icon(
                 imageVector = Icons.Default.Search,
-                contentDescription = "Search",
+                contentDescription = stringResource(com.suguru.expensetracker.R.string.ui_search),
                 tint = ExpenseTrackerTheme.extendedColors.textSecondary,
                 modifier = Modifier.size(ExpenseTrackerTheme.iconSize.sm)
             )
@@ -64,7 +65,7 @@ fun ExpenseTrackerSearchField(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Clear,
-                        contentDescription = "Clear search",
+                        contentDescription = stringResource(com.suguru.expensetracker.R.string.ui_clear_search),
                         tint = ExpenseTrackerTheme.extendedColors.textSecondary,
                         modifier = Modifier.size(ExpenseTrackerTheme.iconSize.sm)
                     )

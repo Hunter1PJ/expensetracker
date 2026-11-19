@@ -2,6 +2,7 @@ package com.suguru.expensetracker.presentation.statistics
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import com.suguru.expensetracker.R
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.model.Money
 import com.suguru.expensetracker.domain.model.statistics.AlignedTrendPoint
@@ -16,6 +17,8 @@ import com.suguru.expensetracker.domain.model.statistics.StatisticsPeriodOption
 import com.suguru.expensetracker.domain.usecase.statistics.ObserveStatisticsComparisonUseCase
 import com.suguru.expensetracker.domain.usecase.statistics.ObserveStatisticsUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
+import com.suguru.expensetracker.presentation.util.UiMessage
+import com.suguru.expensetracker.presentation.util.uiMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,8 +47,7 @@ class StatisticsViewModel(
     companion object {
         const val KEY_COMPARISON_ENABLED = "key_comparison_enabled"
         const val KEY_COMPARISON_MODE = "key_comparison_mode"
-        private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
-        private val shortDateFormatter = DateTimeFormatter.ofPattern("MMM d")
+
     }
 
     private val initialComparisonEnabled: Boolean = savedStateHandle?.get<Boolean>(KEY_COMPARISON_ENABLED) ?: false
@@ -59,7 +61,7 @@ class StatisticsViewModel(
     private val _customStartDate = MutableStateFlow<LocalDate?>(null)
     private val _customEndDate = MutableStateFlow<LocalDate?>(null)
     private val _isCustomRangePickerVisible = MutableStateFlow(false)
-    private val _customRangeError = MutableStateFlow<String?>(null)
+    private val _customRangeError = MutableStateFlow<UiMessage?>(null)
 
     // Advanced Compare state
     private val _isComparisonEnabled = MutableStateFlow(initialComparisonEnabled)
@@ -190,7 +192,7 @@ class StatisticsViewModel(
 
     fun onCustomDatesSelected(start: LocalDate, end: LocalDate) {
         if (start.isAfter(end)) {
-            _customRangeError.value = "Start date must be on or before end date."
+            _customRangeError.value = UiMessage(R.string.error_budget_date_range_invalid)
             return
         }
         _customRangeError.value = null
@@ -312,7 +314,6 @@ class StatisticsViewModel(
     private fun mapToComparisonUiModel(comp: StatisticsComparison): ComparisonUiModel {
         val primaryLabel = formatDateRange(comp.primaryDateRange.startInclusive, comp.primaryDateRange.endInclusive)
         val comparisonLabel = formatDateRange(comp.comparisonDateRange.startInclusive, comp.comparisonDateRange.endInclusive)
-        val rangeSubtitle = "$primaryLabel vs $comparisonLabel"
 
         val incomeMetricUi = formatComparisonMetric(comp.incomeMetric, MetricType.INCOME)
         val expenseMetricUi = formatComparisonMetric(comp.expenseMetric, MetricType.EXPENSE)
@@ -342,7 +343,6 @@ class StatisticsViewModel(
             mode = comp.mode,
             primaryDateRangeLabel = primaryLabel,
             comparisonDateRangeLabel = comparisonLabel,
-            rangeHeaderSubtitle = rangeSubtitle,
             incomeMetric = incomeMetricUi,
             expenseMetric = expenseMetricUi,
             netMetric = netMetricUi,
@@ -355,11 +355,41 @@ class StatisticsViewModel(
     }
 
     private fun formatDateRange(start: LocalDate, end: LocalDate): String {
+        val locale = java.util.Locale.getDefault()
+        val fullDateFormatter = DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(locale)
+        val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", locale)
         return if (start.year == end.year) {
             "${start.format(shortDateFormatter)} – ${end.format(shortDateFormatter)}, ${start.year}"
         } else {
-            "${start.format(dateFormatter)} – ${end.format(dateFormatter)}"
+            "${start.format(fullDateFormatter)} – ${end.format(fullDateFormatter)}"
         }
+    }
+
+    private fun relativeChangeMessage(change: RelativeChange): UiMessage? = when (change) {
+        is RelativeChange.Defined -> {
+            val bp = change.basisPoints
+            val sign = if (bp > 0L) "+" else ""
+            val whole = bp / 100L
+            val remainder = abs(bp % 100L) / 10L
+            val value = if (remainder == 0L) "$sign$whole" else "$sign$whole.$remainder"
+            uiMessage(R.string.statistics_relative_percentage, value)
+        }
+        is RelativeChange.FromZero -> UiMessage(R.string.statistics_relative_new)
+        is RelativeChange.NoChangeFromZero -> UiMessage(R.string.statistics_relative_no_change)
+        is RelativeChange.Suppressed -> null
+    }
+
+    private fun comparisonChangeMessage(
+        deltaMinorUnits: Long,
+        currencyCode: String,
+        formattedDelta: String
+    ): UiMessage = when {
+        deltaMinorUnits == 0L -> UiMessage(R.string.statistics_change_no_change)
+        deltaMinorUnits > 0L -> uiMessage(R.string.statistics_change_increased, formattedDelta)
+        else -> uiMessage(
+            R.string.statistics_change_decreased,
+            MoneyParser.format(Money(abs(deltaMinorUnits), currencyCode), includeSymbol = true)
+        )
     }
 
     private fun formatComparisonMetric(
@@ -370,36 +400,31 @@ class StatisticsViewModel(
         val formattedComp = MoneyParser.format(metric.comparisonAmount, includeSymbol = true, useGrouping = true)
         val formattedDelta = MoneyParser.format(metric.absoluteDelta, includeSymbol = true, useGrouping = true, showExplicitSign = true)
 
-        val relativeText = when (val rel = metric.relativeChange) {
-            is RelativeChange.Defined -> {
-                val bp = rel.basisPoints
-                val sign = if (bp > 0L) "+" else ""
-                val whole = bp / 100L
-                val remainder = abs(bp % 100L) / 10L
-                if (remainder == 0L) "$sign$whole%" else "$sign$whole.$remainder%"
+        val relativeText = relativeChangeMessage(metric.relativeChange)
+        val metricLabel = when (metricType) {
+            MetricType.INCOME -> UiMessage(R.string.type_income)
+            MetricType.EXPENSE -> UiMessage(R.string.type_expense)
+            MetricType.NET -> UiMessage(R.string.home_net)
+        }
+        val changeDescription = comparisonChangeMessage(
+            deltaMinorUnits = metric.absoluteDelta.amountInMinorUnits,
+            currencyCode = metric.absoluteDelta.currencyCode,
+            formattedDelta = formattedDelta
+        )
+        val contentDescription = UiMessage(
+            resourceId = if (relativeText == null) {
+                R.string.statistics_metric_accessibility_no_relative
+            } else {
+                R.string.statistics_metric_accessibility
+            },
+            arguments = buildList {
+                add(metricLabel)
+                add(formattedPrimary)
+                add(formattedComp)
+                add(changeDescription)
+                relativeText?.let(::add)
             }
-            is RelativeChange.FromZero -> "New"
-            is RelativeChange.NoChangeFromZero -> "No change"
-            is RelativeChange.Suppressed -> ""
-        }
-
-        val typeName = when (metricType) {
-            MetricType.INCOME -> "Income"
-            MetricType.EXPENSE -> "Expense"
-            MetricType.NET -> "Net"
-        }
-
-        val changeDescription = when {
-            metric.absoluteDelta.amountInMinorUnits == 0L -> "No change"
-            metric.absoluteDelta.amountInMinorUnits > 0L -> "Increased by $formattedDelta"
-            else -> "Decreased by ${MoneyParser.format(Money(abs(metric.absoluteDelta.amountInMinorUnits), metric.absoluteDelta.currencyCode), includeSymbol = true)}"
-        }
-
-        val contentDescription = if (relativeText.isNotBlank()) {
-            "$typeName: Current $formattedPrimary, Previous $formattedComp. $changeDescription ($relativeText)."
-        } else {
-            "$typeName: Current $formattedPrimary, Previous $formattedComp. $changeDescription."
-        }
+        )
 
         return ComparisonMetricUiModel(
             primaryAmount = formattedPrimary,
@@ -418,26 +443,21 @@ class StatisticsViewModel(
         val formattedComp = MoneyParser.format(cat.comparisonAmount, includeSymbol = true, useGrouping = true)
         val formattedDelta = MoneyParser.format(cat.absoluteDelta, includeSymbol = true, useGrouping = true, showExplicitSign = true)
 
-        val relativeText = when (val rel = cat.relativeChange) {
-            is RelativeChange.Defined -> {
-                val bp = rel.basisPoints
-                val sign = if (bp > 0L) "+" else ""
-                val whole = bp / 100L
-                val remainder = abs(bp % 100L) / 10L
-                if (remainder == 0L) "$sign$whole%" else "$sign$whole.$remainder%"
-            }
-            is RelativeChange.FromZero -> "New"
-            is RelativeChange.NoChangeFromZero -> "No change"
-            is RelativeChange.Suppressed -> ""
-        }
-
-        val changeDesc = when {
-            cat.absoluteDelta.amountInMinorUnits == 0L -> "No change"
-            cat.absoluteDelta.amountInMinorUnits > 0L -> "Increased by $formattedDelta"
-            else -> "Decreased by ${MoneyParser.format(Money(abs(cat.absoluteDelta.amountInMinorUnits), cat.absoluteDelta.currencyCode), includeSymbol = true)}"
-        }
-
-        val contentDesc = "${cat.categoryName}: Current $formattedPrimary, Previous $formattedComp. $changeDesc."
+        val relativeText = relativeChangeMessage(cat.relativeChange)
+        val changeDescription = comparisonChangeMessage(
+            deltaMinorUnits = cat.absoluteDelta.amountInMinorUnits,
+            currencyCode = cat.absoluteDelta.currencyCode,
+            formattedDelta = formattedDelta
+        )
+        val contentDesc = UiMessage(
+            R.string.statistics_category_accessibility,
+            listOf(
+                if (cat.categoryId == null) UiMessage(R.string.pdf_empty_category) else cat.categoryName,
+                formattedPrimary,
+                formattedComp,
+                changeDescription
+            )
+        )
 
         return CategoryComparisonUiModel(
             categoryId = cat.categoryId,

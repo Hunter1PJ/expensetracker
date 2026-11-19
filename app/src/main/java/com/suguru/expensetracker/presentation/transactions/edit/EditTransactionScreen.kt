@@ -224,6 +224,7 @@ fun EditTransactionScreenContent(
                                 is AddTransactionError.InvalidAmount -> stringResource(R.string.error_invalid_amount)
                                 is AddTransactionError.AmountMustBePositive -> stringResource(R.string.error_amount_positive)
                                 is AddTransactionError.AccountRequired -> stringResource(R.string.error_account_required)
+                                is AddTransactionError.TransferUnavailable -> stringResource(R.string.transfer_unavailable_single_account)
                                 is AddTransactionError.CategoryRequired -> stringResource(R.string.error_category_required)
                                 is AddTransactionError.DestinationRequired -> stringResource(R.string.error_destination_required)
                                 is AddTransactionError.SameSourceAndDestination -> stringResource(R.string.error_same_accounts)
@@ -232,6 +233,9 @@ fun EditTransactionScreenContent(
                                 is AddTransactionError.CategoryArchived -> stringResource(R.string.error_category_archived)
                                 is AddTransactionError.IncompatibleCategory -> stringResource(R.string.error_incompatible_category)
                                 is AddTransactionError.InvalidTransactionTime -> stringResource(R.string.error_transaction_time_invalid)
+                                AddTransactionError.TransactionNotFound -> stringResource(R.string.error_transaction_not_found)
+                                AddTransactionError.TransferReadOnly -> stringResource(R.string.error_transaction_transfer_read_only)
+                                AddTransactionError.AiTransferDraftUnavailable -> stringResource(R.string.ai_warning_transfer_unavailable)
                                 is AddTransactionError.Unknown -> err.message ?: stringResource(R.string.error_unknown)
                             }
 
@@ -268,7 +272,7 @@ fun EditTransactionScreenContent(
                     if (uiState.isReadOnlyTransfer) {
                         val localDateTime = uiState.transactionTime.atZone(ZoneId.systemDefault())
                         val formattedDate = remember(uiState.transactionTime) {
-                            localDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                            localDateTime.format(DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(java.util.Locale.getDefault()))
                         }
                         val formattedTime = remember(uiState.transactionTime) {
                             localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -323,23 +327,23 @@ fun EditTransactionScreenContent(
                                 }
 
                                 Text(
-                                    text = "${stringResource(R.string.from_account_label)}: ${uiState.transferFromAccountName ?: "Unknown Account"}",
+                                    text = stringResource(R.string.edit_transfer_from_value, stringResource(R.string.from_account_label), uiState.transferFromAccountName ?: stringResource(R.string.label_unknown_account)),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "${stringResource(R.string.to_account_label)}: ${uiState.transferToAccountName ?: "Unknown Account"}",
+                                    text = stringResource(R.string.edit_transfer_to_value, stringResource(R.string.to_account_label), uiState.transferToAccountName ?: stringResource(R.string.label_unknown_account)),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "${stringResource(R.string.date_time_label)}: $formattedDate",
+                                    text = stringResource(R.string.edit_date_time_value, stringResource(R.string.date_time_label), formattedDate),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
                                 if (uiState.note.isNotBlank()) {
                                     Text(
-                                        text = "${stringResource(R.string.note_label)}: ${uiState.note}",
+                                        text = stringResource(R.string.edit_note_value, stringResource(R.string.note_label), uiState.note),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )
@@ -540,7 +544,7 @@ fun EditTransactionScreenContent(
 
                         val localDateTime = uiState.transactionTime.atZone(ZoneId.systemDefault())
                         val formattedDate = remember(uiState.transactionTime) {
-                            localDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                            localDateTime.format(DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(java.util.Locale.getDefault()))
                         }
                         val formattedTime = remember(uiState.transactionTime) {
                             localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -653,7 +657,7 @@ fun EditTransactionScreenContent(
                     }
                 ) {
                     Text(
-                        text = "OK",
+                        text = stringResource(R.string.action_ok),
                         color = ExpenseTrackerTheme.extendedColors.primaryPurple,
                         fontWeight = FontWeight.Bold
                     )
@@ -692,7 +696,7 @@ fun EditTransactionScreenContent(
                         onTransactionTimeChanged(localDate.atTime(timePickerState.hour, timePickerState.minute).atZone(ZoneId.systemDefault()).toInstant())
                     }
                     showTimePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.ui_ok)) }
             },
             dismissButton = {
                 TextButton(onClick = { showTimePicker = false }) {
@@ -746,7 +750,7 @@ private fun CategoryChip(
                 modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
             )
             Text(
-                text = if (category.isArchived) "${category.name} (Archived)" else category.name,
+                text = if (category.isArchived) stringResource(R.string.category_archived_label, com.suguru.expensetracker.presentation.util.categoryDisplayName(category), stringResource(R.string.status_archived)) else com.suguru.expensetracker.presentation.util.categoryDisplayName(category),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 color = if (isSelected) MaterialTheme.colorScheme.onBackground else ExpenseTrackerTheme.extendedColors.textSecondary

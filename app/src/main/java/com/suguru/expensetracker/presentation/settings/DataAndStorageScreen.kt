@@ -52,6 +52,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.localized
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -91,6 +94,8 @@ fun DataAndStorageScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val localizedSuccessMessage = uiState.successMessage?.localized()
+    val localizedErrorMessage = uiState.error?.localized()
 
     BackHandler(onBack = onNavigateBack)
 
@@ -111,7 +116,7 @@ fun DataAndStorageScreen(
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        snackbarHostState.showSnackbar("Write failed: ${e.localizedMessage}")
+                        snackbarHostState.showSnackbar(context.getString(R.string.data_backup_failed))
                         viewModel.cancelBackupWrite()
                     }
                 }
@@ -136,7 +141,7 @@ fun DataAndStorageScreen(
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        snackbarHostState.showSnackbar("CSV export failed: ${e.localizedMessage}")
+                        snackbarHostState.showSnackbar(context.getString(R.string.data_csv_failed))
                         viewModel.cancelCsvWrite()
                     }
                 }
@@ -168,7 +173,7 @@ fun DataAndStorageScreen(
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        snackbarHostState.showSnackbar("Read failed: ${e.localizedMessage}")
+                        snackbarHostState.showSnackbar(context.getString(R.string.data_backup_invalid))
                     }
                 }
             }
@@ -188,15 +193,15 @@ fun DataAndStorageScreen(
         }
     }
 
-    LaunchedEffect(uiState.successMessage) {
-        uiState.successMessage?.let { msg ->
+    LaunchedEffect(localizedSuccessMessage) {
+        localizedSuccessMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.clearMessages()
         }
     }
 
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let { err ->
+    LaunchedEffect(localizedErrorMessage) {
+        localizedErrorMessage?.let { err ->
             snackbarHostState.showSnackbar(err)
             viewModel.clearMessages()
         }
@@ -210,13 +215,13 @@ fun DataAndStorageScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Data & Storage",
+                            text = stringResource(R.string.title_data_storage),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "Backup, restore & CSV export",
+                            text = stringResource(R.string.desc_data_storage),
                             style = MaterialTheme.typography.bodySmall,
                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                         )
@@ -229,7 +234,7 @@ fun DataAndStorageScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(com.suguru.expensetracker.R.string.action_back),
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
@@ -264,7 +269,7 @@ fun DataAndStorageScreen(
                     verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
                 ) {
                     SectionHeader(
-                        title = "Database & File Storage",
+                        title = stringResource(R.string.title_data_storage),
                         testTag = "section_data_storage_info"
                     )
 
@@ -289,13 +294,13 @@ fun DataAndStorageScreen(
                             )
                             Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                                 Text(
-                                    text = "Private local app storage",
+                                    text = stringResource(R.string.data_private_title),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Your financial data is stored locally on this device. Back up regularly to protect your history against accidental loss or device replacement.",
+                                    text = stringResource(R.string.data_private_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary,
                                     lineHeight = 18.sp
@@ -312,7 +317,7 @@ fun DataAndStorageScreen(
                                             .padding(horizontal = 8.dp, vertical = 3.dp)
                                     ) {
                                         Text(
-                                            text = "Private local storage",
+                                            text = stringResource(R.string.data_private_badge),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.SemiBold
@@ -326,9 +331,9 @@ fun DataAndStorageScreen(
                                     ) {
                                         Text(
                                             text = if (createCloudBackupViewModel != null) {
-                                                "Optional Google cloud backup"
+                                                stringResource(R.string.data_cloud_optional)
                                             } else {
-                                                "No automatic cloud sync"
+                                                stringResource(R.string.data_cloud_no_sync)
                                             },
                                             style = MaterialTheme.typography.labelSmall,
                                             color = ExpenseTrackerTheme.extendedColors.textSecondary,
@@ -358,7 +363,7 @@ fun DataAndStorageScreen(
                     verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
                 ) {
                     SectionHeader(
-                        title = "Data Operations",
+                        title = stringResource(R.string.section_data_operations),
                         testTag = "section_backup_export_info"
                     )
 
@@ -389,14 +394,14 @@ fun DataAndStorageScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = "Last Full Backup:",
+                                    text = stringResource(R.string.data_last_full_backup),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                 )
                             }
                             Text(
-                                text = uiState.lastBackupAt?.let { formatLastBackupAt(it) } ?: "Never",
+                                text = uiState.lastBackupAt?.let { formatLastBackupAt(it) } ?: stringResource(R.string.cloud_never),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = if (uiState.lastBackupAt != null) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.textMuted,
@@ -407,7 +412,7 @@ fun DataAndStorageScreen(
                         if (uiState.lastBackupFileName != null) {
                             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                             Text(
-                                text = "File: ${uiState.lastBackupFileName}",
+                                text = stringResource(R.string.data_file_name, uiState.lastBackupFileName.orEmpty()),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.textMuted,
                                 modifier = Modifier.testTag("last_backup_file_name_info")
@@ -438,13 +443,13 @@ fun DataAndStorageScreen(
                                 )
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        text = "Create Full Backup",
+                                        text = stringResource(R.string.data_create_full_backup),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onBackground
                                     )
                                     Text(
-                                        text = "Includes accounts, categories, transactions, budgets, recurring rules, and preferences.",
+                                        text = stringResource(R.string.data_backup_includes),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary,
                                         lineHeight = 18.sp
@@ -465,12 +470,12 @@ fun DataAndStorageScreen(
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        text = "• Backup files contain financial data. Store them somewhere you trust.",
+                                        text = "• " + stringResource(R.string.data_backup_privacy),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )
                                     Text(
-                                        text = "• Includes SHA-256 integrity verification to detect file corruption.",
+                                        text = "• " + stringResource(R.string.data_integrity_check),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = ExpenseTrackerTheme.extendedColors.textMuted
                                     )
@@ -478,7 +483,7 @@ fun DataAndStorageScreen(
                             }
 
                             PrimaryButton(
-                                text = if (uiState.isLoading && uiState.message?.contains("backup", ignoreCase = true) == true) "Preparing Backup..." else "Create Backup",
+                                text = if (uiState.isLoading && uiState.message?.resourceId == R.string.data_progress_backup) stringResource(R.string.data_preparing_backup) else stringResource(R.string.data_create_backup),
                                 onClick = { viewModel.createBackup() },
                                 enabled = !uiState.isLoading,
                                 leadingIcon = Icons.Default.Backup,
@@ -511,13 +516,13 @@ fun DataAndStorageScreen(
                                 )
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        text = "Restore From Backup",
+                                        text = stringResource(R.string.data_restore_from_backup),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onBackground
                                     )
                                     Text(
-                                        text = "Replace the current local financial database with data from a saved backup file.",
+                                        text = stringResource(R.string.data_restore_explanation),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary,
                                         lineHeight = 18.sp
@@ -536,7 +541,7 @@ fun DataAndStorageScreen(
                                     )
                             ) {
                                 Text(
-                                    text = "⚠️ High-risk action: Current local database will be replaced. Any data created since the backup will be lost.",
+                                    text = "⚠️ " + stringResource(R.string.data_restore_risk),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = ExpenseTrackerTheme.extendedColors.financialWarning,
                                     fontWeight = FontWeight.Medium
@@ -544,7 +549,7 @@ fun DataAndStorageScreen(
                             }
 
                             SecondaryButton(
-                                text = "Choose Backup File",
+                                text = stringResource(R.string.data_choose_backup_file),
                                 onClick = { restoreBackupLauncher.launch(arrayOf("application/json")) },
                                 enabled = !uiState.isLoading,
                                 leadingIcon = Icons.Default.FileOpen,
@@ -577,13 +582,13 @@ fun DataAndStorageScreen(
                                 )
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        text = "Export Transactions (CSV)",
+                                        text = stringResource(R.string.data_export_csv_title),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onBackground
                                     )
                                     Text(
-                                        text = "Create a spreadsheet-compatible CSV file containing all transaction records for spreadsheets or external accounting.",
+                                        text = stringResource(R.string.data_export_csv_desc),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary,
                                         lineHeight = 18.sp
@@ -592,7 +597,7 @@ fun DataAndStorageScreen(
                             }
 
                             SecondaryButton(
-                                text = if (uiState.isLoading && uiState.message?.contains("CSV", ignoreCase = true) == true) "Preparing CSV..." else "Export CSV",
+                                text = if (uiState.isLoading && uiState.message?.resourceId == R.string.data_progress_csv) stringResource(R.string.data_preparing_csv) else stringResource(R.string.data_export_csv),
                                 onClick = { viewModel.exportCsv() },
                                 enabled = !uiState.isLoading,
                                 leadingIcon = Icons.Default.FileDownload,
@@ -616,7 +621,7 @@ fun DataAndStorageScreen(
                         )
                         uiState.message?.let {
                             Text(
-                                text = it,
+                                text = it.localized(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ExpenseTrackerTheme.extendedColors.textSecondary
                             )
@@ -647,7 +652,7 @@ fun DataAndStorageScreen(
             },
             title = {
                 Text(
-                    text = "Restore this backup?",
+                    text = stringResource(R.string.data_restore_confirm_title),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -655,13 +660,13 @@ fun DataAndStorageScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                     Text(
-                        text = "Your current local financial database will be replaced by the contents of this backup file.",
+                        text = stringResource(R.string.data_restore_replace_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Any unsaved changes or new records created since this backup will be overwritten.",
+                        text = stringResource(R.string.data_restore_overwrite_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -679,27 +684,27 @@ fun DataAndStorageScreen(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxs)) {
                             Text(
-                                text = "BACKUP SNAPSHOT DETAILS:",
+                                text = stringResource(R.string.data_snapshot_details),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(text = "• Created: ${formatLastBackupAt(backup.createdAt)}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "• App Version: ${backup.appVersion}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "• Format Version: v${backup.formatVersion}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "• Accounts: ${backup.accounts.size}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "• Categories: ${backup.categories.size}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "• Transactions: ${backup.transactions.size}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "• Budgets: ${backup.budgets.size}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "• Recurring Rules: ${backup.recurringTransactions.size}", style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_created, formatLastBackupAt(backup.createdAt)), style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_app_version, backup.appVersion), style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_format_version, backup.formatVersion), style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_accounts, backup.accounts.size), style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_categories, backup.categories.size), style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_transactions, backup.transactions.size), style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_budgets, backup.budgets.size), style = MaterialTheme.typography.bodySmall)
+                            Text(text = "• " + stringResource(R.string.data_snapshot_recurring, backup.recurringTransactions.size), style = MaterialTheme.typography.bodySmall)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
 
                     SecondaryButton(
-                        text = "Back Up Current Data First",
+                        text = stringResource(R.string.data_backup_first),
                         onClick = { viewModel.createBackup() },
                         enabled = !uiState.isLoading,
                         leadingIcon = Icons.Default.Backup,
@@ -709,7 +714,7 @@ fun DataAndStorageScreen(
             },
             confirmButton = {
                 DangerButton(
-                    text = "Restore Database",
+                    text = stringResource(R.string.data_restore_database),
                     onClick = { viewModel.confirmAndRestore() },
                     leadingIcon = Icons.Default.CloudDownload,
                     testTag = "confirm_restore_button"
@@ -717,7 +722,7 @@ fun DataAndStorageScreen(
             },
             dismissButton = {
                 SecondaryButton(
-                    text = "Cancel",
+                    text = stringResource(R.string.action_cancel),
                     onClick = { viewModel.cancelRestore() },
                     modifier = Modifier.testTag("cancel_restore_button")
                 )
@@ -732,7 +737,7 @@ private fun formatLastBackupAt(instantStr: String?): String {
     return try {
         val instant = Instant.parse(instantStr)
         val zonedDateTime = instant.atZone(ZoneId.systemDefault())
-        val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - hh:mm a")
+        val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - HH:mm", java.util.Locale.getDefault())
         zonedDateTime.format(formatter)
     } catch (e: Exception) {
         instantStr

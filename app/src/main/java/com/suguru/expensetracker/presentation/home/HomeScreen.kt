@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.TransactionType
@@ -166,7 +167,7 @@ fun HomeScreenContent(
             if (uiState.errorMessage != null) {
                 item {
                     ErrorBanner(
-                        message = uiState.errorMessage,
+                        message = uiState.errorMessage.localized(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 540.dp)
@@ -484,9 +485,9 @@ private fun HomeMonthlyOverviewSection(
         }
 
         val netSubtitle = when {
-            activeSummary.isNetPositive -> "Net savings this month"
-            activeSummary.isNetNegative -> "Net deficit this month"
-            else -> "Break-even this month"
+            activeSummary.isNetPositive -> stringResource(R.string.home_net_savings_subtitle)
+            activeSummary.isNetNegative -> stringResource(R.string.home_net_deficit_subtitle)
+            else -> stringResource(R.string.home_net_break_even_subtitle)
         }
 
         MetricCard(
@@ -628,9 +629,17 @@ private fun HomeRecentActivitySection(
                         }
 
                         FinancialListRow(
-                            title = tx.title,
+                            title = tx.title.ifBlank {
+                                when (tx.type) {
+                                    TransactionType.INCOME -> stringResource(R.string.type_income)
+                                    TransactionType.EXPENSE -> stringResource(R.string.type_expense)
+                                    TransactionType.TRANSFER -> stringResource(R.string.type_transfer)
+                                }
+                            },
                             amountText = tx.amountFormatted,
-                            subtitle = tx.subtitle,
+                            subtitle = tx.subtitle.ifBlank {
+                                if (tx.type == TransactionType.TRANSFER) stringResource(R.string.type_transfer) else ""
+                            },
                             icon = icon,
                             iconTint = iconColor,
                             iconBackground = iconColor.copy(alpha = 0.16f),
@@ -699,7 +708,7 @@ private fun HomeAiSection(
                 ) {
                     IconAvatar(
                         icon = androidx.compose.material.icons.Icons.Default.AccountBalanceWallet,
-                        contentDescription = "AI Assistant",
+                        contentDescription = stringResource(R.string.section_ai_assistant),
                         tint = ExpenseTrackerTheme.extendedColors.primaryPurple,
                         backgroundColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.16f),
                         size = 32.dp
@@ -806,7 +815,7 @@ private fun HomeAiSection(
                             },
                             modifier = Modifier.testTag("home_ai_clear_button")
                         ) {
-                            Text("Dismiss")
+                            Text(stringResource(R.string.ui_dismiss))
                         }
                     }
             }
@@ -832,7 +841,7 @@ private fun HomeAiSection(
                         candidates.forEach { candidate ->
                             val amountStr = candidate.amount?.let {
                                 MoneyParser.format(it, includeSymbol = true, useGrouping = true)
-                            } ?: "Amount not specified"
+                            } ?: stringResource(R.string.ai_amount_not_specified)
 
                             Card(
                                 modifier = Modifier
@@ -855,7 +864,7 @@ private fun HomeAiSection(
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
                                         Text(
-                                            text = candidate.suggestedTitle,
+                                            text = if (candidate.suggestedTitleIsFallback) stringResource(R.string.transaction_fallback_title) else candidate.suggestedTitle,
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -871,8 +880,13 @@ private fun HomeAiSection(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                                         )
+                                        val candidateTypeLabel = when (candidate.transactionType) {
+                                            TransactionType.EXPENSE -> stringResource(R.string.type_expense)
+                                            TransactionType.INCOME -> stringResource(R.string.type_income)
+                                            TransactionType.TRANSFER -> stringResource(R.string.type_transfer)
+                                        }
                                         Text(
-                                            text = "${candidate.transactionType.name} • $amountStr",
+                                            text = stringResource(R.string.home_ai_candidate_summary, candidateTypeLabel, amountStr),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = ExpenseTrackerTheme.extendedColors.textSecondary
                                         )
@@ -891,7 +905,7 @@ private fun HomeAiSection(
                                         }
                                         if (candidate.suggestedCategoryName != null) {
                                             Text(
-                                                text = "Category: ${candidate.suggestedCategoryName}",
+                                                text = stringResource(R.string.home_ai_category_prefix, candidate.suggestedCategoryName),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = ExpenseTrackerTheme.extendedColors.accentViolet
                                             )

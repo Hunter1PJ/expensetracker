@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.RecurrenceFrequency
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
@@ -106,7 +107,7 @@ fun RecurringTransactionsScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "AUTOMATED SCHEDULES & RULES",
+                            text = stringResource(R.string.recurring_section_subtitle),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.2.sp,
@@ -184,7 +185,7 @@ fun RecurringTransactionsScreen(
             when (val state = uiState) {
                 is RecurringTransactionsUiState.Loading -> {
                     LoadingState(
-                        message = "Loading recurring schedules...",
+                        message = stringResource(R.string.ui_recurring_loading),
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -234,7 +235,7 @@ fun RecurringTransactionsScreen(
                                 ) {
                                     Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
                                         Text(
-                                            text = "AUTOMATION SUMMARY",
+                                            text = stringResource(R.string.recurring_summary_heading),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             letterSpacing = 1.2.sp,
@@ -247,13 +248,13 @@ fun RecurringTransactionsScreen(
                                         ) {
                                             Column {
                                                 Text(
-                                                    text = "${state.rules.size} Rules",
+                                                    text = stringResource(R.string.recurring_rule_count, state.rules.size),
                                                     style = MaterialTheme.typography.headlineMedium,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onBackground
                                                 )
                                                 Text(
-                                                    text = "$activeCount active • $pausedCount paused",
+                                                    text = stringResource(R.string.recurring_active_paused, activeCount, pausedCount),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                                                 )
@@ -283,7 +284,7 @@ fun RecurringTransactionsScreen(
                                         .fillMaxWidth()
                                         .widthIn(max = 540.dp)
                                 ) {
-                                    SectionHeader(title = "Configured Schedules")
+                                    SectionHeader(title = stringResource(R.string.ui_recurring_schedules))
                                 }
                             }
 
@@ -379,7 +380,7 @@ private fun RecurringRuleCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Actions",
+                                contentDescription = stringResource(R.string.ui_actions),
                                 tint = ExpenseTrackerTheme.extendedColors.textSecondary
                             )
                         }
@@ -490,7 +491,7 @@ private fun RecurringRuleCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = rule.statusDetail,
+                        text = rule.statusDetail.localized(),
                         style = MaterialTheme.typography.labelSmall,
                         color = ExpenseTrackerTheme.extendedColors.financialNegative
                     )
@@ -510,7 +511,7 @@ private fun RecurringRuleCard(
                 )
 
                 Text(
-                    text = "${stringResource(R.string.next_occurrence_label)}: ${rule.nextOccurrence}",
+                    text = stringResource(R.string.recurring_next_occurrence_format, stringResource(R.string.next_occurrence_label), rule.nextOccurrence),
                     style = MaterialTheme.typography.labelSmall,
                     color = ExpenseTrackerTheme.extendedColors.textSecondary
                 )

@@ -252,6 +252,33 @@ class ProcessDueRecurringTransactionsUseCaseTest {
     }
 
     @Test
+    fun `legacy active transfer recurring rule remains preserved but creates no new transaction`() = runBlocking {
+        val destinationId = accountRepo.insertAccount(
+            Account(name = "Savings", type = AccountType.SAVINGS, initialBalance = Money(0L, "USD"))
+        )
+        val rule = RecurringTransaction(
+            id = 0L,
+            type = TransactionType.TRANSFER,
+            amount = Money(1000L, "USD"),
+            accountId = accountId,
+            destinationAccountId = destinationId,
+            categoryId = null,
+            frequency = RecurrenceFrequency.DAILY,
+            startDate = LocalDate.of(2026, 9, 1),
+            nextOccurrence = LocalDate.of(2026, 9, 1),
+            isActive = true
+        )
+        val ruleId = recurringTxRepo.insertRecurringTransaction(rule)
+
+        val processed = useCase(asOfDate = LocalDate.of(2026, 9, 2), zoneId = zoneId)
+
+        assertEquals(0, processed)
+        assertTrue(transactionRepo.getTransactionsByAccount(accountId).isEmpty())
+        assertEquals(LocalDate.of(2026, 9, 1), recurringTxRepo.getRecurringTransactionById(ruleId)?.nextOccurrence)
+        assertTrue(recurringTxRepo.getRecurringTransactionById(ruleId)?.isActive == true)
+    }
+
+    @Test
     fun `endDate is respected`() = runBlocking {
         val rule = RecurringTransaction(
             id = 0L,

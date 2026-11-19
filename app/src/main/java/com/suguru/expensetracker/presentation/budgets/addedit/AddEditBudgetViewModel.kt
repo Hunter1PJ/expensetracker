@@ -1,6 +1,7 @@
 package com.suguru.expensetracker.presentation.budgets.addedit
 
 import androidx.lifecycle.ViewModel
+import com.suguru.expensetracker.R
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.domain.model.Budget
 import com.suguru.expensetracker.domain.model.BudgetPeriodType
@@ -13,6 +14,7 @@ import com.suguru.expensetracker.domain.usecase.budget.GetBudgetUseCase
 import com.suguru.expensetracker.domain.usecase.budget.UpdateBudgetUseCase
 import com.suguru.expensetracker.domain.usecase.category.ObserveActiveCategoriesUseCase
 import com.suguru.expensetracker.domain.util.MoneyParser
+import com.suguru.expensetracker.presentation.util.UiMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +42,7 @@ data class AddEditBudgetUiState(
     val periodType: BudgetPeriodType = BudgetPeriodType.MONTHLY,
     val startDate: LocalDate = LocalDate.now().withDayOfMonth(1),
     val endDate: LocalDate = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth()),
-    val validationError: String? = null,
+    val validationError: UiMessage? = null,
     val isSubmitting: Boolean = false,
     val isSaved: Boolean = false
 )
@@ -103,7 +105,7 @@ class AddEditBudgetViewModel(
                         )
                     }
                 } else {
-                    _uiState.update { it.copy(isLoading = false, validationError = "Budget not found") }
+                    _uiState.update { it.copy(isLoading = false, validationError = UiMessage(R.string.error_budget_not_found)) }
                 }
             } else {
                 _uiState.update { it.copy(isLoading = false) }
@@ -180,24 +182,24 @@ class AddEditBudgetViewModel(
         if (state.isSubmitting) return
 
         if (state.scope == BudgetScope.CATEGORY && state.selectedCategoryId == null) {
-            _uiState.update { it.copy(validationError = "Please select a category") }
+            _uiState.update { it.copy(validationError = UiMessage(R.string.error_budget_category_required)) }
             return
         }
 
         val parseResult = MoneyParser.parse(state.amountText, state.selectedCurrency)
         if (parseResult.isFailure) {
-            _uiState.update { it.copy(validationError = "Please enter a valid amount") }
+            _uiState.update { it.copy(validationError = UiMessage(R.string.error_invalid_amount)) }
             return
         }
 
         val limitMoney = parseResult.getOrThrow()
         if (limitMoney.amountInMinorUnits <= 0L) {
-            _uiState.update { it.copy(validationError = "Limit must be greater than zero") }
+            _uiState.update { it.copy(validationError = UiMessage(R.string.error_budget_limit_required)) }
             return
         }
 
         if (state.startDate.isAfter(state.endDate)) {
-            _uiState.update { it.copy(validationError = "Start date must be before or equal to end date") }
+            _uiState.update { it.copy(validationError = UiMessage(R.string.error_budget_date_range_invalid)) }
             return
         }
 
@@ -222,17 +224,17 @@ class AddEditBudgetViewModel(
                 _uiState.update { it.copy(isSubmitting = false, isSaved = true) }
             } catch (e: BudgetValidationError) {
                 val message = when (e) {
-                    is BudgetValidationError.InvalidLimit -> "Limit must be greater than zero"
-                    is BudgetValidationError.InvalidCurrency -> "Please select a valid currency"
-                    is BudgetValidationError.InvalidDateRange -> "Start date must be before or equal to end date"
-                    is BudgetValidationError.CategoryNotFound -> "Selected category not found"
-                    is BudgetValidationError.IncompatibleCategoryType -> "Budget category must be Expense or Both"
-                    is BudgetValidationError.CategoryArchived -> "Selected category is archived"
-                    is BudgetValidationError.OverlappingBudgetExists -> "An active budget already exists for this scope, currency, and period"
+                    is BudgetValidationError.InvalidLimit -> UiMessage(R.string.error_budget_limit_required)
+                    is BudgetValidationError.InvalidCurrency -> UiMessage(R.string.error_budget_currency_required)
+                    is BudgetValidationError.InvalidDateRange -> UiMessage(R.string.error_budget_date_range_invalid)
+                    is BudgetValidationError.CategoryNotFound -> UiMessage(R.string.error_category_not_found)
+                    is BudgetValidationError.IncompatibleCategoryType -> UiMessage(R.string.error_budget_category_type_incompatible)
+                    is BudgetValidationError.CategoryArchived -> UiMessage(R.string.error_category_archived)
+                    is BudgetValidationError.OverlappingBudgetExists -> UiMessage(R.string.error_budget_overlapping)
                 }
                 _uiState.update { it.copy(isSubmitting = false, validationError = message) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isSubmitting = false, validationError = e.message ?: "Failed to save budget") }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isSubmitting = false, validationError = UiMessage(R.string.error_save_budget_failed)) }
             }
         }
     }

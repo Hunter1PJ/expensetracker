@@ -173,3 +173,105 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+tasks.register("verifyLocalizationResources") {
+  group = "verification"
+  description = "Checks application string, array, plural, and format-argument parity for en, uz, and ru."
+  notCompatibleWithConfigurationCache("This task parses source XML files at execution time.")
+
+  doLast {
+    val resourceRoot = file("src/main/res")
+    val localeDirectories = mapOf(
+      "en" to resourceRoot.resolve("values"),
+      "uz" to resourceRoot.resolve("values-uz"),
+      "ru" to resourceRoot.resolve("values-ru"),
+    )
+
+    fun formatArguments(value: String): List<String> =
+      Regex("%(?:\\d+\\$)?[-#+ 0,(<]*\\d*(?:\\.\\d+)?[a-zA-Z]")
+        .findAll(value.replace("%%", ""))
+        .map { it.value }
+        .sorted()
+        .toList()
+
+    fun resourceSignatures(directory: java.io.File): Map<String, String> {
+      val xmlFiles = directory.listFiles { file -> file.isFile && file.extension == "xml" }.orEmpty()
+      return buildMap {
+        xmlFiles.forEach { xmlFile ->
+          val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            setExpandEntityReferences(false)
+          }
+          val document = try {
+            factory.newDocumentBuilder().parse(xmlFile)
+          } catch (error: Exception) {
+            throw GradleException("Invalid localization XML at ${xmlFile.relativeTo(projectDir)}: ${error.message}", error)
+          }
+          val children = document.documentElement.childNodes
+          for (index in 0 until children.length) {
+            val element = children.item(index) as? org.w3c.dom.Element ?: continue
+            val type = element.tagName
+            if (type !in setOf("string", "string-array", "plurals")) continue
+            if (element.getAttribute("translatable") == "false") continue
+            val name = element.getAttribute("name")
+            if (name.isBlank()) throw GradleException("Resource without a name in ${xmlFile.relativeTo(projectDir)}")
+            val key = "$type/$name"
+            val signature = when (type) {
+              "string" -> "args=${formatArguments(element.textContent)}"
+              "string-array" -> {
+                val items = (0 until element.childNodes.length)
+                  .mapNotNull { element.childNodes.item(it) as? org.w3c.dom.Element }
+                  .filter { it.tagName == "item" }
+                  .map { formatArguments(it.textContent) }
+                "items=${items.size};args=$items"
+              }
+              else -> {
+                val items = (0 until element.childNodes.length)
+                  .mapNotNull { element.childNodes.item(it) as? org.w3c.dom.Element }
+                  .filter { it.tagName == "item" }
+                  .associate { it.getAttribute("quantity") to formatArguments(it.textContent) }
+                // Locale plural rules may define additional quantities (for example Russian few/many).
+                // Compare every quantity required by English while permitting valid locale-specific forms.
+                val requiredItems = items.filterKeys { it in setOf("one", "other") }
+                "quantities=${requiredItems.keys.sorted()};args=$requiredItems"
+              }
+            }
+            if (put(key, signature) != null) {
+              throw GradleException("Duplicate localization resource $key in ${xmlFile.relativeTo(projectDir)}")
+            }
+          }
+        }
+      }
+    }
+
+    val english = resourceSignatures(localeDirectories.getValue("en"))
+    logger.lifecycle("Found ${english.size} English app string/array/plural keys.")
+    val failures = mutableListOf<String>()
+    for (locale in listOf("uz", "ru")) {
+      val translated = resourceSignatures(localeDirectories.getValue(locale))
+      (english.keys - translated.keys).sorted().forEach { key ->
+        failures += "Missing $locale resource key $key"
+      }
+      (translated.keys - english.keys).sorted().forEach { key ->
+        failures += "Unexpected $locale resource key $key"
+      }
+      (english.keys intersect translated.keys).sorted().forEach { key ->
+        if (english.getValue(key) != translated.getValue(key)) {
+          failures += "Resource structure or format arguments differ for $locale key $key: " +
+            "English=${english.getValue(key)}, $locale=${translated.getValue(key)}"
+        }
+      }
+    }
+    if (failures.isNotEmpty()) {
+      throw GradleException(
+        "Localization resource validation failed with ${failures.size} issue(s):\n" +
+          failures.joinToString("\n") { " - $it" }
+      )
+    }
+    logger.lifecycle(
+      "Localization resources are consistent: ${english.size} keys in English, Uzbek, and Russian."
+    )
+  }
+}

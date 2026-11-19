@@ -70,6 +70,12 @@ class RoomTransactionRepository(
         }
     }
 
+    override fun observeIncomeCategoryUsageCounts(): Flow<Map<Long, Int>> {
+        return transactionDao.observeIncomeCategoryUsageCounts().map { counts ->
+            counts.associate { it.categoryId to it.count }
+        }
+    }
+
     override suspend fun insertTransaction(transaction: Transaction): Long {
         val id = transactionDao.insertTransaction(transaction.toEntity())
         onDataMutated()

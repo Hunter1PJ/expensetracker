@@ -126,7 +126,7 @@ fun CategoryManagementContent(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "EXPENSE & INCOME TAGS",
+                            text = stringResource(R.string.category_group_heading),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.2.sp,
@@ -331,7 +331,7 @@ fun CategoryManagementContent(
     if (uiState.categoryToArchive != null) {
         val category = uiState.categoryToArchive
         ExpenseTrackerConfirmationDialog(
-            title = stringResource(R.string.dialog_archive_category_title, category.name),
+            title = stringResource(R.string.dialog_archive_category_title, com.suguru.expensetracker.presentation.util.categoryDisplayName(category)),
             message = stringResource(R.string.dialog_archive_category_message),
             confirmText = stringResource(R.string.action_archive),
             dismissText = stringResource(R.string.action_cancel),
@@ -364,7 +364,7 @@ private fun CategoryOverviewCard(
         ) {
             Column {
                 Text(
-                    text = "CATEGORIES DIRECTORY",
+                    text = stringResource(R.string.category_directory_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.1.sp,
@@ -372,7 +372,7 @@ private fun CategoryOverviewCard(
                 )
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                 Text(
-                    text = "$filteredCount Active ${if (filteredCount == 1) "Category" else "Categories"}",
+                    text = stringResource(R.string.category_active_count, filteredCount),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -408,7 +408,7 @@ private fun CategoryItemCard(
 ) {
     val icon = FinanceVisuals.getCategoryIcon(category.iconName)
     val accentColor = FinanceVisuals.parseColorHex(category.colorHex)
-    val typeLabel = FinanceVisuals.getCategoryTypeLabel(category.type)
+    val typeLabel = stringResource(FinanceVisuals.getCategoryTypeLabelRes(category.type))
 
     ExpenseTrackerCard(
         modifier = modifier
@@ -433,7 +433,7 @@ private fun CategoryItemCard(
                 // Icon Avatar
                 IconAvatar(
                     icon = icon,
-                    contentDescription = category.name,
+                    contentDescription = com.suguru.expensetracker.presentation.util.categoryDisplayName(category),
                     tint = accentColor,
                     backgroundColor = accentColor.copy(alpha = 0.15f),
                     borderColor = accentColor.copy(alpha = 0.35f),
@@ -445,7 +445,7 @@ private fun CategoryItemCard(
                     verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxs)
                 ) {
                     Text(
-                        text = category.name,
+                        text = com.suguru.expensetracker.presentation.util.categoryDisplayName(category),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground

@@ -46,13 +46,6 @@ class EditTransactionViewModel(
     private val clock: Clock = Clock.systemDefaultZone()
 ) : ViewModel() {
 
-    private companion object {
-        const val TRANSFER_READ_ONLY_MESSAGE =
-            "Historical transfer transactions are read-only and cannot be edited or converted."
-        const val TRANSFER_NOT_SUPPORTED_MESSAGE =
-            "Transfers are not supported."
-    }
-
     private val _uiState = MutableStateFlow(EditTransactionUiState(transactionId = transactionId, isLoading = true))
     val uiState: StateFlow<EditTransactionUiState> = _uiState.asStateFlow()
 
@@ -72,7 +65,7 @@ class EditTransactionViewModel(
                         it.copy(
                             isLoading = false,
                             isTransactionLoaded = false,
-                            error = AddTransactionError.Unknown("Transaction not found")
+                            error = AddTransactionError.TransactionNotFound
                         )
                     }
                     return@launch
@@ -141,7 +134,7 @@ class EditTransactionViewModel(
                     it.copy(
                         isLoading = false,
                         isTransactionLoaded = false,
-                        error = AddTransactionError.Unknown(e.localizedMessage ?: "Failed to load transaction")
+                        error = AddTransactionError.Unknown()
                     )
                 }
             }
@@ -190,11 +183,11 @@ class EditTransactionViewModel(
         val state = _uiState.value
         val persistedType = persistedTransaction?.type
         if (state.isReadOnlyTransfer || persistedType == TransactionType.TRANSFER) {
-            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_READ_ONLY_MESSAGE)) }
+            _uiState.update { it.copy(error = AddTransactionError.TransferReadOnly) }
             return
         }
         if (type == TransactionType.TRANSFER) {
-            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_NOT_SUPPORTED_MESSAGE)) }
+            _uiState.update { it.copy(error = AddTransactionError.TransferUnavailable) }
             return
         }
         // Persisted transaction type (Expense vs Income) is immutable on edit.
@@ -256,7 +249,7 @@ class EditTransactionViewModel(
 
         val existing = persistedTransaction
         if (existing == null || !state.isTransactionLoaded) {
-            _uiState.update { it.copy(error = AddTransactionError.Unknown("Transaction not found")) }
+            _uiState.update { it.copy(error = AddTransactionError.TransactionNotFound) }
             return
         }
 
@@ -264,7 +257,7 @@ class EditTransactionViewModel(
             existing.type == TransactionType.TRANSFER ||
             state.transactionType == TransactionType.TRANSFER
         ) {
-            _uiState.update { it.copy(error = AddTransactionError.Unknown(TRANSFER_READ_ONLY_MESSAGE)) }
+            _uiState.update { it.copy(error = AddTransactionError.TransferReadOnly) }
             return
         }
 
@@ -314,7 +307,7 @@ class EditTransactionViewModel(
             } catch (e: DomainException) {
                 _uiState.update { it.copy(isSaving = false, error = AddTransactionError.fromDomainException(e)) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isSaving = false, error = AddTransactionError.Unknown(e.localizedMessage ?: e.message)) }
+                _uiState.update { it.copy(isSaving = false, error = AddTransactionError.Unknown()) }
             }
         }
     }

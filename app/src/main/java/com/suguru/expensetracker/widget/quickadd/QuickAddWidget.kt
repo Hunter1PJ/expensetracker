@@ -22,6 +22,8 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.suguru.expensetracker.MainActivity
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.AppLanguageManager
 
 class QuickAddWidget : GlanceAppWidget() {
 
@@ -33,7 +35,7 @@ class QuickAddWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent() {
-        val context = LocalContext.current
+        val context = AppLanguageManager.wrap(LocalContext.current)
         val size = LocalSize.current
         val width = size.width
         val height = size.height
@@ -80,7 +82,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         ) {}
                         Spacer(modifier = GlanceModifier.width(6.dp))
                         Text(
-                            text = "Quick Add Transaction",
+                            text = context.getString(R.string.widget_quick_add),
                             style = TextStyle(
                                 color = textPrimary,
                                 fontSize = 12.sp,
@@ -105,7 +107,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         ) {
                             Column {
                                 Text(
-                                    text = "+ Expense",
+                                    text = "+ ${context.getString(R.string.type_expense)}",
                                     style = TextStyle(
                                         color = expenseColor,
                                         fontSize = 13.sp,
@@ -114,7 +116,7 @@ class QuickAddWidget : GlanceAppWidget() {
                                 )
                                 Spacer(modifier = GlanceModifier.height(2.dp))
                                 Text(
-                                    text = "Log expense",
+                                    text = context.getString(R.string.widget_log_expense),
                                     style = TextStyle(
                                         color = textSecondary,
                                         fontSize = 9.sp
@@ -135,7 +137,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         ) {
                             Column {
                                 Text(
-                                    text = "+ Income",
+                                    text = "+ ${context.getString(R.string.type_income)}",
                                     style = TextStyle(
                                         color = incomeColor,
                                         fontSize = 13.sp,
@@ -144,7 +146,7 @@ class QuickAddWidget : GlanceAppWidget() {
                                 )
                                 Spacer(modifier = GlanceModifier.height(2.dp))
                                 Text(
-                                    text = "Log income",
+                                    text = context.getString(R.string.widget_log_income),
                                     style = TextStyle(
                                         color = textSecondary,
                                         fontSize = 9.sp
@@ -170,7 +172,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "+ Expense",
+                            text = "+ ${context.getString(R.string.type_expense)}",
                             style = TextStyle(
                                 color = expenseColor,
                                 fontSize = 12.sp,
@@ -189,7 +191,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "+ Income",
+                            text = "+ ${context.getString(R.string.type_income)}",
                             style = TextStyle(
                                 color = incomeColor,
                                 fontSize = 12.sp,
@@ -214,7 +216,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "+ Expense",
+                            text = "+ ${context.getString(R.string.type_expense)}",
                             style = TextStyle(
                                 color = expenseColor,
                                 fontSize = 12.sp,
@@ -233,7 +235,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "+ Income",
+                            text = "+ ${context.getString(R.string.type_income)}",
                             style = TextStyle(
                                 color = incomeColor,
                                 fontSize = 12.sp,
@@ -258,7 +260,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "+ Exp",
+                            text = context.getString(R.string.widget_quick_expense_short),
                             style = TextStyle(
                                 color = expenseColor,
                                 fontSize = 10.sp,
@@ -277,7 +279,7 @@ class QuickAddWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "+ Inc",
+                            text = context.getString(R.string.widget_quick_income_short),
                             style = TextStyle(
                                 color = incomeColor,
                                 fontSize = 10.sp,

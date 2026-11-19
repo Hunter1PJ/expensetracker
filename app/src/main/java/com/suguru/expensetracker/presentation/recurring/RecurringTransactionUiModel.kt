@@ -2,6 +2,7 @@ package com.suguru.expensetracker.presentation.recurring
 
 import com.suguru.expensetracker.domain.model.RecurrenceFrequency
 import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.presentation.util.UiMessage
 import java.time.LocalDate
 
 enum class RecurringStatus {
@@ -25,5 +26,5 @@ data class RecurringTransactionUiModel(
     val isActive: Boolean,
     val isReadOnly: Boolean = false,
     val status: RecurringStatus,
-    val statusDetail: String? = null
+    val statusDetail: UiMessage? = null
 )

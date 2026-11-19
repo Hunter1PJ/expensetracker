@@ -95,6 +95,66 @@ class AndroidKeystoreSecureStorageTest {
     }
 
     @Test
+    fun uidScopedStorageKeepsAccountsIsolatedAndDeletesOnlyRequestedUid() {
+        val context = RuntimeEnvironment.getApplication()
+        context.getSharedPreferences(prefName, 0).edit().clear().commit()
+        var activeUid: String? = "uid_a"
+        val scopedStorage = AndroidKeystoreSecureStorage(
+            context = context,
+            prefName = prefName,
+            keyAlias = "test_scoped_master_key",
+            currentUidProvider = { activeUid },
+            uidScopedMode = true
+        )
+        try {
+            scopedStorage.saveKey("uid_a", "AIzaSyAccountAKey1234")
+            scopedStorage.saveKey("uid_b", "AIzaSyAccountBKey9876")
+        } catch (_: IllegalStateException) {
+            return
+        }
+        assertEquals("AIzaSyAccountAKey1234", scopedStorage.getKey("uid_a"))
+        assertEquals("AIzaSyAccountBKey9876", scopedStorage.getKey("uid_b"))
+        assertNull(scopedStorage.getKey("uid_c"))
+
+        scopedStorage.deleteKey("uid_a")
+        assertNull(scopedStorage.getKey("uid_a"))
+        assertEquals("AIzaSyAccountBKey9876", scopedStorage.getKey("uid_b"))
+
+        activeUid = null
+        assertNull(scopedStorage.getKey())
+        assertFalse(scopedStorage.hasKey())
+    }
+
+    @Test
+    fun legacyKeyRemainsQuarantinedUntilExplicitMigrationAndRoundTripsToUidStorage() {
+        val context = RuntimeEnvironment.getApplication()
+        context.getSharedPreferences(prefName, 0).edit().clear().commit()
+        val legacyStorage = AndroidKeystoreSecureStorage(
+            context = context,
+            prefName = prefName,
+            keyAlias = "test_legacy_migration_key"
+        )
+        try {
+            legacyStorage.saveKey("AIzaSyLegacyAccountKey5555")
+        } catch (_: IllegalStateException) {
+            return
+        }
+        val scopedStorage = AndroidKeystoreSecureStorage(
+            context = context,
+            prefName = prefName,
+            keyAlias = "test_legacy_migration_key",
+            currentUidProvider = { null },
+            uidScopedMode = true
+        )
+        assertTrue(scopedStorage.hasUnassignedLegacyKey())
+        assertNull(scopedStorage.getKey("uid_a"))
+        assertTrue(scopedStorage.migrateLegacyKeyToUid("uid_a"))
+        assertEquals("AIzaSyLegacyAccountKey5555", scopedStorage.getKey("uid_a"))
+        assertFalse(scopedStorage.hasUnassignedLegacyKey())
+        assertNull(scopedStorage.getKey())
+    }
+
+    @Test
     fun legacyBase64Fallback_isDeletedAndNeverReadAsAnApiKey() {
         val testKey = "AIzaSyLegacyPlaintextFallback"
         val encoded = android.util.Base64.encodeToString(

@@ -83,7 +83,12 @@ class DataStoreCloudBackupStateStoreTest {
             pendingSinceEpochMillis = 1_763_200_000_000L,
             lastAttemptAtEpochMillis = 1_763_200_010_000L,
             lastFailureAtEpochMillis = 1_763_200_010_000L,
-            lastFailureCode = "NETWORK_UNAVAILABLE"
+            lastFailureCode = "NETWORK_UNAVAILABLE",
+            lastRestoreFailureAtEpochMillis = 1_763_200_020_000L,
+            lastRestoreFailureCode = "RESTORE_FAILED",
+            lastRestoreFailureGenerationId = "gen_failed_01",
+            lastRestoreFailureFingerprint = "a".repeat(64),
+            pendingRestore = true
         )
 
         store.setState(uid, initialState)
@@ -94,6 +99,8 @@ class DataStoreCloudBackupStateStoreTest {
             lastSuccessfulBackupAtEpochMillis = 1_763_200_050_000L,
             lastSuccessfulRestoreAtEpochMillis = 1_763_200_055_000L,
             lastSuccessfulSnapshotId = "snap_pending_01",
+            lastSuccessfulRestoreGenerationId = "gen_restored_01",
+            lastSuccessfulRestoreFingerprint = "b".repeat(64),
             lastAttemptAtEpochMillis = 1_763_200_050_000L
         )
         store.setState(uid, completedState)

@@ -12,11 +12,18 @@ data class CloudBackupState(
     val lastSuccessfulBackupAtEpochMillis: Long? = null,
     val lastSuccessfulRestoreAtEpochMillis: Long? = null,
     val lastSuccessfulSnapshotId: String? = null,
+    val lastSuccessfulRestoreGenerationId: String? = null,
+    val lastSuccessfulRestoreFingerprint: String? = null,
+    val pendingRestore: Boolean = false,
     val pendingSnapshotId: String? = null,
     val pendingSinceEpochMillis: Long? = null,
     val lastAttemptAtEpochMillis: Long? = null,
     val lastFailureAtEpochMillis: Long? = null,
-    val lastFailureCode: String? = null
+    val lastFailureCode: String? = null,
+    val lastRestoreFailureAtEpochMillis: Long? = null,
+    val lastRestoreFailureCode: String? = null,
+    val lastRestoreFailureGenerationId: String? = null,
+    val lastRestoreFailureFingerprint: String? = null
 ) {
     init {
         if (lastSuccessfulBackupAtEpochMillis != null) {
@@ -32,6 +39,16 @@ data class CloudBackupState(
         if (lastSuccessfulSnapshotId != null) {
             require(isValidSnapshotId(lastSuccessfulSnapshotId)) {
                 "lastSuccessfulSnapshotId is invalid."
+            }
+        }
+        if (lastSuccessfulRestoreGenerationId != null) {
+            require(isValidSnapshotId(lastSuccessfulRestoreGenerationId)) {
+                "lastSuccessfulRestoreGenerationId is invalid."
+            }
+        }
+        if (lastSuccessfulRestoreFingerprint != null) {
+            require(Regex("^[0-9a-f]{64}$").matches(lastSuccessfulRestoreFingerprint)) {
+                "lastSuccessfulRestoreFingerprint must be a SHA-256 fingerprint."
             }
         }
         if (pendingSnapshotId != null) {
@@ -64,6 +81,29 @@ data class CloudBackupState(
         }
         require((lastFailureAtEpochMillis == null) == (lastFailureCode == null)) {
             "lastFailureAtEpochMillis and lastFailureCode must either both be set or both be null."
+        }
+        if (lastRestoreFailureAtEpochMillis != null) {
+            require(lastRestoreFailureAtEpochMillis >= 0L) {
+                "lastRestoreFailureAtEpochMillis must be non-negative."
+            }
+        }
+        if (lastRestoreFailureCode != null) {
+            require(isValidFailureCode(lastRestoreFailureCode)) {
+                "lastRestoreFailureCode must be a bounded machine-readable identifier."
+            }
+        }
+        require((lastRestoreFailureAtEpochMillis == null) == (lastRestoreFailureCode == null)) {
+            "Restore failure timestamp and code must either both be set or both be null."
+        }
+        if (lastRestoreFailureGenerationId != null) {
+            require(isValidSnapshotId(lastRestoreFailureGenerationId)) {
+                "lastRestoreFailureGenerationId is invalid."
+            }
+        }
+        if (lastRestoreFailureFingerprint != null) {
+            require(Regex("^[0-9a-f]{64}$").matches(lastRestoreFailureFingerprint)) {
+                "lastRestoreFailureFingerprint must be a SHA-256 fingerprint."
+            }
         }
     }
 

@@ -136,6 +136,20 @@ class AccountBalanceWidgetTest {
         assertEquals("$1,250.00", data.formattedBalance)
     }
 
+    @Test
+    fun configurationForAnotherWorkspaceDoesNotReadAccountData() = runBlocking {
+        widgetConfigRepository.saveConfiguration(401, 1L, false, workspaceKey = "user-a")
+        val scopedProvider = AccountBalanceWidgetDataProvider(
+            fakeAccountRepository,
+            getAccountBalanceUseCase,
+            widgetConfigRepository,
+            activeWorkspaceKey = "user-b"
+        )
+
+        val data = scopedProvider.getWidgetData(401).first { it.state != WidgetDataState.LOADING }
+        assertEquals(WidgetDataState.ACCOUNT_UNAVAILABLE, data.state)
+    }
+
     // --- TEST 10: Missing account -> AccountUnavailable ---
     @Test
     fun testMissingAccountReturnsUnavailable() = runBlocking {
@@ -233,6 +247,7 @@ class AccountBalanceWidgetTest {
 
     class FakeTransactionRepository : com.suguru.expensetracker.domain.repository.TransactionRepository {
         override fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>> = kotlinx.coroutines.flow.flowOf(emptyMap())
+        override fun observeIncomeCategoryUsageCounts(): Flow<Map<Long, Int>> = kotlinx.coroutines.flow.flowOf(emptyMap())
         override fun observeAllTransactions(): Flow<List<Transaction>> = MutableStateFlow(emptyList())
         override fun observeRecentTransactions(limit: Int): Flow<List<Transaction>> = MutableStateFlow(emptyList())
         override suspend fun getRecentTransactions(limit: Int): List<Transaction> = emptyList()
@@ -259,8 +274,8 @@ class AccountBalanceWidgetTest {
         override fun getAllConfigurations(): Flow<List<AccountWidgetConfiguration>> =
             configs.map { it.values.toList() }
 
-        override suspend fun saveConfiguration(appWidgetId: Int, accountId: Long, privacyMode: Boolean) {
-            configs.value = configs.value + (appWidgetId to AccountWidgetConfiguration(appWidgetId, accountId, privacyMode))
+        override suspend fun saveConfiguration(appWidgetId: Int, accountId: Long, privacyMode: Boolean, workspaceKey: String) {
+            configs.value = configs.value + (appWidgetId to AccountWidgetConfiguration(appWidgetId, accountId, privacyMode, workspaceKey))
         }
 
         override suspend fun deleteConfiguration(appWidgetId: Int) {
@@ -273,8 +288,8 @@ class AccountBalanceWidgetTest {
         override fun getAllBudgetProgressConfigurations(): Flow<List<com.suguru.expensetracker.widget.configuration.BudgetProgressWidgetConfiguration>> =
             budgetConfigs.map { it.values.toList() }
 
-        override suspend fun saveBudgetProgressConfiguration(appWidgetId: Int, budgetId: Long, privacyMode: Boolean) {
-            budgetConfigs.value = budgetConfigs.value + (appWidgetId to com.suguru.expensetracker.widget.configuration.BudgetProgressWidgetConfiguration(appWidgetId, budgetId, privacyMode))
+        override suspend fun saveBudgetProgressConfiguration(appWidgetId: Int, budgetId: Long, privacyMode: Boolean, workspaceKey: String) {
+            budgetConfigs.value = budgetConfigs.value + (appWidgetId to com.suguru.expensetracker.widget.configuration.BudgetProgressWidgetConfiguration(appWidgetId, budgetId, privacyMode, workspaceKey))
         }
 
         override suspend fun deleteBudgetProgressConfiguration(appWidgetId: Int) {

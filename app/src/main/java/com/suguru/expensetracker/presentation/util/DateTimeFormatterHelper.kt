@@ -14,13 +14,15 @@ import java.util.Locale
  */
 object DateTimeFormatterHelper {
 
-    private val monthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
-
     fun getLocalDateFormatter(
         pref: DateFormatPreference
     ): DateTimeFormatter {
+        if (pref == DateFormatPreference.SYSTEM_DEFAULT) {
+            return DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+                .withLocale(Locale.getDefault())
+        }
         val pattern = when (pref) {
-            DateFormatPreference.SYSTEM_DEFAULT -> "MMM d, yyyy"
+            DateFormatPreference.SYSTEM_DEFAULT -> error("Handled above")
             DateFormatPreference.DD_MM_YYYY -> "dd/MM/yyyy"
             DateFormatPreference.MM_DD_YYYY -> "MM/dd/yyyy"
             DateFormatPreference.YYYY_MM_DD -> "yyyy/MM/dd"
@@ -28,15 +30,13 @@ object DateTimeFormatterHelper {
         return DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun getTimeFormatter(
         pref: TimeFormatPreference
     ): DateTimeFormatter {
-        val pattern = when (pref) {
-            TimeFormatPreference.SYSTEM_DEFAULT,
-            TimeFormatPreference.HOUR_24 -> "HH:mm"
-            TimeFormatPreference.HOUR_12 -> "hh:mm a"
-        }
-        return DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
+        // Clock presentation is intentionally independent of the Android system setting
+        // and the legacy per-workspace preference.
+        return DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
     }
 
     fun formatTransactionTime(
@@ -46,22 +46,11 @@ object DateTimeFormatterHelper {
         timePref: TimeFormatPreference = TimeFormatPreference.SYSTEM_DEFAULT
     ): String {
         val zonedDateTime = instant.atZone(zoneId)
-        val txDate = zonedDateTime.toLocalDate()
-        val today = LocalDate.now(zoneId)
-        val yesterday = today.minusDays(1)
-
         val timeFormatter = getTimeFormatter(timePref)
+        val dateFormatter = getLocalDateFormatter(datePref)
         val timePart = zonedDateTime.format(timeFormatter)
-
-        return when (txDate) {
-            today -> "Today, $timePart"
-            yesterday -> "Yesterday, $timePart"
-            else -> {
-                val dateFormatter = getLocalDateFormatter(datePref)
-                val datePart = zonedDateTime.format(dateFormatter)
-                "$datePart, $timePart"
-            }
-        }
+        val datePart = zonedDateTime.format(dateFormatter)
+        return "$datePart, $timePart"
     }
 
     fun formatTimeOnly(
@@ -72,20 +61,14 @@ object DateTimeFormatterHelper {
         return instant.atZone(zoneId).format(getTimeFormatter(timePref))
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun formatGroupDateHeader(
         date: LocalDate,
         zoneId: ZoneId = ZoneId.systemDefault(),
         today: LocalDate = LocalDate.now(zoneId),
         datePref: DateFormatPreference = DateFormatPreference.SYSTEM_DEFAULT
     ): String {
-        val yesterday = today.minusDays(1)
-        return when (date) {
-            today -> "Today"
-            yesterday -> "Yesterday"
-            else -> {
-                date.format(getLocalDateFormatter(datePref))
-            }
-        }
+        return date.format(getLocalDateFormatter(datePref))
     }
 
     fun formatFullDateTime(
@@ -104,7 +87,8 @@ object DateTimeFormatterHelper {
         zoneId: ZoneId = ZoneId.systemDefault()
     ): String {
         val yearMonth = YearMonth.now(zoneId)
-        return yearMonth.format(monthYearFormatter)
+        val formatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
+        return yearMonth.format(formatter)
     }
 
     fun formatLocalDate(

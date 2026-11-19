@@ -4,6 +4,7 @@ import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.parser.TransactionCandidate
+import com.suguru.expensetracker.presentation.util.UiMessage
 
 data class CurrencySummaryUiModel(
     val currencyCode: String,
@@ -19,7 +20,6 @@ data class AccountSummaryUiModel(
     val id: Long,
     val name: String,
     val type: AccountType,
-    val typeName: String,
     val currencyCode: String,
     val iconName: String,
     val colorHex: String,
@@ -49,7 +49,7 @@ data class HomeUiState(
     val accounts: List<AccountSummaryUiModel> = emptyList(),
     val recentTransactions: List<RecentTransactionUiModel> = emptyList(),
     val currentMonthName: String = "This Month",
-    val errorMessage: String? = null,
+    val errorMessage: UiMessage? = null,
     val isAiFeatureEnabled: Boolean = true,
     val isAiConfigured: Boolean = false,
     val isAiExtracting: Boolean = false,

@@ -50,23 +50,23 @@ class GeminiAiProvider(
     override suspend fun extractFinancialTransactions(
         prompt: String,
         config: AiConfiguration
-    ): AiResult<ExtractedFinancialPayload> {
-        val apiKey = secureKeyStorage.getKey()
-        if (apiKey.isNullOrBlank()) {
-            return AiResult.Failure(AiError.MissingApiKey)
-        }
+    ): AiResult<ExtractedFinancialPayload> =
+        extractFinancialTransactions(prompt, config, secureKeyStorage.getKey().orEmpty())
 
+    override suspend fun extractFinancialTransactions(
+        prompt: String,
+        config: AiConfiguration,
+        apiKey: String
+    ): AiResult<ExtractedFinancialPayload> {
+        if (apiKey.isBlank()) return AiResult.Failure(AiError.MissingApiKey)
         val request = GeminiRequestFactory.createExtractionRequest(prompt, config)
         val responseResult = apiClient.generateContent(
             apiKey = apiKey,
             model = config.modelIdentifier,
             requestBody = request
         )
-
         return when (responseResult) {
-            is AiResult.Success -> {
-                GeminiResponseParser.parsePayload(responseResult.data)
-            }
+            is AiResult.Success -> GeminiResponseParser.parsePayload(responseResult.data)
             is AiResult.Failure -> responseResult
         }
     }

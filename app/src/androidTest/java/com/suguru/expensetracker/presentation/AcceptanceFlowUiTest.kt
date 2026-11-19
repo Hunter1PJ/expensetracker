@@ -12,6 +12,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.UiMessage
 import com.suguru.expensetracker.domain.ai.AiRepository
 import com.suguru.expensetracker.domain.ai.AiResult
 import com.suguru.expensetracker.domain.model.Account
@@ -79,7 +81,6 @@ class AcceptanceFlowUiTest {
                                 id = 1,
                                 name = "Cash",
                                 type = AccountType.CASH,
-                                typeName = "Cash",
                                 currencyCode = "USD",
                                 iconName = "wallet",
                                 colorHex = "#000000",
@@ -123,7 +124,7 @@ class AcceptanceFlowUiTest {
             selectedCategoryId = 1,
             isAiAssisted = true,
             candidateSource = CandidateSource.OFFLINE_PARSER,
-            aiAmountWarning = "Amount was not detected in the AI draft. Please enter an amount.",
+            aiAmountWarning = UiMessage(R.string.ai_missing_amount_warning),
             aiSourceWarnings = listOf(ParseWarning.MISSING_AMOUNT)
         )
 
@@ -191,31 +192,11 @@ class AcceptanceFlowUiTest {
     }
 
     @Test
-    fun transferFormShowsDistinctSourceAndDestinationAccountSelectors() {
-        val cash = Account(
-            id = 1,
-            name = "Cash",
-            type = AccountType.CASH,
-            initialBalance = Money(0, "USD")
-        )
-        val bank = Account(
-            id = 2,
-            name = "Bank",
-            type = AccountType.BANK,
-            initialBalance = Money(0, "USD")
-        )
-        var selectedSource: Long? = null
-        var selectedDestination: Long? = null
-
+    fun transferDataCannotExposeTransactionCreationControls() {
         composeRule.setContent {
             ExpenseTrackerTheme {
                 AddTransactionScreenContent(
-                    uiState = AddTransactionUiState(
-                        transactionType = TransactionType.TRANSFER,
-                        activeAccounts = listOf(cash, bank),
-                        selectedTransferSourceAccountId = cash.id,
-                        selectedTransferDestinationAccountId = null
-                    ),
+                    uiState = AddTransactionUiState(transactionType = TransactionType.TRANSFER),
                     onNavigateBack = {},
                     onTransactionTypeChanged = {},
                     onAmountChanged = {},
@@ -223,19 +204,15 @@ class AcceptanceFlowUiTest {
                     onNoteChanged = {},
                     onTransactionTimeChanged = {},
                     onDismissError = {},
-                    onSaveTransaction = {},
-                    onTransferSourceSelected = { selectedSource = it },
-                    onTransferDestinationSelected = { selectedDestination = it }
+                    onSaveTransaction = {}
                 )
             }
         }
 
-        composeRule.onNodeWithTag("transfer_source_account_selector").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Bank").performClick()
-        assertEquals(bank.id, selectedSource)
-        composeRule.onNodeWithTag("transfer_destination_account_selector").performClick()
-        composeRule.onNodeWithText("Bank").performClick()
-        assertEquals(bank.id, selectedDestination)
+        composeRule.onNodeWithTag("transfer_unavailable_message").assertDoesNotExist()
+        composeRule.onAllNodesWithTag("transfer_source_account_selector").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("transfer_destination_account_selector").assertCountEquals(0)
+        composeRule.onNodeWithTag("save_transaction_button").performScrollTo().assertIsNotEnabled()
     }
 
     @Test

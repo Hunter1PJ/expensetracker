@@ -140,7 +140,7 @@ class AddTransactionViewModelTest {
     }
 
     @Test
-    fun `add transaction screen exposes transfer type while keeping expense and income controls`() {
+    fun `add transaction screen exposes only expense and income types`() {
         val expenseCategory = Category(
             id = 1L,
             name = "Groceries",
@@ -182,7 +182,7 @@ class AddTransactionViewModelTest {
 
         composeTestRule.onNodeWithTag("type_tab_expense").assertIsDisplayed()
         composeTestRule.onNodeWithTag("type_tab_income").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("type_tab_transfer").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("type_tab_transfer").assertDoesNotExist()
         composeTestRule.onNodeWithTag("amount_input_field").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("category_selector").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("note_input_field").performScrollTo().assertIsDisplayed()
@@ -214,49 +214,20 @@ class AddTransactionViewModelTest {
     }
 
     @Test
-    fun `switching to transfer selects distinct same-currency source and destination accounts`() = runTest(testDispatcher) {
-        val sourceId = accountRepository.insertAccount(
-            Account(name = "Cash", type = AccountType.CASH, initialBalance = Money(0L, "USD"))
-        )
-        val destinationId = accountRepository.insertAccount(
-            Account(name = "Bank", type = AccountType.BANK, initialBalance = Money(0L, "USD"))
-        )
-
+    fun `transfer form does not invent endpoints in the single-account setup`() = runTest(testDispatcher) {
+        val defaultAccountId = insertDefaultAccount()
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onTransactionTypeChanged(TransactionType.TRANSFER)
-        advanceUntilIdle()
 
-        val state = viewModel.uiState.value
-        assertEquals(TransactionType.TRANSFER, state.transactionType)
-        assertEquals(sourceId, state.selectedTransferSourceAccountId)
-        assertEquals(destinationId, state.selectedTransferDestinationAccountId)
-        assertTrue(state.categories.isEmpty())
-        assertNull(state.error)
-    }
-
-    @Test
-    fun `saving transfer persists source and destination with no category`() = runTest(testDispatcher) {
-        val sourceId = accountRepository.insertAccount(
-            Account(name = "Cash", type = AccountType.CASH, initialBalance = Money(0L, "USD"))
-        )
-        val destinationId = accountRepository.insertAccount(
-            Account(name = "Bank", type = AccountType.BANK, initialBalance = Money(0L, "USD"))
-        )
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
         viewModel.onTransactionTypeChanged(TransactionType.TRANSFER)
         viewModel.onAmountChanged("25.00")
+        assertFalse(viewModel.uiState.value.canSave)
+
         viewModel.saveTransaction()
         advanceUntilIdle()
 
-        val saved = transactionRepository.getRecentTransactions(1).single()
-        assertEquals(TransactionType.TRANSFER, saved.type)
-        assertEquals(sourceId, saved.accountId)
-        assertEquals(destinationId, saved.destinationAccountId)
-        assertNull(saved.categoryId)
-        assertTrue(viewModel.uiState.value.isSavedSuccessfully)
+        assertEquals(AddTransactionError.TransferUnavailable, viewModel.uiState.value.error)
+        assertTrue(transactionRepository.getTransactionsByAccount(defaultAccountId).isEmpty())
     }
 
     @Test

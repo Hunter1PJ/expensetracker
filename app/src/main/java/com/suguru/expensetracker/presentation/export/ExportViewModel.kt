@@ -3,6 +3,7 @@ package com.suguru.expensetracker.presentation.export
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.suguru.expensetracker.data.export.PdfFinancialReportRenderer
+import com.suguru.expensetracker.data.export.PdfFinancialReportLabels
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.domain.model.export.ExportFilter
 import com.suguru.expensetracker.domain.repository.AccountRepository
@@ -58,7 +59,7 @@ class ExportViewModel(
 
     fun setDateRange(startDate: LocalDate?, endDate: LocalDate?) {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
-            _uiState.update { it.copy(errorMessage = "Start date cannot be after end date") }
+            _uiState.update { it.copy(errorMessage = ExportUiMessage.INVALID_DATE_RANGE) }
             return
         }
         _uiState.update {
@@ -155,6 +156,7 @@ class ExportViewModel(
 
     suspend fun executeExportToStream(
         outputStream: OutputStream,
+        pdfLabels: PdfFinancialReportLabels? = null,
         zoneId: ZoneId = ZoneId.systemDefault()
     ) {
         val currentState = _uiState.value
@@ -164,7 +166,7 @@ class ExportViewModel(
         _uiState.update {
             it.copy(
                 isWritingFile = true,
-                exportProgressMessage = "Writing export file..."
+                exportProgressMessage = ExportUiMessage.WRITING_FILE
             )
         }
 
@@ -179,7 +181,12 @@ class ExportViewModel(
                     }
                     ExportFormat.PDF_REPORT -> {
                         val reportData = prepareFinancialReportDataUseCase(filter, zoneId)
-                        pdfFinancialReportRenderer.renderReportToStream(reportData, outputStream, zoneId)
+                        pdfFinancialReportRenderer.renderReportToStream(
+                            reportData,
+                            outputStream,
+                            requireNotNull(pdfLabels) { "Localized PDF report labels are required." },
+                            zoneId
+                        )
                     }
                 }
             }
@@ -190,10 +197,10 @@ class ExportViewModel(
                     targetFileName = null,
                     pendingExportAction = null,
                     exportProgressMessage = null,
-                    successMessage = "Export completed successfully!"
+                    successMessage = ExportUiMessage.EXPORT_COMPLETE
                 )
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             _uiState.update {
                 it.copy(
                     isWritingFile = false,
@@ -201,7 +208,7 @@ class ExportViewModel(
                     targetFileName = null,
                     pendingExportAction = null,
                     exportProgressMessage = null,
-                    errorMessage = "Export failed. Please retry: ${e.localizedMessage}"
+                    errorMessage = ExportUiMessage.EXPORT_FAILED
                 )
             }
         }

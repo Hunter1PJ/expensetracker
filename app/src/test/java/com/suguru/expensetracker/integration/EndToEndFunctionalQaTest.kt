@@ -8,6 +8,7 @@ import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioner
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
 import com.suguru.expensetracker.data.export.CsvExporter
 import com.suguru.expensetracker.data.export.PdfFinancialReportRenderer
+import com.suguru.expensetracker.presentation.export.localizedPdfReportLabels
 import com.suguru.expensetracker.data.local.ExpenseTrackerDatabase
 import com.suguru.expensetracker.data.local.entity.AccountEntity
 import com.suguru.expensetracker.data.repository.DefaultCategorySeeder
@@ -1240,7 +1241,7 @@ class EndToEndFunctionalQaTest {
         // 3. PDF export stream rendering (verify report data structure and handle Robolectric PDF limitation gracefully)
         try {
             val pdfStream = ByteArrayOutputStream()
-            pdfRenderer.renderReportToStream(reportData, pdfStream, zoneId)
+            pdfRenderer.renderReportToStream(reportData, pdfStream, localizedPdfReportLabels(context), zoneId)
             val pdfBytes = pdfStream.toByteArray()
             assertTrue(pdfBytes.isNotEmpty())
             val pdfHeader = String(pdfBytes.take(5).toByteArray(), StandardCharsets.US_ASCII)
@@ -1364,8 +1365,8 @@ class EndToEndFunctionalQaTest {
         override fun getAllConfigurations(): Flow<List<AccountWidgetConfiguration>> =
             configs.map { it.values.toList() }
 
-        override suspend fun saveConfiguration(appWidgetId: Int, accountId: Long, privacyMode: Boolean) {
-            configs.value = configs.value + (appWidgetId to AccountWidgetConfiguration(appWidgetId, accountId, privacyMode))
+        override suspend fun saveConfiguration(appWidgetId: Int, accountId: Long, privacyMode: Boolean, workspaceKey: String) {
+            configs.value = configs.value + (appWidgetId to AccountWidgetConfiguration(appWidgetId, accountId, privacyMode, workspaceKey))
         }
 
         override suspend fun deleteConfiguration(appWidgetId: Int) {
@@ -1378,8 +1379,8 @@ class EndToEndFunctionalQaTest {
         override fun getAllBudgetProgressConfigurations(): Flow<List<BudgetProgressWidgetConfiguration>> =
             budgetConfigs.map { it.values.toList() }
 
-        override suspend fun saveBudgetProgressConfiguration(appWidgetId: Int, budgetId: Long, privacyMode: Boolean) {
-            budgetConfigs.value = budgetConfigs.value + (appWidgetId to BudgetProgressWidgetConfiguration(appWidgetId, budgetId, privacyMode))
+        override suspend fun saveBudgetProgressConfiguration(appWidgetId: Int, budgetId: Long, privacyMode: Boolean, workspaceKey: String) {
+            budgetConfigs.value = budgetConfigs.value + (appWidgetId to BudgetProgressWidgetConfiguration(appWidgetId, budgetId, privacyMode, workspaceKey))
         }
 
         override suspend fun deleteBudgetProgressConfiguration(appWidgetId: Int) {

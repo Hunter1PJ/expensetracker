@@ -41,7 +41,7 @@ fun SettingsPlaceholderScreen(
     ) {
         SectionHeader(
             title = stringResource(R.string.placeholder_settings_title),
-            subtitle = "Preferences & data management"
+            subtitle = stringResource(R.string.settings_subtitle)
         )
 
         ExpenseTrackerCard(

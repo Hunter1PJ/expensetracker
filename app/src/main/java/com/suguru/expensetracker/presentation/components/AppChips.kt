@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.suguru.expensetracker.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.domain.model.TransactionType
@@ -130,11 +132,12 @@ fun TransactionTypeChip(
     modifier: Modifier = Modifier,
     testTag: String = "type_chip_${type.name.lowercase()}"
 ) {
-    val (typeColor, typeLabel) = when (type) {
-        TransactionType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositive to "Income"
-        TransactionType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegative to "Expense"
-        TransactionType.TRANSFER -> ExpenseTrackerTheme.extendedColors.financialNeutral to "Transfer"
+    val (typeColor, typeLabelRes) = when (type) {
+        TransactionType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositive to R.string.type_income
+        TransactionType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegative to R.string.type_expense
+        TransactionType.TRANSFER -> ExpenseTrackerTheme.extendedColors.financialNeutral to R.string.type_transfer
     }
+    val typeLabel = stringResource(typeLabelRes)
 
     val containerColor = if (selected) {
         typeColor.copy(alpha = 0.2f)

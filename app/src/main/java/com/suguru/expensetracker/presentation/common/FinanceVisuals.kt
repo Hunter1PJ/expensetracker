@@ -22,17 +22,19 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Work
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.suguru.expensetracker.domain.model.AccountType
 import com.suguru.expensetracker.domain.model.CategoryType
+import com.suguru.expensetracker.R
 
 /**
  * Visual metadata for curated icon options.
  */
 data class IconOption(
     val id: String,
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ImageVector
 )
 
@@ -41,51 +43,51 @@ data class IconOption(
  */
 data class ColorOption(
     val hex: String,
-    val label: String,
+    @StringRes val labelRes: Int,
     val color: Color
 )
 
 object FinanceVisuals {
 
     val ACCOUNT_ICONS: List<IconOption> = listOf(
-        IconOption("account_balance", "Bank", Icons.Default.AccountBalance),
-        IconOption("wallet", "Wallet", Icons.Default.AccountBalanceWallet),
-        IconOption("credit_card", "Card", Icons.Default.CreditCard),
-        IconOption("savings", "Savings", Icons.Default.Savings),
-        IconOption("trending_up", "Investment", Icons.Default.TrendingUp),
-        IconOption("payments", "Cash", Icons.Default.Payments),
-        IconOption("attach_money", "Money", Icons.Default.AttachMoney),
-        IconOption("star", "Featured", Icons.Default.Star)
+        IconOption("account_balance", R.string.icon_bank, Icons.Default.AccountBalance),
+        IconOption("wallet", R.string.icon_wallet, Icons.Default.AccountBalanceWallet),
+        IconOption("credit_card", R.string.icon_card, Icons.Default.CreditCard),
+        IconOption("savings", R.string.icon_savings, Icons.Default.Savings),
+        IconOption("trending_up", R.string.icon_investment, Icons.Default.TrendingUp),
+        IconOption("payments", R.string.icon_cash, Icons.Default.Payments),
+        IconOption("attach_money", R.string.icon_money, Icons.Default.AttachMoney),
+        IconOption("star", R.string.icon_featured, Icons.Default.Star)
     )
 
     val CATEGORY_ICONS: List<IconOption> = listOf(
-        IconOption("fastfood", "Food & Dining", Icons.Default.Fastfood),
-        IconOption("directions_car", "Transport", Icons.Default.DirectionsCar),
-        IconOption("shopping_bag", "Shopping", Icons.Default.CreditCard),
-        IconOption("movie", "Entertainment", Icons.Default.Movie),
-        IconOption("receipt", "Bills & Utilities", Icons.Default.Receipt),
-        IconOption("local_hospital", "Health", Icons.Default.LocalHospital),
-        IconOption("school", "Education", Icons.Default.School),
-        IconOption("work", "Salary & Income", Icons.Default.Work),
-        IconOption("card_giftcard", "Gifts", Icons.Default.CardGiftcard),
-        IconOption("home", "Housing", Icons.Default.Home),
-        IconOption("fitness_center", "Fitness", Icons.Default.FitnessCenter),
-        IconOption("flight", "Travel", Icons.Default.Flight),
-        IconOption("pets", "Pets", Icons.Default.Pets),
-        IconOption("category", "Other", Icons.Default.Category)
+        IconOption("fastfood", R.string.icon_food_dining, Icons.Default.Fastfood),
+        IconOption("directions_car", R.string.icon_transport, Icons.Default.DirectionsCar),
+        IconOption("shopping_bag", R.string.icon_shopping, Icons.Default.CreditCard),
+        IconOption("movie", R.string.icon_entertainment, Icons.Default.Movie),
+        IconOption("receipt", R.string.icon_bills_utilities, Icons.Default.Receipt),
+        IconOption("local_hospital", R.string.icon_health, Icons.Default.LocalHospital),
+        IconOption("school", R.string.icon_education, Icons.Default.School),
+        IconOption("work", R.string.icon_salary_income, Icons.Default.Work),
+        IconOption("card_giftcard", R.string.icon_gifts, Icons.Default.CardGiftcard),
+        IconOption("home", R.string.icon_housing, Icons.Default.Home),
+        IconOption("fitness_center", R.string.icon_fitness, Icons.Default.FitnessCenter),
+        IconOption("flight", R.string.icon_travel, Icons.Default.Flight),
+        IconOption("pets", R.string.icon_pets, Icons.Default.Pets),
+        IconOption("category", R.string.category_other, Icons.Default.Category)
     )
 
     val CURATED_COLORS: List<ColorOption> = listOf(
-        ColorOption("#10B981", "Emerald", Color(0xFF10B981)),
-        ColorOption("#3B82F6", "Blue", Color(0xFF3B82F6)),
-        ColorOption("#6366F1", "Indigo", Color(0xFF6366F1)),
-        ColorOption("#8B5CF6", "Purple", Color(0xFF8B5CF6)),
-        ColorOption("#F59E0B", "Amber", Color(0xFFF59E0B)),
-        ColorOption("#EF4444", "Coral", Color(0xFFEF4444)),
-        ColorOption("#EC4899", "Pink", Color(0xFFEC4899)),
-        ColorOption("#06B6D4", "Cyan", Color(0xFF06B6D4)),
-        ColorOption("#14B8A6", "Teal", Color(0xFF14B8A6)),
-        ColorOption("#64748B", "Slate", Color(0xFF64748B))
+        ColorOption("#10B981", R.string.color_emerald, Color(0xFF10B981)),
+        ColorOption("#3B82F6", R.string.color_blue, Color(0xFF3B82F6)),
+        ColorOption("#6366F1", R.string.color_indigo, Color(0xFF6366F1)),
+        ColorOption("#8B5CF6", R.string.color_purple, Color(0xFF8B5CF6)),
+        ColorOption("#F59E0B", R.string.color_amber, Color(0xFFF59E0B)),
+        ColorOption("#EF4444", R.string.color_coral, Color(0xFFEF4444)),
+        ColorOption("#EC4899", R.string.color_pink, Color(0xFFEC4899)),
+        ColorOption("#06B6D4", R.string.color_cyan, Color(0xFF06B6D4)),
+        ColorOption("#14B8A6", R.string.color_teal, Color(0xFF14B8A6)),
+        ColorOption("#64748B", R.string.color_slate, Color(0xFF64748B))
     )
 
     fun getAccountIcon(iconName: String): ImageVector {
@@ -136,22 +138,24 @@ object FinanceVisuals {
         }
     }
 
-    fun getAccountTypeLabel(type: AccountType): String {
+    @StringRes
+    fun getAccountTypeLabelRes(type: AccountType): Int {
         return when (type) {
-            AccountType.CASH -> "Cash"
-            AccountType.BANK -> "Bank Account"
-            AccountType.CARD -> "Credit Card"
-            AccountType.SAVINGS -> "Savings"
-            AccountType.INVESTMENT -> "Investment"
-            AccountType.OTHER -> "Other"
+            AccountType.CASH -> R.string.account_type_cash
+            AccountType.BANK -> R.string.account_type_account_bank
+            AccountType.CARD -> R.string.account_type_credit_card
+            AccountType.SAVINGS -> R.string.account_type_savings
+            AccountType.INVESTMENT -> R.string.account_type_investment
+            AccountType.OTHER -> R.string.account_type_other
         }
     }
 
-    fun getCategoryTypeLabel(type: CategoryType): String {
+    @StringRes
+    fun getCategoryTypeLabelRes(type: CategoryType): Int {
         return when (type) {
-            CategoryType.EXPENSE -> "Expense"
-            CategoryType.INCOME -> "Income"
-            CategoryType.BOTH -> "Both"
+            CategoryType.EXPENSE -> R.string.type_expense
+            CategoryType.INCOME -> R.string.type_income
+            CategoryType.BOTH -> R.string.category_type_both
         }
     }
 }

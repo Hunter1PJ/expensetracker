@@ -145,7 +145,7 @@ fun AddAccountScreenContent(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = if (uiState.isEditMode) "UPDATE WALLET CONFIGURATION" else "CONFIGURE NEW WALLET",
+                            text = stringResource(if (uiState.isEditMode) R.string.account_edit_subtitle else R.string.account_add_subtitle),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.2.sp,
@@ -265,7 +265,7 @@ fun AddAccountScreenContent(
                             ) {
                                 AccountType.entries.forEach { type ->
                                     val isSelected = uiState.type == type
-                                    val typeLabel = FinanceVisuals.getAccountTypeLabel(type)
+                                    val typeLabel = stringResource(FinanceVisuals.getAccountTypeLabelRes(type))
 
                                     Surface(
                                         shape = ExpenseTrackerRadius.chipPill,
@@ -564,7 +564,7 @@ fun IconPickerItem(
     ) {
         Icon(
             imageVector = iconOption.icon,
-            contentDescription = iconOption.label,
+            contentDescription = stringResource(iconOption.labelRes),
             tint = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.textSecondary,
             modifier = Modifier.size(ExpenseTrackerTheme.iconSize.md)
         )
@@ -596,7 +596,7 @@ fun ColorPickerItem(
         if (isSelected) {
             Icon(
                 imageVector = Icons.Default.Check,
-                contentDescription = colorOption.label,
+                contentDescription = stringResource(colorOption.labelRes),
                 tint = Color.White,
                 modifier = Modifier.size(ExpenseTrackerTheme.iconSize.xs)
             )

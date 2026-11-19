@@ -119,8 +119,14 @@ class FakeTransactionRepository : TransactionRepository {
         }
 
     override fun observeExpenseCategoryUsageCounts(): Flow<Map<Long, Int>> =
+        observeUsageCounts(com.suguru.expensetracker.domain.model.TransactionType.EXPENSE)
+
+    override fun observeIncomeCategoryUsageCounts(): Flow<Map<Long, Int>> =
+        observeUsageCounts(com.suguru.expensetracker.domain.model.TransactionType.INCOME)
+
+    private fun observeUsageCounts(type: com.suguru.expensetracker.domain.model.TransactionType): Flow<Map<Long, Int>> =
         transactions.map { map ->
-            map.values.filter { it.type == com.suguru.expensetracker.domain.model.TransactionType.EXPENSE && it.categoryId != null }
+            map.values.filter { it.type == type && it.categoryId != null }
                 .groupingBy { it.categoryId!! }
                 .eachCount()
         }

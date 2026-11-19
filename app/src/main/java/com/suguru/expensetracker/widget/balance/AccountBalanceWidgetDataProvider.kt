@@ -11,14 +11,19 @@ import kotlinx.coroutines.flow.flow
 class AccountBalanceWidgetDataProvider(
     private val accountRepository: AccountRepository,
     private val getAccountBalanceUseCase: GetAccountBalanceUseCase,
-    private val widgetConfigurationRepository: WidgetConfigurationRepository
+    private val widgetConfigurationRepository: WidgetConfigurationRepository,
+    private val activeWorkspaceKey: String = "guest"
 ) {
-    fun getWidgetData(appWidgetId: Int): Flow<AccountBalanceWidgetData> = flow {
+    fun getWidgetData(appWidgetId: Int, allowWorkspaceData: Boolean = true): Flow<AccountBalanceWidgetData> = flow {
         emit(AccountBalanceWidgetData.loading())
 
         val config = widgetConfigurationRepository.getConfiguration(appWidgetId).first()
         if (config == null) {
             emit(AccountBalanceWidgetData.configurationRequired())
+            return@flow
+        }
+        if (!allowWorkspaceData || config.workspaceKey != activeWorkspaceKey) {
+            emit(AccountBalanceWidgetData.unavailable(config.accountId))
             return@flow
         }
 

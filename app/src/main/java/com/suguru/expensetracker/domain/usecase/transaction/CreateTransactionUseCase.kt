@@ -21,14 +21,16 @@ class CreateTransactionUseCase(
     private val validator = TransactionValidator(accountRepository, categoryRepository, clock)
 
     suspend operator fun invoke(transaction: Transaction): Long {
+        if (transaction.type == TransactionType.TRANSFER) {
+            throw DomainException.InvalidTransfer("New Transfer transactions are no longer supported.")
+        }
         if (transaction.id != 0L) {
             throw DomainException.InvalidTransactionId(transaction.id)
         }
 
         ensureInternalDefaultAccountIsReady()
         
-        // Expense and income use the internal ledger account. Transfers retain both explicitly
-        // selected accounts and are validated below.
+        // New Expense and Income transactions use this workspace's internal ledger account.
         val resolvedAccountId = resolveAccountIdForNewTransaction(transaction)
         
         val resolvedTransaction = transaction.copy(
@@ -39,10 +41,7 @@ class CreateTransactionUseCase(
         return transactionRepository.insertTransaction(resolvedTransaction)
     }
 
-    /**
-     * Resolves the ledger account for new transactions. Expenses and income always use the
-     * provisioned internal account; transfers keep their selected source account.
-     */
+    /** Resolves the ledger account for supported new transactions. */
     private suspend fun resolveAccountIdForNewTransaction(transaction: Transaction): Long =
         when (transaction.type) {
             TransactionType.EXPENSE, TransactionType.INCOME -> {
@@ -50,7 +49,9 @@ class CreateTransactionUseCase(
                 accounts.firstOrNull { it.internalKey == "default" }?.id
                     ?: throw DomainException.AccountNotFound(0L)
             }
-            TransactionType.TRANSFER -> transaction.accountId
+            TransactionType.TRANSFER -> throw DomainException.InvalidTransfer(
+                "New Transfer transactions are no longer supported."
+            )
         }
 
     private suspend fun ensureInternalDefaultAccountIsReady() {

@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -213,7 +214,7 @@ internal fun logAuthExceptionDiagnostics(e: Exception) {
     )
 }
 
-internal fun mapAuthExceptionToUserMessage(e: Exception): String {
+internal fun mapAuthExceptionToUserMessage(context: Context, e: Exception): String {
     val msg = e.message?.lowercase() ?: ""
     val causeMsg = e.cause?.message?.lowercase() ?: ""
     val combinedMsg = "$msg $causeMsg"
@@ -222,7 +223,7 @@ internal fun mapAuthExceptionToUserMessage(e: Exception): String {
         e is com.google.firebase.FirebaseNetworkException ||
         e is java.net.UnknownHostException ||
         e is java.io.IOException -> {
-            "Network failure. Please check your internet connection and try again."
+            context.getString(com.suguru.expensetracker.R.string.ui_auth_network)
         }
         combinedMsg.contains("[10]") ||
         combinedMsg.contains("[12500]") ||
@@ -231,14 +232,13 @@ internal fun mapAuthExceptionToUserMessage(e: Exception): String {
         combinedMsg.contains("sha") ||
         combinedMsg.contains("signature") ||
         e is androidx.credentials.exceptions.GetCredentialCustomException -> {
-            "Google Sign-In configuration error: Developer error [10/12500] or SHA-1 fingerprint mismatch."
+            context.getString(com.suguru.expensetracker.R.string.ui_auth_config)
         }
         e is com.google.firebase.auth.FirebaseAuthException -> {
-            "Firebase authentication failed. Please check your account configuration and try again."
+            context.getString(com.suguru.expensetracker.R.string.ui_auth_firebase)
         }
         else -> {
-            e.localizedMessage?.takeIf { it.isNotBlank() }
-                ?: "Google Sign-In failed. Please try again."
+            context.getString(com.suguru.expensetracker.R.string.ui_auth_generic)
         }
     }
 }
@@ -256,14 +256,14 @@ fun onGoogleSignInClicked(
     onAuthCancelled: () -> Unit = {}
 ) {
     val clientId = getDefaultWebClientId(context) ?: run {
-        val errorMsg = "Google Sign-In configuration missing: default_web_client_id not found"
+        val errorMsg = context.getString(com.suguru.expensetracker.R.string.ui_auth_config_missing)
         Log.e(AUTH_TAG, "Stage: Config - $errorMsg")
         onAuthError(errorMsg)
         return
     }
     val activity = context.findActivity()
     if (activity == null) {
-        val errorMsg = "Google Sign-In requires an active Activity context."
+        val errorMsg = context.getString(com.suguru.expensetracker.R.string.ui_auth_activity_missing)
         Log.e(AUTH_TAG, "Stage: Activity - $errorMsg")
         onAuthError(errorMsg)
         return
@@ -287,12 +287,12 @@ fun onGoogleSignInClicked(
                     Log.i(AUTH_TAG, "Stage: AuthSuccess - Authenticated UID=${currentUser.uid}")
                     onAuthSuccess()
                 } else {
-                    val errorMsg = "Firebase authentication succeeded, but user account could not be verified."
+                    val errorMsg = context.getString(com.suguru.expensetracker.R.string.ui_auth_firebase)
                     Log.e(AUTH_TAG, "Stage: FirebaseAuth - $errorMsg")
                     onAuthError(errorMsg)
                 }
             } else {
-                val errorMsg = "Unexpected credential type returned by Google Sign-In."
+                val errorMsg = context.getString(com.suguru.expensetracker.R.string.ui_auth_credential_unexpected)
                 Log.e(AUTH_TAG, "Stage: CredentialParsing - $errorMsg")
                 onAuthError(errorMsg)
             }
@@ -305,7 +305,7 @@ fun onGoogleSignInClicked(
                 onAuthCancelled()
             } else {
                 Log.e(AUTH_TAG, "Stage: AuthFailure - ${e.javaClass.simpleName}: ${e.message}")
-                onAuthError(mapAuthExceptionToUserMessage(e))
+                onAuthError(mapAuthExceptionToUserMessage(context, e))
             }
         }
     }
@@ -399,7 +399,7 @@ fun GoogleSignInButton(
             )
             Spacer(modifier = Modifier.size(ExpenseTrackerSpacing.sm))
             Text(
-                text = "Sign in with Google",
+                text = stringResource(com.suguru.expensetracker.R.string.ui_google_signin),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )

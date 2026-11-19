@@ -265,7 +265,7 @@ class EditTransactionViewModelTest {
 
         assertFalse(onSuccessCalled)
         assertEquals(TransactionType.TRANSFER, viewModel.uiState.value.transactionType)
-        assertTrue(viewModel.uiState.value.error is AddTransactionError.Unknown)
+        assertTrue(viewModel.uiState.value.error is AddTransactionError.TransferReadOnly)
 
         val unchangedTx = transactionRepository.getTransactionById(txId)
         assertEquals(TransactionType.TRANSFER, unchangedTx?.type)

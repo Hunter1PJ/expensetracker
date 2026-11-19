@@ -27,7 +27,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.time.LocalDate
@@ -38,63 +41,113 @@ class AiRepositoryImpl(
     private val dataStore: DataStore<Preferences>,
     private val todayProvider: () -> LocalDate = { LocalDate.now() },
     private val offlineParser: TransactionInputParser = DeterministicTransactionParser(),
-    private val isOnline: () -> Boolean = { true }
+    private val isOnline: () -> Boolean = { true },
+    private val currentUidProvider: () -> String? = { null },
+    private val authenticatedUidFlow: Flow<String?> = flowOf(currentUidProvider())
 ) : AiRepository {
 
-    private object PreferencesKeys {
-        val AI_FEATURE_ENABLED = booleanPreferencesKey("ai_feature_enabled")
-        val VERIFIED_KEY_HASH = stringPreferencesKey("verified_key_hash")
-        val INVALID_KEY_HASH = stringPreferencesKey("invalid_key_hash")
+    private fun prefKey(uid: String, name: String): androidx.datastore.preferences.core.Preferences.Key<String> =
+        stringPreferencesKey("ai_${uidHash(uid)}_$name")
+
+    private fun enabledKey(uid: String): androidx.datastore.preferences.core.Preferences.Key<Boolean> =
+        booleanPreferencesKey("ai_${uidHash(uid)}_enabled")
+
+    private fun uidHash(uid: String): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(uid.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+
+    private val activeUid: () -> String? = {
+        currentUidProvider()?.takeIf { it.isNotBlank() && it == it.trim() }
+            ?: AiRepository.GUEST_PROFILE_ID
+    }
+    private val activeProfileFlow: Flow<String?> = authenticatedUidFlow.map { uid ->
+        uid?.takeIf { it.isNotBlank() && it == it.trim() } ?: AiRepository.GUEST_PROFILE_ID
+    }
+    private val legacyKeyAvailable = MutableStateFlow(secureKeyStorage.hasUnassignedLegacyKey())
+    override val authenticatedUid: Flow<String?> = authenticatedUidFlow
+    override val activeAiProfileId: Flow<String?> = activeProfileFlow
+    override val isAiProfileAvailable: Flow<Boolean> = activeProfileFlow.map { !it.isNullOrBlank() }
+    override val isAuthenticated: Flow<Boolean> =
+        authenticatedUidFlow.map { !it.isNullOrBlank() }
+
+    override val hasUnassignedLegacyKey: Flow<Boolean> =
+        combine(authenticatedUidFlow, legacyKeyAvailable) { uid, hasLegacy ->
+            !uid.isNullOrBlank() && hasLegacy
+        }
+
+    override val isAiConfigured: Flow<Boolean> = combine(activeProfileFlow, dataStore.data.catch {
+        if (it is IOException) emit(emptyPreferences()) else throw it
+    }) { uid, _ -> uid?.takeIf { it.isNotBlank() }?.let(secureKeyStorage::hasKey) ?: false }
+
+    override val isKeyVerified: Flow<Boolean> = combine(activeProfileFlow, dataStore.data.catch {
+        if (it is IOException) emit(emptyPreferences()) else throw it
+    }) { uid, prefs ->
+        if (uid.isNullOrBlank()) false else {
+            val currentKey = secureKeyStorage.getKey(uid)
+            val verifiedHash = prefs[prefKey(uid, "verified_key_hash")]
+            val invalidHash = prefs[prefKey(uid, "invalid_key_hash")]
+            currentKey != null && verifiedHash != null &&
+                invalidHash != computeKeyFingerprint(currentKey) &&
+                computeKeyFingerprint(currentKey) == verifiedHash
+        }
     }
 
-    private val _isConfiguredFlow = MutableStateFlow(secureKeyStorage.hasKey())
-    override val isAiConfigured: Flow<Boolean> = _isConfiguredFlow.asStateFlow()
-
-    override val isKeyVerified: Flow<Boolean> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
-            }
-        }
-        .map { prefs ->
-            val verifiedHash = prefs[PreferencesKeys.VERIFIED_KEY_HASH]
-            val invalidHash = prefs[PreferencesKeys.INVALID_KEY_HASH]
-            val currentKey = secureKeyStorage.getKey()
-            if (verifiedHash != null && currentKey != null && invalidHash != computeKeyFingerprint(currentKey)) {
-                computeKeyFingerprint(currentKey) == verifiedHash
-            } else {
-                false
-            }
-        }
-
-    override val isKeyInvalid: Flow<Boolean> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) emit(emptyPreferences()) else throw exception
-        }
-        .map { prefs ->
-            val invalidHash = prefs[PreferencesKeys.INVALID_KEY_HASH]
-            val currentKey = secureKeyStorage.getKey()
+    override val isKeyInvalid: Flow<Boolean> = combine(activeProfileFlow, dataStore.data.catch {
+        if (it is IOException) emit(emptyPreferences()) else throw it
+    }) { uid, prefs ->
+        if (uid.isNullOrBlank()) false else {
+            val invalidHash = prefs[prefKey(uid, "invalid_key_hash")]
+            val currentKey = secureKeyStorage.getKey(uid)
             invalidHash != null && currentKey != null &&
                 computeKeyFingerprint(currentKey.trim()) == invalidHash
         }
+    }
 
-    override val isAiFeatureEnabled: Flow<Boolean> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
+    override val isAiFeatureEnabled: Flow<Boolean> = combine(activeProfileFlow, dataStore.data.catch {
+        if (it is IOException) emit(emptyPreferences()) else throw it
+    }) { uid, prefs ->
+        if (uid.isNullOrBlank()) false else prefs[enabledKey(uid)] ?: false
+    }
+
+    override suspend fun migrateLegacyKeyToCurrentUid(confirmed: Boolean): AiResult<Unit> {
+        if (!confirmed) return AiResult.Failure(AiError.MissingApiKey)
+        if (authenticatedUidFlow.first().isNullOrBlank()) return AiResult.Failure(AiError.MissingApiKey)
+        val uid = activeUid() ?: return AiResult.Failure(AiError.MissingApiKey)
+        if (uid == AiRepository.GUEST_PROFILE_ID) return AiResult.Failure(AiError.MissingApiKey)
+        return try {
+            if (!secureKeyStorage.hasUnassignedLegacyKey() ||
+                !secureKeyStorage.migrateLegacyKeyToUid(uid)
+            ) return AiResult.Failure(AiError.MissingApiKey)
+            legacyKeyAvailable.value = secureKeyStorage.hasUnassignedLegacyKey()
+            val migratedKey = secureKeyStorage.getKey(uid)
+                ?: return AiResult.Failure(AiError.ExecutionError("Saved key migration could not be verified."))
+            val fingerprint = computeKeyFingerprint(migratedKey)
+            val legacyEnabledKey = booleanPreferencesKey("ai_feature_enabled")
+            val legacyVerifiedKey = stringPreferencesKey("verified_key_hash")
+            val legacyInvalidKey = stringPreferencesKey("invalid_key_hash")
+            dataStore.edit { prefs ->
+                prefs[enabledKey(uid)] = prefs[legacyEnabledKey] ?: false
+                if (prefs[legacyVerifiedKey] == fingerprint) {
+                    prefs[prefKey(uid, "verified_key_hash")] = fingerprint
+                }
+                if (prefs[legacyInvalidKey] == fingerprint) {
+                    prefs[prefKey(uid, "invalid_key_hash")] = fingerprint
+                    prefs.remove(prefKey(uid, "verified_key_hash"))
+                }
+                prefs.remove(legacyEnabledKey)
+                prefs.remove(legacyVerifiedKey)
+                prefs.remove(legacyInvalidKey)
             }
+            AiResult.Success(Unit)
+        } catch (_: Exception) {
+            AiResult.Failure(AiError.ExecutionError("Saved key migration failed."))
         }
-        .map { prefs ->
-            // Default to false for genuinely new user/account
-            prefs[PreferencesKeys.AI_FEATURE_ENABLED] ?: false
-        }
+    }
 
     override suspend fun getMaskedApiKey(): String? {
-        val key = secureKeyStorage.getKey() ?: return null
+        val uid = activeUid() ?: return null
+        val key = secureKeyStorage.getKey(uid) ?: return null
         val trimmed = key.trim()
         if (trimmed.length <= 8) {
             return "••••••••"
@@ -108,74 +161,105 @@ class AiRepositoryImpl(
         if (trimmed.isEmpty()) {
             return AiResult.Failure(AiError.MissingApiKey)
         }
-        val currentKey = secureKeyStorage.getKey()
+        val uid = activeUid() ?: return AiResult.Failure(AiError.MissingApiKey)
+        val currentKey = secureKeyStorage.getKey(uid)
+        if (activeUid() != uid) return AiResult.Failure(AiError.MissingApiKey)
         try {
-            secureKeyStorage.saveKey(trimmed)
-            // If the key changed, invalidate the previous verification
+            secureKeyStorage.saveKey(uid, trimmed)
             if (currentKey != trimmed) {
                 dataStore.edit { prefs ->
-                    prefs.remove(PreferencesKeys.VERIFIED_KEY_HASH)
-                    prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
+                    prefs.remove(prefKey(uid, "verified_key_hash"))
+                    prefs.remove(prefKey(uid, "invalid_key_hash"))
                 }
             }
         } catch (_: Exception) {
             return AiResult.Failure(AiError.ExecutionError("Secure key storage is unavailable."))
         }
-        _isConfiguredFlow.value = secureKeyStorage.hasKey()
         return AiResult.Success(Unit)
     }
 
     override suspend fun validateApiKey(apiKey: String): AiResult<Boolean> {
+        val uid = activeUid() ?: return AiResult.Failure(AiError.MissingApiKey)
         val result = aiProvider.validateKey(apiKey)
-        if (result is AiResult.Success && result.data) {
+        if (activeUid() != uid) return AiResult.Failure(AiError.MissingApiKey)
+        if (result is AiResult.Success && result.data &&
+            secureKeyStorage.getKey(uid)?.trim() == apiKey.trim()
+        ) {
             val fingerprint = computeKeyFingerprint(apiKey.trim())
-            if (secureKeyStorage.getKey()?.trim() == apiKey.trim()) {
-                dataStore.edit { prefs ->
-                    prefs[PreferencesKeys.VERIFIED_KEY_HASH] = fingerprint
-                    prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
-                }
+            dataStore.edit { prefs ->
+                prefs[prefKey(uid, "verified_key_hash")] = fingerprint
+                prefs.remove(prefKey(uid, "invalid_key_hash"))
             }
         }
         return result
     }
 
     override suspend fun validateConfiguredKey(): AiResult<Boolean> {
-        val key = secureKeyStorage.getKey()
-        if (key.isNullOrBlank()) {
+        val uid = activeUid() ?: return AiResult.Failure(AiError.MissingApiKey)
+        if (dataStore.data.first()[enabledKey(uid)] != true) {
             return AiResult.Failure(AiError.MissingApiKey)
         }
-        val result = aiProvider.validateKey(key)
+        val key = secureKeyStorage.getKey(uid)
+            ?: return AiResult.Failure(AiError.MissingApiKey)
+        val result = kotlinx.coroutines.coroutineScope {
+            val verificationRequest = async { aiProvider.validateKey(key) }
+            val accountOrPreferenceChange = async {
+                combine(activeProfileFlow, isAiFeatureEnabled) { observedUid, enabled ->
+                    observedUid == uid && enabled
+                }.first { stillEnabledForSameUid -> !stillEnabledForSameUid }
+            }
+            kotlinx.coroutines.selects.select<AiResult<Boolean>?> {
+                verificationRequest.onAwait {
+                    accountOrPreferenceChange.cancel()
+                    it
+                }
+                accountOrPreferenceChange.onAwait {
+                    verificationRequest.cancel()
+                    null
+                }
+            }
+        } ?: return AiResult.Failure(AiError.MissingApiKey)
         val fingerprint = computeKeyFingerprint(key.trim())
-        if (secureKeyStorage.getKey()?.trim() != key.trim()) {
-            return AiResult.Failure(AiError.ExecutionError("The saved API key changed during verification."))
+        if (activeUid() != uid || secureKeyStorage.getKey(uid)?.trim() != key.trim() ||
+            dataStore.data.first()[enabledKey(uid)] != true
+        ) {
+            return AiResult.Failure(AiError.MissingApiKey)
         }
-        if (result is AiResult.Success && result.data) {
+        var persisted = false
+        if ((result is AiResult.Success && result.data) ||
+            (result is AiResult.Failure && result.error is AiError.InvalidApiKey)
+        ) {
             dataStore.edit { prefs ->
-                prefs[PreferencesKeys.VERIFIED_KEY_HASH] = fingerprint
-                prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
+                if (activeUid() != uid || prefs[enabledKey(uid)] != true ||
+                    secureKeyStorage.getKey(uid)?.trim() != key.trim()
+                ) return@edit
+                if (result is AiResult.Success) {
+                    prefs[prefKey(uid, "verified_key_hash")] = fingerprint
+                    prefs.remove(prefKey(uid, "invalid_key_hash"))
+                } else {
+                    prefs.remove(prefKey(uid, "verified_key_hash"))
+                    prefs[prefKey(uid, "invalid_key_hash")] = fingerprint
+                }
+                persisted = true
             }
-        } else if (result is AiResult.Failure && result.error is AiError.InvalidApiKey) {
-            dataStore.edit { prefs ->
-                prefs.remove(PreferencesKeys.VERIFIED_KEY_HASH)
-                prefs[PreferencesKeys.INVALID_KEY_HASH] = fingerprint
-            }
+            if (!persisted) return AiResult.Failure(AiError.MissingApiKey)
         }
         return result
     }
 
     override suspend fun deleteApiKey() {
-        secureKeyStorage.deleteKey()
+        val uid = activeUid() ?: return
+        secureKeyStorage.deleteKey(uid)
         dataStore.edit { prefs ->
-            prefs.remove(PreferencesKeys.VERIFIED_KEY_HASH)
-            prefs.remove(PreferencesKeys.INVALID_KEY_HASH)
+            prefs.remove(prefKey(uid, "verified_key_hash"))
+            prefs.remove(prefKey(uid, "invalid_key_hash"))
+            prefs[enabledKey(uid)] = false
         }
-        _isConfiguredFlow.value = false
     }
 
     override suspend fun setAiFeatureEnabled(enabled: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[PreferencesKeys.AI_FEATURE_ENABLED] = enabled
-        }
+        val uid = activeUid() ?: return
+        dataStore.edit { prefs -> prefs[enabledKey(uid)] = enabled }
     }
 
     override suspend fun extractTransactions(
@@ -187,24 +271,44 @@ class AiRepositoryImpl(
             return AiResult.Success(emptyList())
         }
 
+        val uid = activeUid() ?: return parseOffline(trimmedInput, defaultCurrency)
         val aiEnabled = try {
-            dataStore.data.first()[PreferencesKeys.AI_FEATURE_ENABLED] ?: false
+            dataStore.data.first()[enabledKey(uid)] ?: false
         } catch (_: IOException) {
             false
         }
 
-        if (!aiEnabled || !secureKeyStorage.hasKey() || secureKeyStorage.getKey().isNullOrBlank() || !runCatching(isOnline).getOrDefault(false)) {
+        if (!aiEnabled || !secureKeyStorage.hasKey(uid) ||
+            secureKeyStorage.getKey(uid).isNullOrBlank() ||
+            activeUid() != uid ||
+            !runCatching(isOnline).getOrDefault(false)
+        ) {
             return parseOffline(trimmedInput, defaultCurrency)
         }
 
-        val savedKey = secureKeyStorage.getKey()?.trim()
+        val savedKey = secureKeyStorage.getKey(uid)?.trim()
         if (savedKey.isNullOrBlank()) return parseOffline(trimmedInput, defaultCurrency)
-        val invalidHash = dataStore.data.first()[PreferencesKeys.INVALID_KEY_HASH]
+        val invalidHash = dataStore.data.first()[prefKey(uid, "invalid_key_hash")]
         if (invalidHash == computeKeyFingerprint(savedKey)) return parseOffline(trimmedInput, defaultCurrency, ParseWarning.INVALID_API_KEY)
 
         val config = AiConfiguration(defaultCurrency = defaultCurrency)
         val providerResult = try {
-            aiProvider.extractFinancialTransactions(trimmedInput, config)
+            kotlinx.coroutines.coroutineScope {
+                val request = async { aiProvider.extractFinancialTransactions(trimmedInput, config, savedKey) }
+                val authChange = async {
+                    activeProfileFlow.first { it != uid }
+                }
+                kotlinx.coroutines.selects.select<AiResult<com.suguru.expensetracker.domain.ai.ExtractedFinancialPayload>?> {
+                    request.onAwait {
+                        authChange.cancel()
+                        it
+                    }
+                    authChange.onAwait {
+                        request.cancel()
+                        null
+                    }
+                }
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: SocketTimeoutException) {
@@ -213,6 +317,12 @@ class AiRepositoryImpl(
             AiResult.Failure(AiError.NetworkError("Network request failed."))
         } catch (_: Exception) {
             AiResult.Failure(AiError.ExecutionError("Transaction extraction failed."))
+        }
+
+        if (providerResult == null || activeUid() != uid ||
+            secureKeyStorage.getKey(uid)?.trim() != savedKey
+        ) {
+            return parseOffline(trimmedInput, defaultCurrency)
         }
 
         return when (providerResult) {
@@ -348,11 +458,13 @@ class AiRepositoryImpl(
         // Date resolution from dateExpression
         val resolvedDate = resolveDate(item.dateExpression, todayProvider())
 
+        val hasDescription = !item.description.isNullOrBlank()
         val title = item.description?.takeIf { it.isNotBlank() } ?: "Transaction"
 
         return TransactionCandidate(
             rawText = listOfNotNull(item.description, item.rawAmount, item.currency).joinToString(" "),
             suggestedTitle = title,
+            suggestedTitleIsFallback = !hasDescription,
             transactionType = finalType,
             amount = money,
             date = resolvedDate,

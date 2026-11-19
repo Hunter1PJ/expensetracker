@@ -15,17 +15,27 @@ class ObserveCategoriesByTypeUseCase(
 ) {
     operator fun invoke(type: CategoryType): Flow<List<Category>> {
         val categoriesFlow = categoryRepository.observeActiveCategoriesByType(type)
-        if (type != CategoryType.EXPENSE) {
-            return categoriesFlow
-        }
-        val txRepo = transactionRepository ?: return categoriesFlow.map { categories ->
-            CategorySorter.sortExpenseCategories(categories, emptyMap())
-        }
-        return combine(
-            categoriesFlow,
-            txRepo.observeExpenseCategoryUsageCounts()
-        ) { categories, usageCounts ->
-            CategorySorter.sortExpenseCategories(categories, usageCounts)
+        val txRepo = transactionRepository
+        return when (type) {
+            CategoryType.EXPENSE -> {
+                if (txRepo == null) {
+                    categoriesFlow.map { categories -> CategorySorter.sortExpenseCategories(categories) }
+                } else {
+                    combine(categoriesFlow, txRepo.observeExpenseCategoryUsageCounts()) { categories, usageCounts ->
+                        CategorySorter.sortExpenseCategories(categories, usageCounts)
+                    }
+                }
+            }
+            CategoryType.INCOME -> {
+                if (txRepo == null) {
+                    categoriesFlow.map { categories -> CategorySorter.sortIncomeCategories(categories) }
+                } else {
+                    combine(categoriesFlow, txRepo.observeIncomeCategoryUsageCounts()) { categories, usageCounts ->
+                        CategorySorter.sortIncomeCategories(categories, usageCounts)
+                    }
+                }
+            }
+            CategoryType.BOTH -> categoriesFlow
         }
     }
 }

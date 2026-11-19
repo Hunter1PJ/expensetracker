@@ -145,6 +145,36 @@ class FirestoreCloudBackupRepository internal constructor(
                 )
             }
 
+            currentPath = "users/$uid/backup_manifests/$generationId/chunks"
+            currentOp = OperationType.LIST
+            val generationChunkDtos = gateway.listChunks(uid, generationId)
+            if (generationChunkDtos.size != manifest.chunkCount) {
+                throw CloudBackupRemoteException.ChunkIntegrityError(
+                    snapshotId = generationId,
+                    message = "Generation chunk count mismatch."
+                )
+            }
+            val generationChunks = generationChunkDtos.map { dto ->
+                dto.toDomainOrNull(uid, generationId)
+                    ?: throw CloudBackupRemoteException.ChunkIntegrityError(
+                        snapshotId = generationId,
+                        message = "Uploaded generation contains a malformed chunk."
+                    )
+            }
+            val verifiedPayload = chunker.reassemble(generationChunks, manifest.payloadSha256).getOrElse { error ->
+                throw CloudBackupRemoteException.ChunkIntegrityError(
+                    snapshotId = generationId,
+                    message = error.message ?: "Uploaded generation checksum verification failed.",
+                    cause = error
+                )
+            }
+            if (verifiedPayload.size.toLong() != manifest.compressedBytes) {
+                throw CloudBackupRemoteException.ChunkIntegrityError(
+                    snapshotId = generationId,
+                    message = "Uploaded generation byte count does not match its manifest."
+                )
+            }
+
             currentPath = "users/$uid/backup_manifests/$generationId"
             currentOp = OperationType.UPDATE
             gateway.markManifestComplete(
@@ -166,19 +196,11 @@ class FirestoreCloudBackupRepository internal constructor(
 
             if (generationCompletedAt.seconds < generationCreatedAt.seconds ||
                 (generationCompletedAt.seconds == generationCreatedAt.seconds && generationCompletedAt.nanoseconds < generationCreatedAt.nanoseconds)) {
-                throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Invalid generation timestamp ordering.")
+                throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Invalid generation timestamps.")
             }
 
             if (!completedGeneration.matchesImmutableMetadata(generationManifest)) {
                 throw CloudBackupRemoteException.RemoteOperationFailed("PROMOTION_FAILED", "Generation metadata mismatch.")
-            }
-
-            val generationChunks = gateway.listChunks(uid, generationId)
-            if (generationChunks.size != manifest.chunkCount) {
-                throw CloudBackupRemoteException.ChunkIntegrityError(
-                    snapshotId = generationId,
-                    message = "Generation chunk count mismatch."
-                )
             }
 
             val primaryExists = existingPrimaryDto != null

@@ -20,8 +20,13 @@ class RecurringTransactionWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            val appContainer = (applicationContext as? ExpenseTrackerApplication)?.appContainer
-                ?: return Result.failure()
+            val application = applicationContext as? ExpenseTrackerApplication ?: return Result.failure()
+            val uid = runCatching {
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            }.getOrNull()
+            if (!application.isActiveWorkspaceCurrent()) return Result.retry()
+            val appContainer = application.containerFor(uid)
+            if (appContainer.workspaceId.firebaseUid != uid) return Result.success()
 
             appContainer.processDueRecurringTransactionsUseCase(asOfDate = LocalDate.now())
             Result.success()

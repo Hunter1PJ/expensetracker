@@ -4,6 +4,11 @@ import com.suguru.expensetracker.domain.error.DomainException
 import com.suguru.expensetracker.domain.fake.FakeCategoryRepository
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.CategoryType
+import com.suguru.expensetracker.domain.model.Money
+import com.suguru.expensetracker.domain.model.Transaction
+import com.suguru.expensetracker.domain.model.TransactionType
+import com.suguru.expensetracker.domain.fake.FakeTransactionRepository
+import java.time.Instant
 import com.suguru.expensetracker.domain.usecase.category.ArchiveCategoryUseCase
 import com.suguru.expensetracker.domain.usecase.category.CreateCategoryUseCase
 import com.suguru.expensetracker.domain.usecase.category.GetCategoryUseCase
@@ -105,6 +110,57 @@ class CategoryUseCaseTest {
             assertTrue(archived?.isArchived == true)
         }
     }
+
+    @Test
+    fun incomeOrderingUsesOnlyIncomeUsageAndStaysWorkspaceScoped() = runBlocking {
+        val salaryId = createCategoryUseCase(
+            Category(name = "Salary", type = CategoryType.INCOME, iconName = "work", colorHex = "#000")
+        )
+        val businessId = createCategoryUseCase(
+            Category(name = "Business", type = CategoryType.INCOME, iconName = "work", colorHex = "#000")
+        )
+        createCategoryUseCase(Category(name = "Freelance", type = CategoryType.INCOME, iconName = "work", colorHex = "#000"))
+        createCategoryUseCase(Category(name = "Gift", type = CategoryType.INCOME, iconName = "gift", colorHex = "#000"))
+        val otherId = createCategoryUseCase(
+            Category(name = "Other", type = CategoryType.INCOME, iconName = "category", colorHex = "#000")
+        )
+
+        val workspaceA = FakeTransactionRepository()
+        val workspaceB = FakeTransactionRepository()
+        repeat(20) { index ->
+            workspaceA.insertTransaction(transaction(index + 1L, TransactionType.EXPENSE, salaryId))
+        }
+        workspaceA.insertTransaction(transaction(100L, TransactionType.INCOME, businessId))
+        repeat(25) { index ->
+            workspaceA.insertTransaction(transaction(101L + index, TransactionType.INCOME, otherId))
+        }
+        workspaceB.insertTransaction(transaction(500L, TransactionType.INCOME, businessId))
+
+        val categoriesInA = ObserveCategoriesByTypeUseCase(categoryRepository, workspaceA)
+            .invoke(CategoryType.INCOME).first()
+        val categoriesInB = ObserveCategoriesByTypeUseCase(categoryRepository, workspaceB)
+            .invoke(CategoryType.INCOME).first()
+
+        assertEquals(listOf("Business", "Salary", "Freelance", "Gift", "Other"), categoriesInA.map { it.name })
+        assertEquals(listOf("Business", "Salary", "Freelance", "Gift", "Other"), categoriesInB.map { it.name })
+
+        repeat(2) { index ->
+            workspaceB.insertTransaction(transaction(600L + index, TransactionType.INCOME, salaryId))
+        }
+        val updatedB = ObserveCategoriesByTypeUseCase(categoryRepository, workspaceB)
+            .invoke(CategoryType.INCOME).first()
+        assertEquals(listOf("Salary", "Business", "Freelance", "Gift", "Other"), updatedB.map { it.name })
+        assertEquals("Other", updatedB.last().name)
+    }
+
+    private fun transaction(id: Long, type: TransactionType, categoryId: Long) = Transaction(
+        id = id,
+        type = type,
+        amount = Money(100L, "USD"),
+        accountId = 1L,
+        categoryId = categoryId,
+        transactionTime = Instant.parse("2026-01-01T00:00:00Z")
+    )
 
     @Test
     fun observeCategoriesByType_filtersAppropriately() {

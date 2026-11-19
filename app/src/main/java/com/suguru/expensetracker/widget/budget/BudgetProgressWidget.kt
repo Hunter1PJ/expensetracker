@@ -36,17 +36,23 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.suguru.expensetracker.ExpenseTrackerApplication
 import com.suguru.expensetracker.MainActivity
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.AppLanguageManager
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 class BudgetProgressWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appContainer = (context.applicationContext as ExpenseTrackerApplication).appContainer
+        val application = context.applicationContext as ExpenseTrackerApplication
+        val appContainer = application.activeAppContainer.filterNotNull().first()
+        val allowWorkspaceData = application.isActiveWorkspaceCurrent()
         val manager = GlanceAppWidgetManager(context)
         val appWidgetId = manager.getAppWidgetId(id)
         val dataProvider = appContainer.budgetProgressWidgetDataProvider
 
         provideContent {
-            val widgetData by dataProvider.getWidgetData(appWidgetId).collectAsState(
+            val widgetData by dataProvider.getWidgetData(appWidgetId, allowWorkspaceData).collectAsState(
                 initial = BudgetProgressWidgetData.loading()
             )
             WidgetContent(widgetData)
@@ -55,7 +61,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(data: BudgetProgressWidgetData) {
-        val context = LocalContext.current
+        val context = AppLanguageManager.wrap(LocalContext.current)
         val size = LocalSize.current
         val isSmall = size.width < 180.dp || size.height < 120.dp
         val isLarge = size.width >= 260.dp
@@ -84,7 +90,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                 when (data.state) {
                     BudgetWidgetState.LOADING -> {
                         Text(
-                            text = "Loading budget...",
+                            text = context.getString(R.string.widget_loading_budget),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 14.sp,
@@ -94,7 +100,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                     }
                     BudgetWidgetState.CONFIGURATION_REQUIRED -> {
                         Text(
-                            text = "Track Budget (Pro)",
+                            text = context.getString(R.string.widget_track_budget_pro),
                             style = TextStyle(
                                 color = accentColor,
                                 fontSize = 14.sp,
@@ -103,7 +109,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
-                            text = "Tap to choose active budget",
+                            text = context.getString(R.string.widget_tap_select_budget),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 11.sp
@@ -112,7 +118,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                     }
                     BudgetWidgetState.BUDGET_UNAVAILABLE -> {
                         Text(
-                            text = "Budget Unavailable",
+                            text = context.getString(R.string.widget_budget_unavailable),
                             style = TextStyle(
                                 color = redColor,
                                 fontSize = 13.sp,
@@ -121,7 +127,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
-                            text = "Tap to reconfigure or open",
+                            text = context.getString(R.string.widget_tap_open_app),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 11.sp
@@ -130,7 +136,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                     }
                     BudgetWidgetState.INACTIVE -> {
                         Text(
-                            text = "Budget Inactive",
+                            text = context.getString(R.string.widget_budget_inactive),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 13.sp,
@@ -139,7 +145,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
-                            text = "Tap to open Budgets",
+                            text = context.getString(R.string.widget_tap_open_app),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 11.sp
@@ -148,7 +154,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                     }
                     BudgetWidgetState.ERROR -> {
                         Text(
-                            text = "Error Loading Budget",
+                            text = context.getString(R.string.widget_error_budget),
                             style = TextStyle(
                                 color = redColor,
                                 fontSize = 13.sp,
@@ -157,7 +163,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
-                            text = data.errorMessage ?: "Tap to retry",
+                            text = context.getString(R.string.widget_tap_retry),
                             style = TextStyle(
                                 color = textSecondary,
                                 fontSize = 11.sp
@@ -178,7 +184,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                             ) {}
                             Spacer(modifier = GlanceModifier.width(6.dp))
                             Text(
-                                text = data.title,
+                                text = data.title.ifBlank { context.getString(R.string.widget_config_overall_budget) },
                                 style = TextStyle(
                                     color = textPrimary,
                                     fontSize = 13.sp,
@@ -202,7 +208,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                         // Financial values line (Hidden in Small layout)
                         if (!isSmall) {
                             Spacer(modifier = GlanceModifier.height(4.dp))
-                            val spentText = if (data.privacyMode) "Amounts Hidden" else "${data.spentFormatted} of ${data.limitFormatted}"
+                            val spentText = if (data.privacyMode) context.getString(R.string.widget_amounts_hidden) else "${data.spentFormatted} / ${data.limitFormatted}"
                             Text(
                                 text = spentText,
                                 style = TextStyle(
@@ -246,11 +252,11 @@ class BudgetProgressWidget : GlanceAppWidget() {
                             modifier = GlanceModifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val statusText = if (data.isExceeded) "Exceeded" else "On Track"
+                            val statusText = if (data.isExceeded) context.getString(R.string.widget_exceeded) else context.getString(R.string.widget_on_track)
                             val statusColor = if (data.isExceeded) redColor else accentColor
 
                             Text(
-                                text = if (isSmall) statusText else "${data.progressLabel} spent • $statusText",
+                                text = if (isSmall) statusText else "${data.progressLabel} • $statusText",
                                 style = TextStyle(
                                     color = statusColor,
                                     fontSize = 10.sp,
@@ -262,7 +268,14 @@ class BudgetProgressWidget : GlanceAppWidget() {
                                 Spacer(modifier = GlanceModifier.defaultWeight())
                                 if (data.periodLabel != null) {
                                     Text(
-                                        text = data.periodLabel,
+                                        text = context.getString(
+                                            when (data.periodLabel) {
+                                                "WEEKLY" -> R.string.budget_period_weekly_label
+                                                "MONTHLY" -> R.string.budget_period_monthly_label
+                                                "YEARLY" -> R.string.budget_period_yearly_label
+                                                else -> R.string.budget_period_custom_label
+                                            }
+                                        ),
                                         style = TextStyle(
                                             color = textSecondary,
                                             fontSize = 9.sp
@@ -272,7 +285,7 @@ class BudgetProgressWidget : GlanceAppWidget() {
                                 if (data.privacyMode) {
                                     Spacer(modifier = GlanceModifier.width(6.dp))
                                     Text(
-                                        text = "Private",
+                                        text = context.getString(R.string.widget_private),
                                         style = TextStyle(
                                             color = textSecondary,
                                             fontSize = 9.sp

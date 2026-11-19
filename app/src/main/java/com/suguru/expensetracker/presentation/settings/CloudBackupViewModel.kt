@@ -6,7 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.suguru.expensetracker.data.account.InternalDefaultAccountProvisioningResult
-import com.suguru.expensetracker.data.remote.firestore.FirestoreCloudBackupRepository
+import com.suguru.expensetracker.R
+import com.suguru.expensetracker.presentation.util.UiMessage
 import com.suguru.expensetracker.domain.error.CloudBackupRemoteException
 import com.suguru.expensetracker.domain.model.BackupContentFingerprint
 import com.suguru.expensetracker.domain.model.BackupRestoreOutcome
@@ -54,9 +55,9 @@ sealed interface CloudRestoreResult {
 
 data class CloudBackupActionUiState(
     val isBusy: Boolean = false,
-    val busyMessage: String? = null,
-    val errorMessage: String? = null,
-    val successMessage: String? = null,
+    val busyMessage: UiMessage? = null,
+    val errorMessage: UiMessage? = null,
+    val successMessage: UiMessage? = null,
     val pendingRestoreCandidate: CloudBackupManifest? = null,
     val restoreResult: CloudRestoreResult? = null
 )
@@ -77,6 +78,8 @@ class CloudBackupViewModel(
     private val orchestrator: com.suguru.expensetracker.data.backup.AutomaticCloudBackupOrchestrator? = null,
     private val widgetRefreshCoordinator: WidgetRefreshCoordinator? = null,
     private val onPendingSettingsRecovery: suspend () -> InternalDefaultAccountProvisioningResult? = { null },
+    private val isWorkspaceIdentityCurrent: (uid: String) -> Boolean = { true },
+    private val authenticatedUidProvider: () -> String? = { currentUserId },
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
@@ -117,19 +120,50 @@ class CloudBackupViewModel(
 
     fun resolveConflictRestore(manifest: CloudBackupManifest) {
         if (_actionState.value.isBusy || orchestrator == null) return
+        if (!isCloudOperationIdentityCurrent("conflict restore start")) {
+            _actionState.update { it.copy(errorMessage = UiMessage(R.string.cloud_workspace_changing)) }
+            return
+        }
         viewModelScope.launch {
-            _actionState.update { it.copy(isBusy = true, busyMessage = "Restoring cloud snapshot...") }
-            orchestrator.resolveConflictRestoreCloud(currentUserId, manifest)
-            _actionState.update { it.copy(isBusy = false, busyMessage = null, successMessage = "Cloud snapshot restored.") }
+            _actionState.update { it.copy(isBusy = true, busyMessage = UiMessage(R.string.cloud_busy_restoring)) }
+            val restored = orchestrator.resolveConflictRestoreCloud(currentUserId, manifest)
+            _actionState.update {
+                if (restored) {
+                    it.copy(isBusy = false, busyMessage = null, successMessage = UiMessage(R.string.cloud_snapshot_restored))
+                } else {
+                    it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_snapshot_restore_failed))
+                }
+            }
         }
     }
 
     fun resolveConflictKeepLocal() {
         if (_actionState.value.isBusy || orchestrator == null) return
         viewModelScope.launch {
-            _actionState.update { it.copy(isBusy = true, busyMessage = "Backing up local changes...") }
-            orchestrator.resolveConflictKeepLocalAndBackup(currentUserId)
-            _actionState.update { it.copy(isBusy = false, busyMessage = null, successMessage = "Local data backed up to cloud.") }
+            _actionState.update { it.copy(isBusy = true, busyMessage = UiMessage(R.string.cloud_busy_backing_up_local)) }
+            when (val result = orchestrator.resolveConflictKeepLocalAndBackup(currentUserId)) {
+                is com.suguru.expensetracker.data.backup.BackupExecutionResult.Success,
+                com.suguru.expensetracker.data.backup.BackupExecutionResult.SkippedUnchanged -> {
+                    _actionState.update {
+                        it.copy(isBusy = false, busyMessage = null, successMessage = UiMessage(R.string.cloud_backup_success))
+                    }
+                }
+                is com.suguru.expensetracker.data.backup.BackupExecutionResult.PermanentFailure -> {
+                    _actionState.update {
+                        it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_backup_failed))
+                    }
+                }
+                is com.suguru.expensetracker.data.backup.BackupExecutionResult.RetryableFailure -> {
+                    _actionState.update {
+                        it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_backup_pending))
+                    }
+                }
+                com.suguru.expensetracker.data.backup.BackupExecutionResult.DeferredConflict -> {
+                    _actionState.update {
+                        it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_conflict_decision_required))
+                    }
+                }
+            }
         }
     }
 
@@ -142,7 +176,7 @@ class CloudBackupViewModel(
             if (firestoreError == null && error is CancellationException) throw error
             val rootError = firestoreError ?: error
             Log.w(TAG, "Error observing cloud backup manifests", rootError)
-            emit(CloudSnapshotsUiState.Error(rootError.message ?: "Failed to load cloud backups"))
+            emit(CloudSnapshotsUiState.Error(rootError.message ?: ""))
         }
         .stateIn(
             scope = viewModelScope,
@@ -167,12 +201,20 @@ class CloudBackupViewModel(
 
     fun backUpNow() {
         if (_actionState.value.isBusy) return
+        if (!isCloudOperationIdentityCurrent("manual backup start")) {
+            _actionState.update { it.copy(errorMessage = UiMessage(R.string.cloud_workspace_changing)) }
+            return
+        }
         viewModelScope.launch {
+            if (!isCloudOperationIdentityCurrent("manual backup execution")) {
+                _actionState.update { it.copy(errorMessage = UiMessage(R.string.cloud_workspace_changing)) }
+                return@launch
+            }
             if (orchestrator != null) {
                 _actionState.update {
                     it.copy(
                         isBusy = true,
-                        busyMessage = "Syncing cloud backup...",
+                        busyMessage = UiMessage(R.string.cloud_busy_syncing),
                         errorMessage = null,
                         successMessage = null
                     )
@@ -180,27 +222,27 @@ class CloudBackupViewModel(
                 when (val res = orchestrator.performBackup(currentUserId, explicitManual = true)) {
                     is com.suguru.expensetracker.data.backup.BackupExecutionResult.Success -> {
                         _actionState.update {
-                            it.copy(isBusy = false, busyMessage = null, successMessage = "Cloud backup completed successfully.")
+                            it.copy(isBusy = false, busyMessage = null, successMessage = UiMessage(R.string.cloud_backup_success))
                         }
                     }
                     is com.suguru.expensetracker.data.backup.BackupExecutionResult.SkippedUnchanged -> {
                         _actionState.update {
-                            it.copy(isBusy = false, busyMessage = null, successMessage = "Cloud backup is already up to date.")
+                            it.copy(isBusy = false, busyMessage = null, successMessage = UiMessage(R.string.cloud_backup_already_current))
                         }
                     }
                     is com.suguru.expensetracker.data.backup.BackupExecutionResult.DeferredConflict -> {
                         _actionState.update {
-                            it.copy(isBusy = false, busyMessage = null, errorMessage = "Local and cloud data conflict detected.")
+                            it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_local_cloud_conflict))
                         }
                     }
                     is com.suguru.expensetracker.data.backup.BackupExecutionResult.PermanentFailure -> {
                         _actionState.update {
-                            it.copy(isBusy = false, busyMessage = null, errorMessage = "Backup failed: ${res.failureCode}")
+                            it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_backup_failed))
                         }
                     }
                     is com.suguru.expensetracker.data.backup.BackupExecutionResult.RetryableFailure -> {
                         _actionState.update {
-                            it.copy(isBusy = false, busyMessage = null, errorMessage = "Backup queued (${res.failureCode}). Will upload when online.")
+                            it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_backup_queued))
                         }
                     }
                 }
@@ -209,7 +251,7 @@ class CloudBackupViewModel(
             _actionState.update {
                 it.copy(
                     isBusy = true,
-                    busyMessage = "Preparing encrypted cloud snapshot...",
+                    busyMessage = UiMessage(R.string.cloud_busy_preparing),
                     errorMessage = null,
                     successMessage = null
                 )
@@ -259,9 +301,15 @@ class CloudBackupViewModel(
                 )
 
                 _actionState.update {
-                    it.copy(busyMessage = "Uploading ${chunked.totalChunkCount} chunk(s) to Firestore...")
+                    it.copy(busyMessage = UiMessage(R.string.cloud_busy_uploading_chunks, listOf(chunked.totalChunkCount)) )
                 }
 
+                if (!isCloudOperationIdentityCurrent("manual backup upload")) {
+                    _actionState.update {
+                        it.copy(isBusy = false, busyMessage = null, errorMessage = UiMessage(R.string.cloud_workspace_changed))
+                    }
+                    return@launch
+                }
                 val uploadResult = remoteRepository.uploadBackup(currentUserId, manifest, chunked)
                 if (uploadResult.isSuccess) {
                     val committedManifest = uploadResult.getOrThrow()
@@ -284,7 +332,7 @@ class CloudBackupViewModel(
                         it.copy(
                             isBusy = false,
                             busyMessage = null,
-                            successMessage = "Cloud backup completed (${chunked.totalChunkCount} chunk(s))."
+                            successMessage = UiMessage(R.string.cloud_backup_success)
                         )
                     }
                 } else {
@@ -294,7 +342,7 @@ class CloudBackupViewModel(
                         it.copy(
                             isBusy = false,
                             busyMessage = null,
-                            errorMessage = failure?.localizedMessage ?: "Cloud backup upload failed."
+                            errorMessage = UiMessage(R.string.cloud_upload_failed)
                         )
                     }
                 }
@@ -311,7 +359,7 @@ class CloudBackupViewModel(
                     it.copy(
                         isBusy = false,
                         busyMessage = null,
-                        errorMessage = e.localizedMessage ?: "Cloud backup failed."
+                        errorMessage = UiMessage(R.string.cloud_backup_failed)
                     )
                 }
             }
@@ -320,9 +368,17 @@ class CloudBackupViewModel(
 
     fun requestRestoreSnapshot(manifest: CloudBackupManifest) {
         if (_actionState.value.isBusy) return
-        if (manifest.status != CloudBackupManifestStatus.COMPLETE) {
+        if (!isCloudOperationIdentityCurrent("manual restore selection")) {
+            _actionState.update { it.copy(errorMessage = UiMessage(R.string.cloud_workspace_changing)) }
+            return
+        }
+        if (autoBackupPreferenceStore != null && isAutoBackupEnabled.value) {
+            _actionState.update { it.copy(errorMessage = UiMessage(R.string.cloud_manual_restore_disabled)) }
+            return
+        }
+        if (manifest.status != CloudBackupManifestStatus.COMPLETE || manifest.uid != currentUserId) {
             _actionState.update {
-                it.copy(errorMessage = "Only completed cloud snapshots can be restored.")
+                it.copy(errorMessage = UiMessage(R.string.cloud_completed_snapshot_required))
             }
             return
         }
@@ -341,10 +397,19 @@ class CloudBackupViewModel(
     fun confirmPendingRestore() {
         val manifest = _actionState.value.pendingRestoreCandidate ?: return
         if (_actionState.value.isBusy) return
+        if (!isCloudOperationIdentityCurrent("manual restore start")) {
+            _actionState.update {
+                it.copy(
+                    pendingRestoreCandidate = null,
+                    restoreResult = CloudRestoreResult.Failure("Your account workspace is still changing. Please wait and try again.")
+                )
+            }
+            return
+        }
         _actionState.update {
             it.copy(
                 isBusy = true,
-                busyMessage = "Restoring cloud snapshot to this device...",
+                busyMessage = UiMessage(R.string.cloud_busy_restoring),
                 pendingRestoreCandidate = null,
                 restoreResult = null,
                 errorMessage = null,
@@ -353,6 +418,18 @@ class CloudBackupViewModel(
         }
         viewModelScope.launch {
             try {
+                if (autoBackupPreferenceStore?.isAutoBackupEnabled(currentUserId) == true) {
+                    _actionState.update {
+                        it.copy(
+                            isBusy = false,
+                            busyMessage = null,
+                            restoreResult = CloudRestoreResult.Failure(
+                                "Manual restore is unavailable while automatic backup is enabled."
+                            )
+                        )
+                    }
+                    return@launch
+                }
                 val chunks = remoteRepository.downloadChunks(currentUserId, manifest.snapshotId)
                     .getOrThrow()
                 val compressedBytes = withContext(workDispatcher) {
@@ -368,7 +445,8 @@ class CloudBackupViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                val failureReason = e.localizedMessage ?: "Unable to verify snapshot"
+                recordRestoreFailure(toFailureCode(e), manifest)
+                val failureReason = "Cloud snapshot restore failed (${e::class.java.simpleName})."
                 _actionState.update {
                     it.copy(
                         isBusy = false,
@@ -388,50 +466,44 @@ class CloudBackupViewModel(
         _actionState.update { it.copy(restoreResult = null) }
     }
 
-    fun deleteSnapshot(snapshotId: String) {
-        if (snapshotId == FirestoreCloudBackupRepository.PRIMARY_SNAPSHOT_ID) {
-            _actionState.update {
-                it.copy(errorMessage = "Deleting the primary restore point is prohibited.")
-            }
-            return
-        }
-        if (_actionState.value.isBusy) return
-        viewModelScope.launch {
-            _actionState.update {
-                it.copy(
-                    isBusy = true,
-                    busyMessage = "Removing cloud snapshot...",
-                    errorMessage = null,
-                    successMessage = null
-                )
-            }
-            val result = remoteRepository.deleteSnapshot(currentUserId, snapshotId)
-            _actionState.update {
-                if (result.isSuccess) {
-                    it.copy(
-                        isBusy = false,
-                        busyMessage = null,
-                        successMessage = "Cloud snapshot removed."
-                    )
-                } else {
-                    it.copy(
-                        isBusy = false,
-                        busyMessage = null,
-                        errorMessage = result.exceptionOrNull()?.localizedMessage ?: "Failed to delete snapshot."
-                    )
-                }
-            }
-        }
-    }
-
     fun clearMessages() {
         _actionState.update { it.copy(errorMessage = null, successMessage = null) }
     }
 
     private suspend fun applyCloudRestore(backup: ExpenseTrackerBackup, manifest: CloudBackupManifest) {
+        val authenticatedUidMatches = runCatching { authenticatedUidProvider() == currentUserId }.getOrDefault(false)
+        val workspaceMatches = runCatching { isWorkspaceIdentityCurrent(currentUserId) }.getOrDefault(false)
+        val orchestratorUidMatches = orchestrator == null || orchestrator.currentAuthenticatedUid() == currentUserId
+        if (manifest.uid != currentUserId ||
+            manifest.status != CloudBackupManifestStatus.COMPLETE ||
+            !authenticatedUidMatches ||
+            !workspaceMatches ||
+            !orchestratorUidMatches
+        ) {
+            Log.w(TAG, "Manual cloud operation blocked at manual restore pre-commit (authenticated=${authenticatedUidMatches}, workspaceMatches=${workspaceMatches}, accountSwitchDetected=${!authenticatedUidMatches}).")
+            val reason = when {
+                manifest.uid != currentUserId || manifest.status != CloudBackupManifestStatus.COMPLETE ->
+                    "The selected cloud snapshot is no longer valid for this account. Nothing was restored."
+                !authenticatedUidMatches ->
+                    "The signed-in account changed. Nothing was restored."
+                else ->
+                    "The active account workspace changed before restore. Nothing was restored."
+            }
+            _actionState.update {
+                it.copy(
+                    isBusy = false,
+                    busyMessage = null,
+                    restoreResult = CloudRestoreResult.Failure(reason)
+                )
+            }
+            return
+        }
+
         val outcomeResult = restoreBackupUseCase(backup)
         if (outcomeResult.isFailure) {
-            val failureReason = outcomeResult.exceptionOrNull()?.localizedMessage ?: "Database error"
+            val failure = outcomeResult.exceptionOrNull()
+            recordRestoreFailure(toFailureCode(failure), manifest)
+            val failureReason = "Database restore failed (${failure?.javaClass?.simpleName ?: "unknown"})."
             _actionState.update {
                 it.copy(
                     isBusy = false,
@@ -452,8 +524,16 @@ class CloudBackupViewModel(
         cloudBackupStateStore.setState(
             currentUserId,
             previous.copy(
+                lastSuccessfulBackupAtEpochMillis = manifest.completedAt?.toEpochMilli() ?: System.currentTimeMillis(),
                 lastSuccessfulRestoreAtEpochMillis = System.currentTimeMillis(),
+                lastRestoreFailureAtEpochMillis = null,
+                lastRestoreFailureCode = null,
+                lastRestoreFailureGenerationId = null,
+                lastRestoreFailureFingerprint = null,
                 lastSuccessfulSnapshotId = manifest.snapshotId,
+                lastSuccessfulRestoreGenerationId = manifest.generationId,
+                lastSuccessfulRestoreFingerprint = manifest.contentFingerprint,
+                pendingRestore = false,
                 pendingSnapshotId = null,
                 pendingSinceEpochMillis = null,
                 lastFailureAtEpochMillis = null,
@@ -472,6 +552,40 @@ class CloudBackupViewModel(
                 pendingRestoreCandidate = null,
                 restoreResult = CloudRestoreResult.Success(manifest)
             )
+        }
+    }
+
+    private fun isCloudOperationIdentityCurrent(stage: String): Boolean {
+        val authenticatedUidMatches = runCatching { authenticatedUidProvider() == currentUserId }.getOrDefault(false)
+        val workspaceMatches = runCatching { isWorkspaceIdentityCurrent(currentUserId) }.getOrDefault(false)
+        val orchestratorUidMatches = orchestrator == null || orchestrator.currentAuthenticatedUid() == currentUserId
+        val matches = authenticatedUidMatches && workspaceMatches && orchestratorUidMatches
+        if (!matches) {
+            Log.w(TAG, "Manual cloud operation blocked at $stage (authenticated=${authenticatedUidMatches}, workspaceMatches=${workspaceMatches}, accountSwitchDetected=${!authenticatedUidMatches}).")
+        }
+        return matches
+    }
+
+    private suspend fun recordRestoreFailure(
+        failureCode: String,
+        manifest: CloudBackupManifest? = null
+    ) {
+        val safeCode = failureCode.takeIf(CloudBackupState::isValidFailureCode) ?: "RESTORE_FAILED"
+        try {
+            val previous = cloudBackupStateStore.getState(currentUserId)
+            cloudBackupStateStore.setState(
+                currentUserId,
+                previous.copy(
+                    lastRestoreFailureAtEpochMillis = System.currentTimeMillis(),
+                    lastRestoreFailureCode = safeCode,
+                    lastRestoreFailureGenerationId = manifest?.generationId,
+                    lastRestoreFailureFingerprint = manifest?.contentFingerprint,
+                    pendingRestore = false
+                )
+            )
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.w(TAG, "Unable to persist restore failure state (${e::class.java.simpleName})")
         }
     }
 
