@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,9 +20,9 @@ import androidx.compose.ui.unit.dp
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 enum class ProgressVariant {
-    NORMAL,    // Purple gradient
+    NORMAL,    // Forest green
     WARNING,   // Amber
-    EXCEEDED   // Red
+    EXCEEDED   // Terracotta
 }
 
 /**
