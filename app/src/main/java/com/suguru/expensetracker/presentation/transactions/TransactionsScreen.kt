@@ -87,77 +87,68 @@ fun TransactionsScreenContent(
     onNavigateToDetail: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
+    val hasActiveFilters = uiState.selectedType != TransactionTypeFilter.ALL ||
+        uiState.selectedCategoryId != null || uiState.searchQuery.isNotBlank()
+
+    Box(modifier = modifier.fillMaxSize().testTag("transactions_screen")) {
+    LazyColumn(
+        modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .testTag("transactions_list"),
+        contentPadding = PaddingValues(
+            horizontal = ExpenseTrackerSpacing.screenHorizontal,
+            top = ExpenseTrackerSpacing.md,
+            bottom = 104.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        BackgroundGlowDecoration()
-
-        Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("transactions_screen"),
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-        ) { innerPadding ->
+        // Archive identity and search are a single scrollable header, matching the journal design.
+        item(key = "transactions_header") {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = ExpenseTrackerSpacing.screenHorizontal),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
             ) {
-                // Header section
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                        .padding(top = ExpenseTrackerSpacing.sm, bottom = ExpenseTrackerSpacing.sm)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxs)) {
                     Text(
                         text = stringResource(R.string.transaction_activity_heading),
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.2.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                     Text(
                         text = stringResource(R.string.nav_transactions),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                     Text(
                         text = stringResource(R.string.transaction_activity_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                     )
                 }
-
-                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
-
-                // 1. Search Bar (Elevated dark surface, clear action)
                 ExpenseTrackerSearchField(
                     query = uiState.searchQuery,
                     onQueryChange = onSearchQueryChanged,
                     placeholder = stringResource(R.string.search_transactions_hint),
                     onClear = { onSearchQueryChanged("") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("transaction_search_input"),
                     testTag = "transaction_search_input"
                 )
+            }
+        }
 
-                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                // 2. Type Filter Row (All, Expense, Income, Transfer)
+        // Filters remain directly below search; Transfer is retained only as a historical filter.
+        item(key = "transaction_filters") {
+            Column(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+            ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
-                        .horizontalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -167,42 +158,32 @@ fun TransactionsScreenContent(
                         TransactionTypeFilter.INCOME to stringResource(R.string.type_income),
                         TransactionTypeFilter.TRANSFER to stringResource(R.string.type_transfer)
                     )
-
                     types.forEach { (type, label) ->
-                        val isSelected = uiState.selectedType == type
                         ExpenseTrackerFilterChip(
                             text = label,
-                            selected = isSelected,
+                            selected = uiState.selectedType == type,
                             onClick = { onTypeFilterChanged(type) },
                             testTag = "type_filter_${type.name.lowercase()}"
                         )
                     }
                 }
 
-                // 3. Category Filter Row
                 if (uiState.categories.isNotEmpty() && uiState.selectedType != TransactionTypeFilter.TRANSFER) {
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val isAllCategoriesSelected = uiState.selectedCategoryId == null
                         ExpenseTrackerFilterChip(
                             text = stringResource(R.string.filter_all_categories),
-                            selected = isAllCategoriesSelected,
+                            selected = uiState.selectedCategoryId == null,
                             onClick = { onCategoryFilterChanged(null) },
                             testTag = "category_filter_all"
                         )
-
                         uiState.categories.forEach { category ->
-                            val isSelected = uiState.selectedCategoryId == category.id
                             ExpenseTrackerFilterChip(
                                 text = com.suguru.expensetracker.presentation.util.categoryDisplayName(category),
-                                selected = isSelected,
+                                selected = uiState.selectedCategoryId == category.id,
                                 onClick = { onCategoryFilterChanged(category.id) },
                                 testTag = "category_filter_${category.id}"
                             )
@@ -210,20 +191,8 @@ fun TransactionsScreenContent(
                     }
                 }
 
-                // Active filter summary & clear action
-                val hasActiveFilters = uiState.selectedType != TransactionTypeFilter.ALL ||
-                        uiState.selectedCategoryId != null ||
-                        uiState.searchQuery.isNotBlank()
-
                 if (hasActiveFilters && uiState.hasAnyTransactionsInDb) {
-                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         SecondaryButton(
                             text = stringResource(R.string.action_clear_filters),
                             onClick = onClearFilters,
@@ -232,146 +201,119 @@ fun TransactionsScreenContent(
                         )
                     }
                 }
+            }
+        }
 
-                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
+        when {
+            uiState.isLoading -> item(key = "transactions_loading") {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.testTag("transactions_loading_indicator")
+                    )
+                }
+            }
 
-                // 4. Content Area: List / Loading / Empty
-                if (uiState.isLoading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = ExpenseTrackerTheme.extendedColors.primaryPurple,
-                            modifier = Modifier.testTag("transactions_loading_indicator")
-                        )
-                    }
-                } else if (!uiState.hasAnyTransactionsInDb) {
-                    // Database is completely empty
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg),
-                            modifier = Modifier.padding(ExpenseTrackerSpacing.xl)
-                        ) {
-                            EmptyState(
-                                title = stringResource(R.string.no_transactions_title),
-                                description = stringResource(R.string.no_transactions_desc),
-                                icon = Icons.Default.ReceiptLong,
-                                testTag = "empty_transactions_state"
-                            )
+            !uiState.hasAnyTransactionsInDb -> item(key = "transactions_empty") {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(300.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    EmptyState(
+                        title = stringResource(R.string.no_transactions_title),
+                        description = stringResource(R.string.no_transactions_desc),
+                        icon = Icons.Default.ReceiptLong,
+                        testTag = "empty_transactions_state"
+                    )
+                }
+            }
+
+            uiState.groupedTransactions.isEmpty() -> item(key = "transactions_no_match") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().height(300.dp).padding(ExpenseTrackerSpacing.xl),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    EmptyState(
+                        title = stringResource(R.string.no_matching_transactions_title),
+                        description = stringResource(R.string.no_matching_transactions_desc),
+                        icon = Icons.Default.FilterAltOff,
+                        testTag = "no_matching_transactions_state"
+                    )
+                    SecondaryButton(
+                        text = stringResource(R.string.action_clear_filters),
+                        onClick = onClearFilters,
+                        modifier = Modifier.testTag("clear_filters_button")
+                    )
+                }
+            }
+
+            else -> {
+                uiState.groupedTransactions.forEach { dateGroup ->
+                    item(key = "header_${dateGroup.date}") {
+                        val today = java.time.LocalDate.now()
+                        val title = when (dateGroup.date) {
+                            today -> stringResource(R.string.date_today)
+                            today.minusDays(1) -> stringResource(R.string.date_yesterday)
+                            else -> dateGroup.headerTitle
                         }
+                        DateGroupHeader(title = title, modifier = Modifier.widthIn(max = 540.dp))
                     }
-                } else if (uiState.groupedTransactions.isEmpty()) {
-                    // Search or filters returned 0 results
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
-                            modifier = Modifier.padding(ExpenseTrackerSpacing.xl)
+                    item(key = "group_${dateGroup.date}") {
+                        ExpenseTrackerCard(
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                            shape = RoundedCornerShape(ExpenseTrackerRadius.lg),
+                            containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                            borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            EmptyState(
-                                title = stringResource(R.string.no_matching_transactions_title),
-                                description = stringResource(R.string.no_matching_transactions_desc),
-                                icon = Icons.Default.FilterAltOff,
-                                testTag = "no_matching_transactions_state"
-                            )
-                            SecondaryButton(
-                                text = stringResource(R.string.action_clear_filters),
-                                onClick = onClearFilters,
-                                modifier = Modifier.testTag("clear_filters_button")
-                            )
-                        }
-                    }
-                } else {
-                    // Display grouped transactions in LazyColumn with shared date cards
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                            .widthIn(max = 540.dp)
-                            .testTag("transactions_list"),
-                        contentPadding = PaddingValues(bottom = 88.dp),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                    ) {
-                        uiState.groupedTransactions.forEach { dateGroup ->
-                            item(key = "header_${dateGroup.date}") {
-                                val today = java.time.LocalDate.now()
-                                val title = when (dateGroup.date) {
-                                    today -> stringResource(R.string.date_today)
-                                    today.minusDays(1) -> stringResource(R.string.date_yesterday)
-                                    else -> dateGroup.headerTitle
-                                }
-                                DateGroupHeader(title = title)
-                            }
-
-                            item(key = "group_${dateGroup.date}") {
-                                ExpenseTrackerCard(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(ExpenseTrackerRadius.lg),
-                                    containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                                    borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        dateGroup.transactions.forEachIndexed { index, item ->
-                                            FinancialListRow(
-                                                title = item.title.ifBlank {
-                                                    when (item.type) {
-                                                        TransactionType.EXPENSE -> stringResource(R.string.type_expense)
-                                                        TransactionType.INCOME -> stringResource(R.string.type_income)
-                                                        TransactionType.TRANSFER -> stringResource(R.string.type_transfer)
-                                                    }
-                                                },
-                                                subtitle = item.subtitle.takeIf { it.isNotBlank() }
-                                                    ?: if (item.type == TransactionType.TRANSFER) stringResource(R.string.type_transfer) else null,
-                                                trailingSubtitle = item.timeFormatted,
-                                                amountText = item.formattedAmount,
-                                                amountColor = when (item.isPositive) {
-                                                    true -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                                    false -> ExpenseTrackerTheme.extendedColors.financialNegative
-                                                    null -> ExpenseTrackerTheme.extendedColors.financialNeutral
-                                                },
-                                                icon = when (item.type) {
-                                                    TransactionType.EXPENSE -> Icons.Default.ArrowDownward
-                                                    TransactionType.INCOME -> Icons.Default.ArrowUpward
-                                                    TransactionType.TRANSFER -> Icons.AutoMirrored.Filled.CompareArrows
-                                                },
-                                                iconTint = when (item.type) {
-                                                    TransactionType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegative
-                                                    TransactionType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                                    TransactionType.TRANSFER -> ExpenseTrackerTheme.extendedColors.financialNeutral
-                                                },
-                                                iconBackground = when (item.type) {
-                                                    TransactionType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegative.copy(alpha = 0.14f)
-                                                    TransactionType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositive.copy(alpha = 0.14f)
-                                                    TransactionType.TRANSFER -> ExpenseTrackerTheme.extendedColors.financialNeutral.copy(alpha = 0.14f)
-                                                },
-                                                isRecurring = item.isRecurring,
-                                                onClick = { onNavigateToDetail(item.id) },
-                                                testTag = "transaction_row_${item.id}"
-                                            )
-
-                                            if (index < dateGroup.transactions.lastIndex) {
-                                                HorizontalDivider(
-                                                    color = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                                                    thickness = 0.5.dp,
-                                                    modifier = Modifier.padding(horizontal = ExpenseTrackerSpacing.lg)
-                                                )
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                dateGroup.transactions.forEachIndexed { index, item ->
+                                    FinancialListRow(
+                                        title = item.title.ifBlank {
+                                            when (item.type) {
+                                                TransactionType.EXPENSE -> stringResource(R.string.type_expense)
+                                                TransactionType.INCOME -> stringResource(R.string.type_income)
+                                                TransactionType.TRANSFER -> stringResource(R.string.type_transfer)
                                             }
-                                        }
+                                        },
+                                        subtitle = item.subtitle.takeIf { it.isNotBlank() }
+                                            ?: if (item.type == TransactionType.TRANSFER) stringResource(R.string.type_transfer) else null,
+                                        trailingSubtitle = item.timeFormatted,
+                                        amountText = item.formattedAmount,
+                                        amountColor = when (item.isPositive) {
+                                            true -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                            false -> ExpenseTrackerTheme.extendedColors.financialNegative
+                                            null -> ExpenseTrackerTheme.extendedColors.financialNeutral
+                                        },
+                                        icon = when (item.type) {
+                                            TransactionType.EXPENSE -> Icons.Default.ArrowDownward
+                                            TransactionType.INCOME -> Icons.Default.ArrowUpward
+                                            TransactionType.TRANSFER -> Icons.AutoMirrored.Filled.CompareArrows
+                                        },
+                                        iconTint = when (item.type) {
+                                            TransactionType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegative
+                                            TransactionType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositive
+                                            TransactionType.TRANSFER -> ExpenseTrackerTheme.extendedColors.financialNeutral
+                                        },
+                                        iconBackground = when (item.type) {
+                                            TransactionType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegative.copy(alpha = 0.12f)
+                                            TransactionType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositive.copy(alpha = 0.12f)
+                                            TransactionType.TRANSFER -> ExpenseTrackerTheme.extendedColors.financialNeutral.copy(alpha = 0.12f)
+                                        },
+                                        isRecurring = item.isRecurring,
+                                        onClick = { onNavigateToDetail(item.id) },
+                                        testTag = "transaction_row_${item.id}"
+                                    )
+                                    if (index < dateGroup.transactions.lastIndex) {
+                                        HorizontalDivider(
+                                            color = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                                            thickness = 0.5.dp,
+                                            modifier = Modifier.padding(horizontal = ExpenseTrackerSpacing.lg)
+                                        )
                                     }
                                 }
                             }
@@ -380,6 +322,7 @@ fun TransactionsScreenContent(
                 }
             }
         }
+    }
     }
 }
 
