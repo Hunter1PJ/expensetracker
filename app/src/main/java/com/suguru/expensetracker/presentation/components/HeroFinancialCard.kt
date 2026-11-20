@@ -65,8 +65,8 @@ fun HeroFinancialCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(ExpenseTrackerRadius.cardHero)
-            .background(ExpenseTrackerGradients.heroCard)
-            .border(1.25.dp, ExpenseTrackerGradients.heroCardBorder, ExpenseTrackerRadius.cardHero)
+            .background(ExpenseTrackerTheme.extendedColors.surfaceHigh)
+            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, ExpenseTrackerRadius.cardHero)
             .padding(ExpenseTrackerSpacing.lg)
             .testTag(testTag)
     ) {
