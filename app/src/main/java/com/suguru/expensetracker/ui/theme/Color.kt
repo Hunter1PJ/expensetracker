@@ -5,150 +5,107 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// ==========================================
-// NEW PREMIUM PURPLE/INDIGO COLOR PALETTE
-// ==========================================
+// Warm Paper Journal palette. Legacy property names are preserved so existing
+// screens keep their APIs while receiving the new visual system.
 
-// Neutrals & Surfaces - Dark Palette
-val BackgroundDeepDark = Color(0xFF09090F)      // Deep midnight canvas
-val BackgroundAltDark = Color(0xFF0D0D16)       // Secondary background
-val SurfaceLowDark = Color(0xFF11111B)          // Lowest elevated surface
-val SurfaceDark = Color(0xFF161624)             // Default card / container surface
-val SurfaceHighDark = Color(0xFF1C1C2D)         // Higher elevation / input fields
-val SurfaceHighlightDark = Color(0xFF24243A)    // Selected state / active hover
+val BackgroundDeepDark = Color(0xFF20231F)
+val BackgroundAltDark = Color(0xFF272B25)
+val SurfaceLowDark = Color(0xFF292D27)
+val SurfaceDark = Color(0xFF30352E)
+val SurfaceHighDark = Color(0xFF393F36)
+val SurfaceHighlightDark = Color(0xFF454D42)
 
-// Brand Purple & Indigo Accents - Dark
-val PrimaryPurpleDark = Color(0xFF8B5CF6)       // Primary brand purple
-val PrimaryBrightDark = Color(0xFFA78BFA)       // Bright violet highlight
-val PrimaryDeepDark = Color(0xFF6D4AFF)         // Rich deep purple/violet
-val AccentIndigoDark = Color(0xFF6366F1)        // Indigo accent
-val AccentVioletDark = Color(0xFFC084FC)        // Soft neon violet accent
+val PrimaryPurpleDark = Color(0xFF9AA88F)
+val PrimaryBrightDark = Color(0xFFB4C0A9)
+val PrimaryDeepDark = Color(0xFF718568)
+val AccentIndigoDark = Color(0xFFB86B4F)
+val AccentVioletDark = Color(0xFFD29A83)
 
-// Typography - Dark
-val TextPrimaryDark = Color(0xFFF8F7FF)         // High-contrast primary text
-val TextSecondaryDark = Color(0xFFAAA6BE)       // Secondary / label text
-val TextMutedDark = Color(0xFF747087)           // Muted captions / hints
+val TextPrimaryDark = Color(0xFFF4F0E8)
+val TextSecondaryDark = Color(0xFFC3BFB5)
+val TextMutedDark = Color(0xFF96948B)
 
-// Borders & Dividers - Dark
-val BorderSubtleDark = Color(0xFF2B2940)        // Subtle card borders
-val DividerDark = Color(0xFF242238)             // Section dividers
+val BorderSubtleDark = Color(0xFF4A5046)
+val DividerDark = Color(0xFF3D433A)
 
-// ------------------------------------------
-// Neutrals & Surfaces - Light Palette
-// ------------------------------------------
-val BackgroundDeepLight = Color(0xFFF8F7FC)     // Soft lavender-white canvas
-val BackgroundAltLight = Color(0xFFF2F1F8)      // Subtle off-white background
-val SurfaceLowLight = Color(0xFFFFFFFF)         // White surface
-val SurfaceLight = Color(0xFFFFFFFF)            // Default card background
-val SurfaceHighLight = Color(0xFFF3F1F9)        // Elevated tinted surface
-val SurfaceHighlightLight = Color(0xFFE8E5F5)   // Selected state / hover
+// Light Warm Paper Journal palette.
+val BackgroundDeepLight = Color(0xFFFAF7F2)
+val BackgroundAltLight = Color(0xFFF6F1E8)
+val SurfaceLowLight = Color(0xFFFFFCF7)
+val SurfaceLight = Color(0xFFFFFCF7)
+val SurfaceHighLight = Color(0xFFF1ECE3)
+val SurfaceHighlightLight = Color(0xFFE7EDE4)
 
-// Brand Purple & Indigo Accents - Light
-val PrimaryPurpleLight = Color(0xFF7C3AED)      // Vibrant purple
-val PrimaryBrightLight = Color(0xFF8B5CF6)      // Mid purple
-val PrimaryDeepLight = Color(0xFF6D28D9)        // Deep violet
-val AccentIndigoLight = Color(0xFF4F46E5)       // Indigo accent
-val AccentVioletLight = Color(0xFF9333EA)       // Violet accent
+val PrimaryPurpleLight = Color(0xFF2D5A43)
+val PrimaryBrightLight = Color(0xFF52755D)
+val PrimaryDeepLight = Color(0xFF214632)
+val AccentIndigoLight = Color(0xFFB86B4F)
+val AccentVioletLight = Color(0xFF98604C)
 
-// Typography - Light
-val TextPrimaryLight = Color(0xFF13111E)        // High-contrast dark text
-val TextSecondaryLight = Color(0xFF5B5772)      // Secondary / label text
-val TextMutedLight = Color(0xFF8B87A0)          // Muted captions
+val TextPrimaryLight = Color(0xFF282923)
+val TextSecondaryLight = Color(0xFF77766F)
+val TextMutedLight = Color(0xFF96938B)
 
-// Borders & Dividers - Light
-val BorderSubtleLight = Color(0xFFE3E0EE)       // Subtle card borders
-val DividerLight = Color(0xFFECE9F4)            // Section dividers
+val BorderSubtleLight = Color(0xFFE5DED2)
+val DividerLight = Color(0xFFEEE8DE)
 
-// ==========================================
-// FINANCIAL SEMANTIC COLORS (Distinct from Brand)
-// ==========================================
-// Positive / Income (Soft Emerald)
-val SemanticPositiveDark = Color(0xFF34D399)
-val SemanticPositiveContainerDark = Color(0xFF0F382A)
-val SemanticPositiveLight = Color(0xFF059669)
-val SemanticPositiveContainerLight = Color(0xFFD1FAE5)
+// Financial semantic colors.
+val SemanticPositiveDark = Color(0xFF9BB99A)
+val SemanticPositiveContainerDark = Color(0xFF334A35)
+val SemanticPositiveLight = Color(0xFF2D5A43)
+val SemanticPositiveContainerLight = Color(0xFFE5EDE2)
 
-// Negative / Expense (Soft Coral / Red)
-val SemanticNegativeDark = Color(0xFFF87171)
-val SemanticNegativeContainerDark = Color(0xFF3B1818)
-val SemanticNegativeLight = Color(0xFFDC2626)
-val SemanticNegativeContainerLight = Color(0xFFFEE2E2)
+val SemanticNegativeDark = Color(0xFFD99378)
+val SemanticNegativeContainerDark = Color(0xFF52352C)
+val SemanticNegativeLight = Color(0xFFB86B4F)
+val SemanticNegativeContainerLight = Color(0xFFF3E5DE)
 
-// Transfer / Neutral (Indigo)
-val SemanticTransferDark = Color(0xFF818CF8)
-val SemanticTransferContainerDark = Color(0xFF1E1B4B)
-val SemanticTransferLight = Color(0xFF4F46E5)
-val SemanticTransferContainerLight = Color(0xFFE0E7FF)
+// Historical transfers are neutral information, not a creation action.
+val SemanticTransferDark = Color(0xFFB9B5A9)
+val SemanticTransferContainerDark = Color(0xFF42443D)
+val SemanticTransferLight = Color(0xFF77766F)
+val SemanticTransferContainerLight = Color(0xFFECE8DF)
 
-// Warning / Approaching Limit (Amber)
-val SemanticWarningDark = Color(0xFFFBBF24)
-val SemanticWarningContainerDark = Color(0xFF3B260A)
-val SemanticWarningLight = Color(0xFFD97706)
-val SemanticWarningContainerLight = Color(0xFFFEF3C7)
+val SemanticWarningDark = Color(0xFFD7B579)
+val SemanticWarningContainerDark = Color(0xFF4A402D)
+val SemanticWarningLight = Color(0xFF99723A)
+val SemanticWarningContainerLight = Color(0xFFF4EBD8)
 
-// Danger / Exceeded (Red)
-val SemanticDangerDark = Color(0xFFEF4444)
-val SemanticDangerContainerDark = Color(0xFF450A0A)
-val SemanticDangerLight = Color(0xFFDC2626)
-val SemanticDangerContainerLight = Color(0xFFFEE2E2)
+val SemanticDangerDark = Color(0xFFE28B79)
+val SemanticDangerContainerDark = Color(0xFF57322D)
+val SemanticDangerLight = Color(0xFFA94F40)
+val SemanticDangerContainerLight = Color(0xFFF5E4DF)
 
-// ==========================================
-// REUSABLE GRADIENTS & GLOWS
-// ==========================================
+// Kept for compatibility with components that still accept Brush tokens.
+// The new design intentionally uses flat, paper-like surfaces without gradients.
 object ExpenseTrackerGradients {
-    val primary = Brush.linearGradient(
-        colors = listOf(PrimaryDeepDark, PrimaryPurpleDark, PrimaryBrightDark)
-    )
-
-    val primaryHorizontal = Brush.horizontalGradient(
-        colors = listOf(PrimaryDeepDark, PrimaryPurpleDark)
-    )
-
-    val deepSurface = Brush.verticalGradient(
-        colors = listOf(Color(0xFF181426), SurfaceLowDark)
-    )
-
-    val heroCard = Brush.linearGradient(
-        colors = listOf(Color(0xFF1F1A36), Color(0xFF141324), SurfaceLowDark)
-    )
-
-    val heroCardBorder = Brush.linearGradient(
-        colors = listOf(Color(0x66A78BFA), Color(0x228B5CF6), Color(0x102B2940))
-    )
-
-    val heroGlow = Brush.radialGradient(
-        colors = listOf(Color(0x338B5CF6), Color(0x008B5CF6))
-    )
-
-    val positiveGradient = Brush.horizontalGradient(
-        colors = listOf(Color(0xFF059669), Color(0xFF34D399))
-    )
-
-    val negativeGradient = Brush.horizontalGradient(
-        colors = listOf(Color(0xFFDC2626), Color(0xFFF87171))
-    )
+    val primary = Brush.linearGradient(listOf(PrimaryDeepLight, PrimaryDeepLight))
+    val primaryHorizontal = Brush.horizontalGradient(listOf(PrimaryDeepLight, PrimaryDeepLight))
+    val deepSurface = Brush.verticalGradient(listOf(SurfaceLowLight, SurfaceLowLight))
+    val heroCard = Brush.linearGradient(listOf(SurfaceHighLight, SurfaceHighLight))
+    val heroCardBorder = Brush.linearGradient(listOf(BorderSubtleLight, BorderSubtleLight))
+    val heroGlow = Brush.radialGradient(listOf(Color.Transparent, Color.Transparent))
+    val positiveGradient = Brush.horizontalGradient(listOf(SemanticPositiveLight, SemanticPositiveLight))
+    val negativeGradient = Brush.horizontalGradient(listOf(SemanticNegativeLight, SemanticNegativeLight))
 }
 
 object ExpenseTrackerGlow {
-    val small = Color(0x268B5CF6)   // 15% opacity
-    val medium = Color(0x408B5CF6)  // 25% opacity
-    val large = Color(0x668B5CF6)   // 40% opacity
-    val violet = Color(0x33C084FC)  // 20% opacity
+    val small = Color.Transparent
+    val medium = Color.Transparent
+    val large = Color.Transparent
+    val violet = Color.Transparent
 }
 
 object ExpenseTrackerChartColors {
-    val incomeSeries = SemanticPositiveDark
-    val expenseSeries = SemanticNegativeDark
-    val transferSeries = SemanticTransferDark
-    val gridLine = Color(0x1FAAA6BE)
-    val axisLabel = TextMutedDark
-    val chartGlow = Color(0x338B5CF6)
-    val chartSurface = SurfaceDark
+    val incomeSeries = SemanticPositiveLight
+    val expenseSeries = SemanticNegativeLight
+    val transferSeries = SemanticTransferLight
+    val gridLine = Color(0xFFE5DED2)
+    val axisLabel = TextSecondaryLight
+    val chartGlow = Color.Transparent
+    val chartSurface = SurfaceHighLight
 }
 
-// ==========================================
-// EXTENDED COLOR SYSTEM
-// ==========================================
 @Immutable
 data class ExtendedColors(
     val backgroundDeep: Color,
@@ -157,6 +114,7 @@ data class ExtendedColors(
     val surface: Color,
     val surfaceHigh: Color,
     val surfaceHighlight: Color,
+    // Legacy names retained for source compatibility.
     val primaryPurple: Color,
     val primaryBright: Color,
     val primaryDeep: Color,
@@ -167,8 +125,6 @@ data class ExtendedColors(
     val textMuted: Color,
     val borderSubtle: Color,
     val divider: Color,
-
-    // Financial Semantics
     val financialPositive: Color,
     val financialPositiveContainer: Color,
     val financialNegative: Color,
@@ -179,8 +135,6 @@ data class ExtendedColors(
     val financialWarningContainer: Color,
     val financialDanger: Color,
     val financialDangerContainer: Color,
-
-    // Backward-compatible mappings
     val surfaceElevated: Color = surfaceHigh,
     val cardBackground: Color = surface,
     val cardBorder: Color = borderSubtle,
