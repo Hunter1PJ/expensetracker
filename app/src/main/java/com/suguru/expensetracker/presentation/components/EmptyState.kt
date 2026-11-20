@@ -30,7 +30,7 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Reusable centered empty state with a quiet paper icon medallion and editorial title.
+ * Reusable minimal Empty State component.
  */
 @Composable
 fun EmptyState(
@@ -73,7 +73,7 @@ fun EmptyState(
 
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
