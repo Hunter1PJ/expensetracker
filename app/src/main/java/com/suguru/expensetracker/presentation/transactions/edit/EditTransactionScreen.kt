@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SelectableDates
@@ -621,6 +622,10 @@ fun EditTransactionScreenContent(
 
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
+            colors = DatePickerDefaults.colors(
+                containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+            ),
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -653,7 +658,12 @@ fun EditTransactionScreenContent(
                 }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+                )
+            )
         }
     }
 
@@ -666,6 +676,10 @@ fun EditTransactionScreenContent(
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
+            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text(stringResource(R.string.time_picker_dialog_title)) },
             text = { TimePicker(state = timePickerState) },
             confirmButton = {

@@ -872,6 +872,10 @@ fun SettingsScreen(
                     if (showLanguageDialog) {
                         AlertDialog(
                             onDismissRequest = { showLanguageDialog = false },
+                            shape = ExpenseTrackerRadius.dialog,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
                             title = { Text(stringResource(R.string.language_change_title)) },
                             text = {
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
@@ -912,6 +916,10 @@ fun SettingsScreen(
                                 }
                                 showApiKeyDialog = false
                             },
+                            shape = ExpenseTrackerRadius.dialog,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
                             title = {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -986,6 +994,10 @@ fun SettingsScreen(
                     if (showLegacyKeyMigrationDialog) {
                         AlertDialog(
                             onDismissRequest = { showLegacyKeyMigrationDialog = false },
+                            shape = ExpenseTrackerRadius.dialog,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
                             title = { Text(stringResource(R.string.dialog_migrate_legacy_key_title)) },
                             text = { Text(stringResource(R.string.dialog_migrate_legacy_key_message)) },
                             confirmButton = {

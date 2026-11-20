@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -532,6 +533,10 @@ fun AdvancedExportScreen(
         val fileName = uiState.targetFileName ?: "ExpenseTracker_Export"
         AlertDialog(
             onDismissRequest = { viewModel.dismissPrivacyWarning() },
+            shape = ExpenseTrackerRadius.dialog,
+            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             icon = {
                 Icon(
                     imageVector = Icons.Default.Security,
@@ -596,6 +601,10 @@ fun AdvancedExportScreen(
         val dateRangePickerState = rememberDateRangePickerState()
         DatePickerDialog(
             onDismissRequest = { showDatePickerDialog = false },
+            shape = ExpenseTrackerRadius.dialog,
+            colors = DatePickerDefaults.colors(
+                containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+            ),
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -623,6 +632,9 @@ fun AdvancedExportScreen(
         ) {
             DateRangePicker(
                 state = dateRangePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+                ),
                 title = { Text(stringResource(com.suguru.expensetracker.R.string.ui_select_date_range), modifier = Modifier.padding(16.dp)) },
                 headline = { Text(stringResource(com.suguru.expensetracker.R.string.ui_filter_export_period), modifier = Modifier.padding(horizontal = 16.dp)) },
                 showModeToggle = false

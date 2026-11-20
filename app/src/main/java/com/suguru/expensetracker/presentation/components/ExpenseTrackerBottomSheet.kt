@@ -24,7 +24,7 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Reusable modal bottom sheet container with purple/indigo tokens.
+ * Reusable modal bottom sheet container with Warm Paper surface and divider tokens.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

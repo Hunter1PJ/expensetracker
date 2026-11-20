@@ -38,6 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -603,6 +604,10 @@ fun AddEditBudgetScreen(
 
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
+            colors = DatePickerDefaults.colors(
+                containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+            ),
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -623,7 +628,12 @@ fun AddEditBudgetScreen(
                 }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+                )
+            )
         }
     }
 
@@ -633,6 +643,10 @@ fun AddEditBudgetScreen(
 
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
+            colors = DatePickerDefaults.colors(
+                containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+            ),
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -653,7 +667,12 @@ fun AddEditBudgetScreen(
                 }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+                )
+            )
         }
     }
 }

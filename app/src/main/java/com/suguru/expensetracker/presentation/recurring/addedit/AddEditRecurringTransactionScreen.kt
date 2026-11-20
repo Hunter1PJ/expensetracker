@@ -709,6 +709,7 @@ fun AddEditRecurringTransactionScreenContent(
         )
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -746,6 +747,7 @@ fun AddEditRecurringTransactionScreenContent(
         )
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
             confirmButton = {
                 TextButton(
                     onClick = {
