@@ -520,24 +520,8 @@ private fun HeroStatisticsCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(ExpenseTrackerRadius.cardHero)
-            .background(ExpenseTrackerGradients.heroCard)
-            .border(1.25.dp, ExpenseTrackerGradients.heroCardBorder, ExpenseTrackerRadius.cardHero)
-            .drawBehind {
-                val glowRadius = size.width * 0.6f
-                val glowCenter = Offset(size.width * 0.85f, size.height * 0.15f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x28A855F7),
-                            Color.Transparent
-                        ),
-                        center = glowCenter,
-                        radius = glowRadius
-                    ),
-                    center = glowCenter,
-                    radius = glowRadius
-                )
-            }
+            .background(ExpenseTrackerTheme.extendedColors.surfaceHigh)
+            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, ExpenseTrackerRadius.cardHero)
             .padding(ExpenseTrackerSpacing.xxl)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
