@@ -12,6 +12,19 @@ This file is the source-of-truth checklist for the redesign. The 41-page `App pr
 - Mobile baseline 390dp; 16dp horizontal inset; minimum interactive hit target 48dp.
 - Five bottom destinations only: Home, Transactions, Statistics, Budgets, Settings. Labels remain one line in English, Uzbek Latin and Russian.
 
+## Implementation progress — 20 November 2026
+
+The current branch now contains a first substantive Compose layout pass for four primary destinations:
+
+- **Home:** balance and per-currency summary consolidated into one paper hero; the separate monthly metric block removed; primary entry, AI draft workflow and recent ledger retained.
+- **Transactions:** search, type/category filters, empty/loading states and date-grouped rows placed in one continuous archive scroll. No creation CTA was added. Historical Transfer filtering remains available.
+- **Statistics:** period, currency and comparison controls grouped into one compact paper panel; summary, interactive trend chart, comparison and category breakdown paths retained.
+- **Budgets:** Create Budget moved from the floating action button into the page header; currency filtering, overview, budget cards and deactivation confirmation retained.
+
+**Not yet considered redesigned or complete:** Settings, Add Transaction, Edit Transaction, Transaction Detail, Categories, Add/Edit Category, Add/Edit Budget, Recurring Rules, Add/Edit Recurring Rule, Data & Storage and Financial Export. Existing shared-theme styling on those screens is not a substitute for their screen-specific layout work.
+
+**Validation status:** only source-level delimiter and key test-tag checks were performed on the four changed Kotlin files. No Android Gradle build, unit tests, locale validation or Medium_Phone AVD visual review has been run. Do not treat this milestone as complete until the completion gate below passes.
+
 ## Screens and required controls
 
 | Screen / route | Source PDF | Controls and actions that must remain functional |
