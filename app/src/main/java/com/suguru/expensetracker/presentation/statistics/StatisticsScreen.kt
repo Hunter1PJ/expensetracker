@@ -406,7 +406,7 @@ private fun StatisticsHeader(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.5.sp,
-            color = ExpenseTrackerTheme.extendedColors.accentViolet
+            color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
         Text(
@@ -582,7 +582,7 @@ private fun HeroStatisticsCard(
                             Text(
                                 text = pluralStringResource(R.plurals.statistics_transaction_count, transactionCount, transactionCount),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = ExpenseTrackerTheme.extendedColors.accentViolet
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -723,7 +723,7 @@ private fun TransfersOnlyBanner(
             Icon(
                 imageVector = Icons.Default.Repeat,
                 contentDescription = stringResource(R.string.ui_stats_transfers),
-                tint = ExpenseTrackerTheme.extendedColors.accentIndigo,
+                tint = ExpenseTrackerTheme.extendedColors.financialNeutral,
                 modifier = Modifier.size(20.dp)
             )
             Text(
@@ -1241,7 +1241,7 @@ private fun CustomRangePickerDialog(
                     text = stringResource(R.string.statistics_start_date_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = ExpenseTrackerTheme.extendedColors.accentViolet
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
                 DatePickerSelectorRow(
@@ -1256,7 +1256,7 @@ private fun CustomRangePickerDialog(
                     text = stringResource(R.string.statistics_end_date_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = ExpenseTrackerTheme.extendedColors.accentViolet
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
                 DatePickerSelectorRow(
