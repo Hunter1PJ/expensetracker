@@ -93,7 +93,7 @@ fun InteractiveCard(
             contentColor = contentColor
         ),
         border = BorderStroke(1.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
