@@ -30,7 +30,7 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Reusable Financial List Row for transactions, accounts, recurring items, and category lists.
+ * Reusable financial ledger row for transactions, recurring items and category lists.
  */
 @Composable
 fun FinancialListRow(
@@ -128,8 +128,8 @@ fun FinancialListRow(
         ) {
             Text(
                 text = amountText,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                fontWeight = FontWeight.SemiBold,
                 color = amountColor
             )
             if (trailingSubtitle != null) {
