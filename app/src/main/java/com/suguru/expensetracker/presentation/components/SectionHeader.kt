@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 
 /**
- * Clean Section Header component for structuring dashboard or list sections.
+ * Editorial section header with a serif title and compact supporting text.
  */
 @Composable
 fun SectionHeader(
@@ -37,7 +37,7 @@ fun SectionHeader(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
