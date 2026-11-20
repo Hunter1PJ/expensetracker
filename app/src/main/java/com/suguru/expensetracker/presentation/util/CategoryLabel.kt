@@ -11,33 +11,38 @@ import com.suguru.expensetracker.domain.model.Category
  * Stored category names and IDs remain untouched.
  */
 @StringRes
-private fun Category.builtInLabelResource(): Int? {
+internal fun builtInCategoryLabelResource(name: String, isSystem: Boolean): Int? {
     if (!isSystem) return null
-    return when (name.trim().lowercase()) {
-        "groceries" -> R.string.category_groceries
-        "food" -> R.string.category_food
-        "transport" -> R.string.category_transport
-        "study" -> R.string.category_study
-        "shopping" -> R.string.category_shopping
-        "health" -> R.string.category_health
-        "entertainment" -> R.string.category_entertainment
-        "bills" -> R.string.category_bills
-        "housing" -> R.string.category_housing
-        "personal care" -> R.string.category_personal_care
-        "subscriptions" -> R.string.category_subscriptions
-        "travel" -> R.string.category_travel
-        "gifts & donations" -> R.string.category_gifts_donations
-        "salary" -> R.string.category_salary
-        "freelance" -> R.string.category_freelance
-        "business" -> R.string.category_business
-        "gift" -> R.string.category_gift
-        "other" -> R.string.category_other
-        else -> null
-    }
+    return builtInCategoryLabelResources[name.trim().lowercase(java.util.Locale.ROOT)]
 }
 
+internal val builtInCategoryLabelResources: Map<String, Int> = mapOf(
+    "groceries" to R.string.category_groceries,
+    "food" to R.string.category_food,
+    "transport" to R.string.category_transport,
+    "study" to R.string.category_study,
+    "shopping" to R.string.category_shopping,
+    "health" to R.string.category_health,
+    "entertainment" to R.string.category_entertainment,
+    "bills" to R.string.category_bills,
+    "housing" to R.string.category_housing,
+    "personal care" to R.string.category_personal_care,
+    "subscriptions" to R.string.category_subscriptions,
+    "travel" to R.string.category_travel,
+    "gifts & donations" to R.string.category_gifts_donations,
+    "salary" to R.string.category_salary,
+    "freelance" to R.string.category_freelance,
+    "business" to R.string.category_business,
+    "gift" to R.string.category_gift,
+    "other" to R.string.category_other
+)
+
 @Composable
-fun categoryDisplayName(category: Category): String {
-    val resource = category.builtInLabelResource()
-    return if (resource == null) category.name else stringResource(resource)
+fun categoryDisplayName(category: Category): String =
+    categoryDisplayName(category.name, category.isSystem)
+
+@Composable
+fun categoryDisplayName(name: String, isSystem: Boolean): String {
+    val resource = builtInCategoryLabelResource(name, isSystem)
+    return if (resource == null) name else stringResource(resource)
 }

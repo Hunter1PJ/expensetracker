@@ -232,7 +232,8 @@ class PdfFinancialReportRenderer {
                             if (currentY + 14f > pageHeight - margin - 30f) {
                                 startNewPage()
                             }
-                            val catLabel = "• ${cat.categoryName} (${labels.text("categoryCount", cat.transactionCount)})"
+                            val categoryName = labels.categoryName(cat.categoryName, cat.isSystem) ?: cat.categoryName
+                            val catLabel = "• $categoryName (${labels.text("categoryCount", cat.transactionCount)})"
                             val catAmount = MoneyParser.format(cat.totalAmount, includeSymbol = true, useGrouping = true)
                             canvas.drawText(catLabel, margin + 10f, currentY, bodyPaint)
                             val amountMeasure = bodyBoldPaint.measureText(catAmount)
@@ -251,7 +252,8 @@ class PdfFinancialReportRenderer {
                             if (currentY + 14f > pageHeight - margin - 30f) {
                                 startNewPage()
                             }
-                            val catLabel = "• ${cat.categoryName} (${labels.text("categoryCount", cat.transactionCount)})"
+                            val categoryName = labels.categoryName(cat.categoryName, cat.isSystem) ?: cat.categoryName
+                            val catLabel = "• $categoryName (${labels.text("categoryCount", cat.transactionCount)})"
                             val catAmount = MoneyParser.format(cat.totalAmount, includeSymbol = true, useGrouping = true)
                             canvas.drawText(catLabel, margin + 10f, currentY, bodyPaint)
                             val amountMeasure = bodyBoldPaint.measureText(catAmount)
@@ -310,7 +312,8 @@ class PdfFinancialReportRenderer {
                     TransactionType.INCOME -> labels.text("income")
                     TransactionType.TRANSFER -> labels.text("transfer")
                 }
-                val categoryStr = tx.categoryName ?: (if (tx.type == TransactionType.TRANSFER) "—" else labels.text("uncategorized"))
+                val categoryStr = labels.categoryName(tx.categoryName, tx.categoryIsSystem)
+                    ?: (if (tx.type == TransactionType.TRANSFER) "—" else labels.text("uncategorized"))
                 val accountStr = if (tx.type == TransactionType.TRANSFER) {
                     "${tx.sourceAccountName} → ${tx.destinationAccountName ?: ""}"
                 } else {

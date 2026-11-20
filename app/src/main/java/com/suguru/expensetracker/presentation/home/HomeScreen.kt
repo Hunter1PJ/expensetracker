@@ -167,13 +167,6 @@ fun HomeScreenContent(
             }
 
             item {
-                HomeHeaderSection(
-                    monthLabel = uiState.currentMonthName,
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp)
-                )
-            }
-
-            item {
                 HomeHeroBalanceSection(
                     currencySummaries = uiState.currencySummaries,
                     activeSummary = activeCurrencySummary,
@@ -636,7 +629,7 @@ private fun HomeRecentActivitySection(
                         }
 
                         FinancialListRow(
-                            title = tx.title.ifBlank {
+                            title = (if (tx.categoryIsSystem) com.suguru.expensetracker.presentation.util.categoryDisplayName(tx.title, true) else tx.title).ifBlank {
                                 when (tx.type) {
                                     TransactionType.INCOME -> stringResource(R.string.type_income)
                                     TransactionType.EXPENSE -> stringResource(R.string.type_expense)
@@ -803,7 +796,7 @@ private fun HomeAiSection(
                     horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
             ) {
                     PrimaryButton(
-                        text = if (isExtracting) "Extracting…" else stringResource(R.string.home_ai_extract_action),
+                        text = if (isExtracting) stringResource(R.string.home_ai_extracting) else stringResource(R.string.home_ai_extract_action),
                         onClick = {
                             if (aiInputText.isNotBlank()) {
                                 onExtract(aiInputText)

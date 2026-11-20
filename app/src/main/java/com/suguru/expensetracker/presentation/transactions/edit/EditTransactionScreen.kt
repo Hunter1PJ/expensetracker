@@ -235,7 +235,7 @@ fun EditTransactionScreenContent(
                                 AddTransactionError.TransactionNotFound -> stringResource(R.string.error_transaction_not_found)
                                 AddTransactionError.TransferReadOnly -> stringResource(R.string.error_transaction_transfer_read_only)
                                 AddTransactionError.AiTransferDraftUnavailable -> stringResource(R.string.ai_warning_transfer_unavailable)
-                                is AddTransactionError.Unknown -> err.message ?: stringResource(R.string.error_unknown)
+                                is AddTransactionError.Unknown -> stringResource(R.string.error_unknown)
                             }
 
                             ExpenseTrackerCard(

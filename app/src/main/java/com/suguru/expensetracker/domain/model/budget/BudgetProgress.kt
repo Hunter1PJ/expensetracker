@@ -14,7 +14,8 @@ data class BudgetProgress(
     val spent: Money,
     val remaining: Money,
     val progressBasisPoints: Int, // 0 -> 10000+ (e.g., 5000 = 50%, 10000 = 100%)
-    val isExceeded: Boolean
+    val isExceeded: Boolean,
+    val categoryIsSystem: Boolean = false
 )
 
 sealed class BudgetValidationError : Exception() {

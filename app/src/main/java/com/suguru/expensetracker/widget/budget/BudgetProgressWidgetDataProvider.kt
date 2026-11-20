@@ -41,7 +41,7 @@ class BudgetProgressWidgetDataProvider(
             val budgetTitle = category?.name.orEmpty()
 
             if (!budget.isActive) {
-                emit(BudgetProgressWidgetData.inactive(budgetTitle))
+                emit(BudgetProgressWidgetData.inactive(budgetTitle, category?.isSystem == true))
                 return@flow
             }
 
@@ -57,6 +57,7 @@ class BudgetProgressWidgetDataProvider(
                     BudgetProgressWidgetData(
                         budgetId = budget.id,
                         title = budgetTitle,
+                        categoryIsSystem = category?.isSystem == true,
                         spentFormatted = spentFormatted,
                         limitFormatted = limitFormatted,
                         remainingFormatted = remainingFormatted,
@@ -80,6 +81,7 @@ class BudgetProgressWidgetDataProvider(
                     BudgetProgressWidgetData(
                         budgetId = budget.id,
                         title = budgetTitle,
+                        categoryIsSystem = category?.isSystem == true,
                         spentFormatted = spentFormatted,
                         limitFormatted = limitFormatted,
                         remainingFormatted = remainingFormatted,

@@ -250,10 +250,6 @@
     <string name="week_start_sunday">Sunday</string>
     <string name="title_date_format">Date Format</string>
     <string name="date_format_system">System Default</string>
-    <string name="title_time_format">Time Format</string>
-    <string name="time_format_system">System Default</string>
-    <string name="time_format_24">24-Hour</string>
-    <string name="time_format_12">12-Hour</string>
     <string name="title_show_currency_code">Show Currency Code</string>
     <string name="desc_show_currency_code">Display ISO currency codes beside symbols</string>
     <string name="title_confirm_delete">Confirm before delete</string>
@@ -305,6 +301,7 @@
     <string name="home_ai_action_configure">Configure in Settings</string>
     <string name="home_ai_input_hint">e.g., "Paid 45,000 UZS for taxi yesterday"</string>
     <string name="home_ai_extract_action">Parse Transaction</string>
+    <string name="home_ai_extracting">Extracting…</string>
     <string name="home_ai_preview_title">Transaction Preview</string>
     <string name="home_ai_preview_desc">Review suggestions before editing or saving</string>
     <string name="home_ai_action_edit_candidate">Edit &amp; Confirm</string>

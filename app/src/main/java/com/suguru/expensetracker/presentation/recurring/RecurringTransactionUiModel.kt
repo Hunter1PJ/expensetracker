@@ -18,6 +18,7 @@ data class RecurringTransactionUiModel(
     val formattedAmount: String,
     val categoryName: String?,
     val categoryIcon: String?,
+    val categoryIsSystem: Boolean = false,
     val frequency: RecurrenceFrequency,
     val startDate: LocalDate,
     val endDate: LocalDate?,

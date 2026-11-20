@@ -3,6 +3,7 @@ package com.suguru.expensetracker.presentation.export
 import android.content.Context
 import com.suguru.expensetracker.R
 import com.suguru.expensetracker.data.export.PdfFinancialReportLabels
+import com.suguru.expensetracker.presentation.util.builtInCategoryLabelResources
 import java.util.Locale
 
 fun localizedPdfReportLabels(context: Context): PdfFinancialReportLabels {
@@ -46,5 +47,8 @@ fun localizedPdfReportLabels(context: Context): PdfFinancialReportLabels {
         "uncategorized" to context.getString(R.string.pdf_empty_category),
         "emptyTransactions" to context.getString(R.string.pdf_empty_transactions)
     )
-    return PdfFinancialReportLabels(locale, values)
+    val categoryNames = builtInCategoryLabelResources.mapValues { (_, resourceId) ->
+        context.getString(resourceId)
+    }
+    return PdfFinancialReportLabels(locale, values, categoryNames)
 }

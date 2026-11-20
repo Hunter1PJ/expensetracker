@@ -70,8 +70,6 @@
     <string name="week_start_sunday">Yakshanba</string>
     <string name="title_date_format">Sana formati</string>
     <string name="date_format_system">Standart</string>
-    <string name="title_time_format">Vaqt formati</string>
-    <string name="time_format_24">24 soatlik</string>
     <string name="title_language">Til</string>
     <string name="language_description">Ilovada ishlatiladigan tilni tanlang</string>
     <string name="language_uzbek">O‘zbekcha</string>
@@ -142,7 +140,7 @@
     <string name="widget_config_budget_title">Budjet sarfini kuzatish</string>
     <string name="widget_config_select_budget">Faol budjetni tanlang</string>
     <string name="widget_config_overall_budget">Umumiy budjet</string>
-    <string name="widget_config_limit_period">Limit: %1$s • %2$s</string>
+    <string name="widget_config_limit_period">Chegara: %1$s • %2$s</string>
     <string name="widget_config_hide_spending">Bosh ekranda sarf va limit miqdorlarini yashiring.</string>
     <string name="widget_config_quick_add_title">Tez qo‘shish vidjetini qo‘shish</string>
     <string name="widget_config_quick_add_desc">Bosh ekrandagi yorliqlar orqali xarajat va daromadlarni tez kiriting.</string>
@@ -315,8 +313,6 @@
     <string name="dialog_deactivate_recurring_message">Qoida qayta faollashtirilmaguncha yangi operatsiyalar yaratmaydi.</string>
     <string name="error_recurring_start_after_end">Boshlanish sanasi tugash sanasidan kech bo‘lmasligi kerak.</string>
     <string name="currency_automatic">Yo‘q / avtomatik</string>
-    <string name="time_format_system">Tizim sozlamasi</string>
-    <string name="time_format_12">12 soatlik</string>
     <string name="title_show_currency_code">Valyuta kodini ko‘rsatish</string>
     <string name="desc_show_currency_code">Valyuta belgisi yonida ISO kodini ko‘rsatish</string>
     <string name="title_confirm_delete">O‘chirishdan oldin tasdiqlash</string>
@@ -361,6 +357,7 @@
     <string name="home_ai_action_configure">Sozlamalarda sozlash</string>
     <string name="home_ai_input_hint">masalan, “Kecha taksiga 45 000 UZS to‘ladim”</string>
     <string name="home_ai_extract_action">Operatsiyani tahlil qilish</string>
+    <string name="home_ai_extracting">Ma’lumot ajratilmoqda…</string>
     <string name="home_ai_preview_title">Operatsiya namunasi</string>
     <string name="home_ai_preview_desc">Saqlash yoki tahrirlashdan oldin tavsiyalarni ko‘rib chiqing</string>
     <string name="home_ai_action_edit_candidate">Tahrirlash va tasdiqlash</string>

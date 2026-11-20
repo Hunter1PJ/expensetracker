@@ -24,5 +24,6 @@ data class ExportTransactionRow(
     val categoryName: String? = null,
     val note: String? = null,
     val recurringRuleId: Long? = null,
-    val recurringOccurrenceDate: LocalDate? = null
+    val recurringOccurrenceDate: LocalDate? = null,
+    val categoryIsSystem: Boolean = false
 )

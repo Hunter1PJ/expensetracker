@@ -349,7 +349,7 @@ fun TransactionDetailScreenContent(
                                 DetailInfoRow(
                                     icon = Icons.Default.Category,
                                     label = stringResource(R.string.category_label),
-                                    value = uiState.category?.name ?: stringResource(R.string.pdf_empty_category),
+                                    value = uiState.category?.let { com.suguru.expensetracker.presentation.util.categoryDisplayName(it) } ?: stringResource(R.string.pdf_empty_category),
                                     isArchived = uiState.isCategoryArchived,
                                     testTag = "detail_category"
                                 )

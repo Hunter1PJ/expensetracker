@@ -212,6 +212,7 @@ class ObserveStatisticsComparisonUseCase(
             val catName = pCat?.categoryName ?: cCat?.categoryName ?: "Uncategorized"
             val iconName = pCat?.iconName ?: cCat?.iconName
             val colorHex = pCat?.colorHex ?: cCat?.colorHex
+            val isSystem = pCat?.isSystem ?: cCat?.isSystem ?: false
 
             val pAmount = pCat?.amount ?: Money(0L, currency)
             val cAmount = cCat?.amount ?: Money(0L, currency)
@@ -227,6 +228,7 @@ class ObserveStatisticsComparisonUseCase(
                 categoryName = catName,
                 iconName = iconName,
                 colorHex = colorHex,
+                isSystem = isSystem,
                 currencyCode = currency,
                 primaryAmount = pAmount,
                 comparisonAmount = cAmount,

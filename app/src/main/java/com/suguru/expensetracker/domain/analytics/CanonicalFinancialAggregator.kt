@@ -99,7 +99,8 @@ class CanonicalFinancialAggregator {
                 colorHex = cat?.colorHex,
                 amount = Money(catTotal, currency),
                 transactionCount = txList.size,
-                isArchived = cat?.isArchived == true
+                isArchived = cat?.isArchived == true,
+                isSystem = cat?.isSystem == true
             )
         }.sortedByDescending { it.amount.amountInMinorUnits }
     }

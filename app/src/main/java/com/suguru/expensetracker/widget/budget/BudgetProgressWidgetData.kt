@@ -14,6 +14,7 @@ enum class BudgetWidgetState {
 data class BudgetProgressWidgetData(
     val budgetId: Long = 0L,
     val title: String = "",
+    val categoryIsSystem: Boolean = false,
     val spentFormatted: String? = null,
     val limitFormatted: String? = null,
     val remainingFormatted: String? = null,
@@ -28,7 +29,7 @@ data class BudgetProgressWidgetData(
     companion object {
         fun loading() = BudgetProgressWidgetData(state = BudgetWidgetState.LOADING)
         fun configurationRequired() = BudgetProgressWidgetData(state = BudgetWidgetState.CONFIGURATION_REQUIRED)
-        fun inactive(title: String) = BudgetProgressWidgetData(title = title, state = BudgetWidgetState.INACTIVE)
+        fun inactive(title: String, categoryIsSystem: Boolean = false) = BudgetProgressWidgetData(title = title, categoryIsSystem = categoryIsSystem, state = BudgetWidgetState.INACTIVE)
         fun unavailable() = BudgetProgressWidgetData(state = BudgetWidgetState.BUDGET_UNAVAILABLE)
         fun error(message: String) = BudgetProgressWidgetData(state = BudgetWidgetState.ERROR, errorMessage = message)
     }

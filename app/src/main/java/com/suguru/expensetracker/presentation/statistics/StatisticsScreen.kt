@@ -129,9 +129,6 @@ fun StatisticsScreen(
                 .testTag("statistics_screen"),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Editorial report heading
-            StatisticsHeader(modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp))
-
             // Period, currency and comparison controls are grouped as one compact control surface.
             ExpenseTrackerCard(
                 modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
@@ -1090,7 +1087,7 @@ private fun CategoryProgressRow(
             ) {
                 IconAvatar(
                     icon = FinanceVisuals.getCategoryIcon(category.iconName ?: ""),
-                    contentDescription = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else category.categoryName,
+                    contentDescription = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else com.suguru.expensetracker.presentation.util.categoryDisplayName(category.categoryName, category.isSystem),
                     size = 40.dp,
                     tint = categoryColor,
                     backgroundColor = categoryColor.copy(alpha = 0.16f),
@@ -1103,7 +1100,7 @@ private fun CategoryProgressRow(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else category.categoryName,
+                            text = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else com.suguru.expensetracker.presentation.util.categoryDisplayName(category.categoryName, category.isSystem),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = ExpenseTrackerTheme.extendedColors.textPrimary,

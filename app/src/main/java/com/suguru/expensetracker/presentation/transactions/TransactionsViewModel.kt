@@ -196,7 +196,8 @@ class TransactionsViewModel(
                     timeFormatted = timeFormatted,
                     rawInstant = tx.transactionTime,
                     rawDate = localDate,
-                    isRecurring = tx.recurringRuleId != null
+                    isRecurring = tx.recurringRuleId != null,
+                    categoryIsSystem = category?.isSystem == true
                 )
             }
             TransactionType.INCOME -> {
@@ -216,7 +217,8 @@ class TransactionsViewModel(
                     timeFormatted = timeFormatted,
                     rawInstant = tx.transactionTime,
                     rawDate = localDate,
-                    isRecurring = tx.recurringRuleId != null
+                    isRecurring = tx.recurringRuleId != null,
+                    categoryIsSystem = category?.isSystem == true
                 )
             }
             TransactionType.TRANSFER -> {
@@ -238,7 +240,8 @@ class TransactionsViewModel(
                     timeFormatted = timeFormatted,
                     rawInstant = tx.transactionTime,
                     rawDate = localDate,
-                    isRecurring = tx.recurringRuleId != null
+                    isRecurring = tx.recurringRuleId != null,
+                    categoryIsSystem = category?.isSystem == true
                 )
             }
         }

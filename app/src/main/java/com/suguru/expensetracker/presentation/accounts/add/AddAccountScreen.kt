@@ -204,9 +204,9 @@ fun AddAccountScreenContent(
                         uiState.error?.let { err ->
                             val errorMessage = when (err) {
                                 AddAccountError.NameRequired -> stringResource(R.string.error_account_name_required)
-                                is AddAccountError.InvalidInitialBalance -> err.message ?: stringResource(R.string.error_invalid_initial_balance)
+                                is AddAccountError.InvalidInitialBalance -> stringResource(R.string.error_invalid_initial_balance)
                                 AddAccountError.AccountNotFound -> stringResource(R.string.error_account_not_found)
-                                is AddAccountError.SaveFailed -> err.message ?: stringResource(R.string.error_save_account_failed)
+                                is AddAccountError.SaveFailed -> stringResource(R.string.error_save_account_failed)
                             }
 
                             ErrorBanner(

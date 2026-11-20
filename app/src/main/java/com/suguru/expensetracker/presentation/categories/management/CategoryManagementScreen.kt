@@ -184,7 +184,7 @@ fun CategoryManagementContent(
                         val errorMessage = when (err) {
                             CategoryManagementError.CategoryNotFound -> stringResource(R.string.error_category_not_found)
                             CategoryManagementError.SystemCategoryCannotBeArchived -> stringResource(R.string.error_system_category_cannot_archive)
-                            is CategoryManagementError.ArchiveFailed -> err.message ?: stringResource(R.string.error_archive_category_failed)
+                            is CategoryManagementError.ArchiveFailed -> stringResource(R.string.error_archive_category_failed)
                         }
 
                         ErrorBanner(

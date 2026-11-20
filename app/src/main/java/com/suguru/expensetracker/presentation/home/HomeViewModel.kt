@@ -240,7 +240,8 @@ class HomeViewModel(
                 iconName = iconName,
                 colorHex = colorHex,
                 isPositive = isPositive,
-                isRecurring = tx.recurringRuleId != null
+                isRecurring = tx.recurringRuleId != null,
+                categoryIsSystem = detail.category?.isSystem == true
             )
         }
 

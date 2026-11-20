@@ -90,7 +90,8 @@ class PrepareFinancialReportDataUseCase(
                 categoryName = categoryName,
                 note = tx.note,
                 recurringRuleId = tx.recurringRuleId,
-                recurringOccurrenceDate = tx.recurringOccurrenceDate
+                recurringOccurrenceDate = tx.recurringOccurrenceDate,
+                categoryIsSystem = tx.categoryId?.let { categoryMap[it]?.isSystem } ?: false
             )
         }
 
@@ -130,7 +131,8 @@ class PrepareFinancialReportDataUseCase(
                     categoryName = it.categoryName,
                     totalAmount = it.amount,
                     transactionCount = it.transactionCount,
-                    isArchived = it.isArchived
+                    isArchived = it.isArchived,
+                    isSystem = it.categoryId?.let { id -> categoryMap[id]?.isSystem } ?: false
                 )
             }
 
@@ -147,7 +149,8 @@ class PrepareFinancialReportDataUseCase(
                     categoryName = it.categoryName,
                     totalAmount = it.amount,
                     transactionCount = it.transactionCount,
-                    isArchived = it.isArchived
+                    isArchived = it.isArchived,
+                    isSystem = it.categoryId?.let { id -> categoryMap[id]?.isSystem } ?: false
                 )
             }
         }

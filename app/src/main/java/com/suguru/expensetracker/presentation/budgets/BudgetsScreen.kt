@@ -159,36 +159,11 @@ fun BudgetsScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
                     ) {
-                        // Header
                         item {
                             Row(
                                 modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.End
                             ) {
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.ui_budget_planning),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        letterSpacing = 1.2.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.title_budgets),
-                                        style = MaterialTheme.typography.headlineLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.budget_spending_limits_intro),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                    )
-                                }
                                 TextButton(
                                     onClick = onNavigateToAddBudget,
                                     modifier = Modifier.testTag("fab_add_budget")
@@ -757,7 +732,8 @@ private fun CategoryBudgetCard(
         FinanceVisuals.getCategoryIcon(it)
     } ?: Icons.Outlined.PieChart
 
-    val title = progress.categoryName ?: stringResource(R.string.budget_category_fallback)
+    val title = progress.categoryName?.let { com.suguru.expensetracker.presentation.util.categoryDisplayName(it, progress.categoryIsSystem) }
+        ?: stringResource(R.string.budget_category_fallback)
 
     val periodLabel = when (progress.budget.periodType) {
         BudgetPeriodType.MONTHLY -> stringResource(R.string.budget_period_monthly_label)

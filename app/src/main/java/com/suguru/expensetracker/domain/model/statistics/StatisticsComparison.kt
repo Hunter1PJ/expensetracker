@@ -46,7 +46,8 @@ data class CategoryComparisonMetric(
     val comparisonAmount: Money,
     val absoluteDelta: Money,
     val relativeChange: RelativeChange,
-    val semantic: ComparisonSemantic
+    val semantic: ComparisonSemantic,
+    val isSystem: Boolean = false
 )
 
 data class AlignedTrendPoint(

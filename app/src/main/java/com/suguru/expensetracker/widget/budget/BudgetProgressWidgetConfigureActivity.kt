@@ -67,7 +67,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
             var privacyMode by remember { mutableStateOf(false) }
 
             val categoryMap = remember(categories) {
-                categories.associate { it.id to it.name }
+                categories.associateBy { it.id }
             }
 
             ExpenseTrackerTheme {
@@ -165,7 +165,7 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
     @Composable
     private fun ConfigurationScreen(
         budgetProgressList: List<BudgetProgress>,
-        categoryMap: Map<Long, String>,
+        categoryMap: Map<Long, com.suguru.expensetracker.domain.model.Category>,
         selectedBudgetProgress: BudgetProgress?,
         privacyMode: Boolean,
         onBudgetSelected: (BudgetProgress) -> Unit,
@@ -202,7 +202,9 @@ class BudgetProgressWidgetConfigureActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(budgetProgressList) { progress ->
-                    val categoryName = progress.budget.categoryId?.let { categoryMap[it] } ?: stringResource(R.string.widget_config_overall_budget)
+                    val categoryName = progress.budget.categoryId?.let { categoryMap[it] }
+                        ?.let { com.suguru.expensetracker.presentation.util.categoryDisplayName(it) }
+                        ?: stringResource(R.string.widget_config_overall_budget)
                     val limitFormatted = MoneyParser.format(progress.budget.limitAmount, includeSymbol = true, useGrouping = true)
                     val periodText = stringResource(
                         when (progress.budget.periodType) {

@@ -77,6 +77,7 @@ class ObserveActiveBudgetProgressUseCase(
                     categoryName = category?.name,
                     categoryIconName = category?.iconName,
                     categoryColorHex = category?.colorHex,
+                    categoryIsSystem = category?.isSystem == true,
                     spent = spentMoney,
                     remaining = remainingMoney,
                     progressBasisPoints = basisPoints,

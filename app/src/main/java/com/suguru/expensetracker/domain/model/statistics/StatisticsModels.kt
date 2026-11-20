@@ -19,7 +19,8 @@ data class CategoryAnalytics(
     val colorHex: String?,
     val amount: Money,
     val transactionCount: Int,
-    val isArchived: Boolean
+    val isArchived: Boolean,
+    val isSystem: Boolean = false
 )
 
 data class AccountAnalytics(

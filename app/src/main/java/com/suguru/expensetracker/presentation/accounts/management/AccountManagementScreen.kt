@@ -185,7 +185,7 @@ fun AccountManagementContent(
                     uiState.error?.let { err ->
                         val errorMessage = when (err) {
                             AccountManagementError.AccountNotFound -> stringResource(R.string.error_account_not_found)
-                            is AccountManagementError.ArchiveFailed -> err.message ?: stringResource(R.string.error_archive_account_failed)
+                            is AccountManagementError.ArchiveFailed -> stringResource(R.string.error_archive_account_failed)
                         }
 
                         ErrorBanner(

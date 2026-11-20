@@ -70,8 +70,6 @@
     <string name="week_start_sunday">Воскресенье</string>
     <string name="title_date_format">Формат даты</string>
     <string name="date_format_system">По умолчанию</string>
-    <string name="title_time_format">Формат времени</string>
-    <string name="time_format_24">24-часовой</string>
     <string name="title_language">Язык</string>
     <string name="language_description">Выберите язык приложения</string>
     <string name="language_uzbek">O‘zbekcha</string>
@@ -315,8 +313,6 @@
     <string name="dialog_deactivate_recurring_message">Правило перестанет создавать операции, пока вы его снова не активируете.</string>
     <string name="error_recurring_start_after_end">Дата начала должна быть не позже даты окончания.</string>
     <string name="currency_automatic">Нет / автоматически</string>
-    <string name="time_format_system">Системный формат</string>
-    <string name="time_format_12">12-часовой</string>
     <string name="title_show_currency_code">Показывать код валюты</string>
     <string name="desc_show_currency_code">Показывать код ISO рядом с символом валюты</string>
     <string name="title_confirm_delete">Подтверждать удаление</string>
@@ -361,6 +357,7 @@
     <string name="home_ai_action_configure">Настроить в параметрах</string>
     <string name="home_ai_input_hint">например: «Вчера заплатил 45 000 UZS за такси»</string>
     <string name="home_ai_extract_action">Разобрать операцию</string>
+    <string name="home_ai_extracting">Извлечение данных…</string>
     <string name="home_ai_preview_title">Предварительный просмотр операции</string>
     <string name="home_ai_preview_desc">Проверьте предложенные данные перед изменением или сохранением</string>
     <string name="home_ai_action_edit_candidate">Изменить и подтвердить</string>

@@ -190,7 +190,7 @@ fun AddCategoryScreenContent(
                             val errorMessage = when (err) {
                                 AddCategoryError.NameRequired -> stringResource(R.string.error_category_name_required)
                                 AddCategoryError.CategoryNotFound -> stringResource(R.string.error_category_not_found)
-                                is AddCategoryError.SaveFailed -> err.message ?: stringResource(R.string.error_save_category_failed)
+                                is AddCategoryError.SaveFailed -> stringResource(R.string.error_save_category_failed)
                             }
 
                             ErrorBanner(

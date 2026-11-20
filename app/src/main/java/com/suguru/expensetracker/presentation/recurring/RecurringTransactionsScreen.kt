@@ -423,8 +423,11 @@ private fun RecurringRuleCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxs)
                 ) {
+                    val localizedCategoryName = rule.categoryName?.let {
+                        com.suguru.expensetracker.presentation.util.categoryDisplayName(it, rule.categoryIsSystem)
+                    }
                     val title = rule.note?.ifBlank { null }
-                        ?: rule.categoryName
+                        ?: localizedCategoryName
                         ?: when (rule.type) {
                             TransactionType.EXPENSE -> stringResource(R.string.type_expense)
                             TransactionType.INCOME -> stringResource(R.string.type_income)
@@ -440,7 +443,7 @@ private fun RecurringRuleCard(
 
                     val subtitle = when {
                         rule.type == TransactionType.TRANSFER -> stringResource(R.string.recurring_transfer_readonly_subtitle)
-                        !rule.note.isNullOrBlank() && !rule.categoryName.isNullOrBlank() -> rule.categoryName
+                        !rule.note.isNullOrBlank() && !localizedCategoryName.isNullOrBlank() -> localizedCategoryName
                         else -> null
                     }
 

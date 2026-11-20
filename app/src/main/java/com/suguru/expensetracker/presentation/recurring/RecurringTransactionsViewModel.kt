@@ -117,6 +117,7 @@ class RecurringTransactionsViewModel(
             formattedAmount = formattedAmount,
             categoryName = category?.name,
             categoryIcon = category?.iconName,
+            categoryIsSystem = category?.isSystem == true,
             frequency = rule.frequency,
             startDate = rule.startDate,
             endDate = rule.endDate,

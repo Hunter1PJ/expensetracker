@@ -37,7 +37,8 @@ data class RecentTransactionUiModel(
     val iconName: String,
     val colorHex: String,
     val isPositive: Boolean?,
-    val isRecurring: Boolean = false
+    val isRecurring: Boolean = false,
+    val categoryIsSystem: Boolean = false
 )
 
 /**

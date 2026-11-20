@@ -505,7 +505,7 @@ private fun CategoryComparisonRow(
 
             Column {
                 Text(
-                    text = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else category.categoryName,
+                    text = if (category.categoryId == null) stringResource(R.string.pdf_empty_category) else com.suguru.expensetracker.presentation.util.categoryDisplayName(category.categoryName, category.isSystem),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = ExpenseTrackerTheme.extendedColors.textPrimary,

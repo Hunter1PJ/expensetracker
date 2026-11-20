@@ -21,7 +21,8 @@ data class ExportCategoryItem(
     val categoryName: String,
     val totalAmount: Money,
     val transactionCount: Int,
-    val isArchived: Boolean
+    val isArchived: Boolean,
+    val isSystem: Boolean = false
 )
 
 /**

@@ -22,7 +22,8 @@ data class CategoryBreakdownUiModel(
     val percentage: Float,
     val percentageText: String,
     val transactionCount: Int,
-    val isArchived: Boolean
+    val isArchived: Boolean,
+    val isSystem: Boolean = false
 )
 
 data class AccountAnalyticsUiModel(
@@ -60,7 +61,8 @@ data class CategoryComparisonUiModel(
     val formattedDelta: String,
     val relativeChangeText: UiMessage?,
     val semantic: ComparisonSemantic,
-    val contentDescription: UiMessage
+    val contentDescription: UiMessage,
+    val isSystem: Boolean = false
 )
 
 data class AlignedTrendPointUiModel(

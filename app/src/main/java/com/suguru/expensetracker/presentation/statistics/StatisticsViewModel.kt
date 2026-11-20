@@ -243,7 +243,8 @@ class StatisticsViewModel(
                 percentage = ratio,
                 percentageText = "$percentageInt%",
                 transactionCount = cat.transactionCount,
-                isArchived = cat.isArchived
+                isArchived = cat.isArchived,
+                isSystem = cat.isSystem
             )
         }
 
@@ -264,7 +265,8 @@ class StatisticsViewModel(
                 percentage = ratio,
                 percentageText = "$percentageInt%",
                 transactionCount = cat.transactionCount,
-                isArchived = cat.isArchived
+                isArchived = cat.isArchived,
+                isSystem = cat.isSystem
             )
         }
 
@@ -452,7 +454,12 @@ class StatisticsViewModel(
         val contentDesc = UiMessage(
             R.string.statistics_category_accessibility,
             listOf(
-                if (cat.categoryId == null) UiMessage(R.string.pdf_empty_category) else cat.categoryName,
+                if (cat.categoryId == null) {
+                    UiMessage(R.string.pdf_empty_category)
+                } else {
+                    com.suguru.expensetracker.presentation.util.builtInCategoryLabelResource(cat.categoryName, cat.isSystem)
+                        ?.let { UiMessage(it) } ?: cat.categoryName
+                },
                 formattedPrimary,
                 formattedComp,
                 changeDescription
@@ -469,7 +476,8 @@ class StatisticsViewModel(
             formattedDelta = formattedDelta,
             relativeChangeText = relativeText,
             semantic = cat.semantic,
-            contentDescription = contentDesc
+            contentDescription = contentDesc,
+            isSystem = cat.isSystem
         )
     }
 }

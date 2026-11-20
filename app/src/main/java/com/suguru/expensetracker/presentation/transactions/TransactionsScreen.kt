@@ -105,41 +105,15 @@ fun TransactionsScreenContent(
         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Archive identity and search are a single scrollable header, matching the journal design.
-        item(key = "transactions_header") {
-            Column(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
-                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxs)) {
-                    Text(
-                        text = stringResource(R.string.transaction_activity_heading),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.2.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = stringResource(R.string.nav_transactions),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = stringResource(R.string.transaction_activity_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                    )
-                }
-                ExpenseTrackerSearchField(
-                    query = uiState.searchQuery,
-                    onQueryChange = onSearchQueryChanged,
-                    placeholder = stringResource(R.string.search_transactions_hint),
-                    onClear = { onSearchQueryChanged("") },
-                    modifier = Modifier.fillMaxWidth().testTag("transaction_search_input"),
-                    testTag = "transaction_search_input"
-                )
-            }
+        item(key = "transactions_search") {
+            ExpenseTrackerSearchField(
+                query = uiState.searchQuery,
+                onQueryChange = onSearchQueryChanged,
+                placeholder = stringResource(R.string.search_transactions_hint),
+                onClear = { onSearchQueryChanged("") },
+                modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp).testTag("transaction_search_input"),
+                testTag = "transaction_search_input"
+            )
         }
 
         // Filters remain directly below search; Transfer is retained only as a historical filter.
@@ -271,7 +245,7 @@ fun TransactionsScreenContent(
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 dateGroup.transactions.forEachIndexed { index, item ->
                                     FinancialListRow(
-                                        title = item.title.ifBlank {
+                                        title = (if (item.categoryIsSystem) com.suguru.expensetracker.presentation.util.categoryDisplayName(item.title, true) else item.title).ifBlank {
                                             when (item.type) {
                                                 TransactionType.EXPENSE -> stringResource(R.string.type_expense)
                                                 TransactionType.INCOME -> stringResource(R.string.type_income)

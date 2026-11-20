@@ -30,9 +30,9 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Card
@@ -68,7 +68,6 @@ import com.suguru.expensetracker.domain.ai.AiError
 import com.suguru.expensetracker.domain.model.AppSettings
 import com.suguru.expensetracker.domain.model.DateFormatPreference
 import com.suguru.expensetracker.domain.model.ThemeMode
-import com.suguru.expensetracker.domain.model.TimeFormatPreference
 import com.suguru.expensetracker.domain.model.WeekStart
 import com.suguru.expensetracker.presentation.components.ErrorBanner
 import com.suguru.expensetracker.presentation.components.AvatarShape
@@ -102,8 +101,7 @@ private enum class ActiveSettingsSheet {
     THEME,
     CURRENCY,
     WEEK_START,
-    DATE_FORMAT,
-    TIME_FORMAT
+    DATE_FORMAT
 }
 
 @StringRes
@@ -175,33 +173,6 @@ fun SettingsScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxl)
         ) {
-            // Screen Header with Eyebrow
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.settings_preferences_heading),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.2.sp
-                )
-                Text(
-                    text = stringResource(R.string.title_settings),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(R.string.settings_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                )
-            }
-
             when (val state = uiState) {
                 is SettingsUiState.Loading -> {
                     LoadingState(
@@ -224,6 +195,13 @@ fun SettingsScreen(
 
                 is SettingsUiState.Success -> {
                     val settings = state.settings
+
+                    if (createCloudBackupViewModel != null && onShowMessage != null) {
+                        CloudBackupSection(
+                            createCloudBackupViewModel = createCloudBackupViewModel,
+                            onShowMessage = onShowMessage
+                        )
+                    }
 
                     // 2. Financial Structures Section
                     Column(
@@ -288,13 +266,6 @@ fun SettingsScreen(
                                 testTag = "settings_item_export"
                             )
                         }
-                    }
-
-                    if (createCloudBackupViewModel != null && onShowMessage != null) {
-                        CloudBackupSection(
-                            createCloudBackupViewModel = createCloudBackupViewModel,
-                            onShowMessage = onShowMessage
-                        )
                     }
 
                     // 2. AI Assistant (BYOK) Section
@@ -494,21 +465,9 @@ fun SettingsScreen(
                             )
                             SettingsDivider()
                             SettingsRow(
-                                title = stringResource(R.string.title_time_format),
-                                subtitle = stringResource(R.string.ui_settings_24hour),
-                                icon = Icons.Default.Schedule,
-                                iconTint = MaterialTheme.colorScheme.tertiary,
-                                trailingText = stringResource(R.string.time_display_24_preview),
-                                onClick = {
-                                    viewModel.setTimeFormat(TimeFormatPreference.HOUR_24)
-                                    activeSheet = null
-                                }
-                            )
-                            SettingsDivider()
-                            SettingsRow(
                                 title = stringResource(R.string.title_language),
                                 subtitle = stringResource(R.string.language_description),
-                                icon = Icons.Default.Info,
+                                icon = Icons.Default.Language,
                                 iconTint = MaterialTheme.colorScheme.primary,
                                 trailingText = when (selectedLanguage) {
                                     "uz" -> stringResource(R.string.language_uzbek)
@@ -831,37 +790,6 @@ fun SettingsScreen(
                                             activeSheet = null
                                         },
                                         testTag = "date_ymd_chip"
-                                    )
-                                }
-                            }
-                        }
-
-                        ActiveSettingsSheet.TIME_FORMAT -> {
-                            ExpenseTrackerBottomSheet(
-                                onDismissRequest = { activeSheet = null }
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.title_time_format),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = stringResource(R.string.settings_time_explanation),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
-                                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
-                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
-                                    SettingsOptionCard(
-                                        title = stringResource(R.string.time_display_24_preview),
-                                        subtitle = stringResource(R.string.time_format_24),
-                                        isSelected = true,
-                                        onClick = {
-                                            viewModel.setTimeFormat(TimeFormatPreference.HOUR_24)
-                                            activeSheet = null
-                                        },
-                                        testTag = "time_24_chip"
                                     )
                                 }
                             }

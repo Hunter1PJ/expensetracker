@@ -184,7 +184,10 @@ class BudgetProgressWidget : GlanceAppWidget() {
                             ) {}
                             Spacer(modifier = GlanceModifier.width(6.dp))
                             Text(
-                                text = data.title.ifBlank { context.getString(R.string.widget_config_overall_budget) },
+                                text = data.title.takeIf { it.isNotBlank() }?.let { name ->
+                                    com.suguru.expensetracker.presentation.util.builtInCategoryLabelResource(name, data.categoryIsSystem)
+                                        ?.let(context::getString) ?: name
+                                } ?: context.getString(R.string.widget_config_overall_budget),
                                 style = TextStyle(
                                     color = textPrimary,
                                     fontSize = 13.sp,

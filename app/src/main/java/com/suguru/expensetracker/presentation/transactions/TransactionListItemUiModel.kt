@@ -19,7 +19,8 @@ data class TransactionListItemUiModel(
     val timeFormatted: String,
     val rawInstant: Instant,
     val rawDate: LocalDate,
-    val isRecurring: Boolean = false
+    val isRecurring: Boolean = false,
+    val categoryIsSystem: Boolean = false
 )
 
 /**
