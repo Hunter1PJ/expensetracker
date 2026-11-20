@@ -119,7 +119,7 @@ fun TransactionsScreenContent(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp,
-                        color = ExpenseTrackerTheme.extendedColors.accentViolet
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                     Text(
@@ -403,7 +403,7 @@ private fun DateGroupHeader(
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
-            color = ExpenseTrackerTheme.extendedColors.accentViolet
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
