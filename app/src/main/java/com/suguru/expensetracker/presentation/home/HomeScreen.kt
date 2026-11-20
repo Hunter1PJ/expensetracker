@@ -283,7 +283,7 @@ private fun HomeHeaderSection(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.4.sp,
-                color = ExpenseTrackerTheme.extendedColors.accentViolet
+                color = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = stringResource(R.string.home_header_title),
