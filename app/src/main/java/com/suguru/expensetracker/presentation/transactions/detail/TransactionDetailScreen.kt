@@ -130,8 +130,8 @@ fun TransactionDetailScreenContent(
                     title = {
                         Text(
                             text = stringResource(R.string.title_transaction_details),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                     },
