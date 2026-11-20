@@ -126,8 +126,8 @@ fun AddCategoryScreenContent(
                             } else {
                                 stringResource(R.string.title_add_category)
                             },
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
