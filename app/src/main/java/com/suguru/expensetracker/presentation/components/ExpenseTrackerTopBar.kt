@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Reusable Top App Bar adhering to the purple/indigo premium design system.
+ * Reusable editorial top app bar with a restrained serif title and warm paper surface.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,8 +37,8 @@ fun ExpenseTrackerTopBar(
             Column {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 if (subtitle != null) {
