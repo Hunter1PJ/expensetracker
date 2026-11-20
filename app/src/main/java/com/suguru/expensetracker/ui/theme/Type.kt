@@ -21,7 +21,7 @@ private val defaultLineHeightStyle = LineHeightStyle(
 val Typography = Typography(
     // Large financial hero numbers / balance
     displayLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
         fontSize = 40.sp,
         lineHeight = 46.sp,
@@ -30,7 +30,7 @@ val Typography = Typography(
         lineHeightStyle = defaultLineHeightStyle
     ),
     displayMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
         fontSize = 32.sp,
         lineHeight = 38.sp,
@@ -39,7 +39,7 @@ val Typography = Typography(
         lineHeightStyle = defaultLineHeightStyle
     ),
     displaySmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 26.sp,
         lineHeight = 32.sp,
@@ -48,9 +48,9 @@ val Typography = Typography(
         lineHeightStyle = defaultLineHeightStyle
     ),
 
-    // Screen and section headers
+    // Screen and section headers use a restrained editorial serif.
     headlineLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Bold,
         fontSize = 24.sp,
         lineHeight = 30.sp,
@@ -59,7 +59,7 @@ val Typography = Typography(
         lineHeightStyle = defaultLineHeightStyle
     ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 20.sp,
         lineHeight = 26.sp,
@@ -68,7 +68,7 @@ val Typography = Typography(
         lineHeightStyle = defaultLineHeightStyle
     ),
     headlineSmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp,
         lineHeight = 24.sp,

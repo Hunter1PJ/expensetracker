@@ -15,15 +15,15 @@ import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryPurpleDark,
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF3B2D6B),
-    onPrimaryContainer = PrimaryBrightDark,
+    onPrimary = Color(0xFF20231F),
+    primaryContainer = Color(0xFF394638),
+    onPrimaryContainer = Color(0xFFE2EBDD),
     secondary = AccentIndigoDark,
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = SurfaceHighlightDark,
-    onSecondaryContainer = PrimaryBrightDark,
+    onSecondary = Color(0xFF241B17),
+    secondaryContainer = Color(0xFF51392F),
+    onSecondaryContainer = Color(0xFFF2DFD4),
     tertiary = AccentVioletDark,
-    onTertiary = Color(0xFFFFFFFF),
+    onTertiary = Color(0xFF241B17),
     background = BackgroundDeepDark,
     onBackground = TextPrimaryDark,
     surface = SurfaceDark,
@@ -33,7 +33,7 @@ private val DarkColorScheme = darkColorScheme(
     outline = BorderSubtleDark,
     outlineVariant = DividerDark,
     error = SemanticNegativeDark,
-    onError = Color(0xFFFFFFFF),
+    onError = Color(0xFF2B1915),
     errorContainer = SemanticNegativeContainerDark,
     onErrorContainer = SemanticNegativeDark
 )
@@ -41,14 +41,14 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryPurpleLight,
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFEDE9FE),
-    onPrimaryContainer = PrimaryDeepLight,
+    primaryContainer = Color(0xFFE5EDE2),
+    onPrimaryContainer = Color(0xFF214632),
     secondary = AccentIndigoLight,
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = SurfaceHighlightLight,
-    onSecondaryContainer = PrimaryPurpleLight,
-    tertiary = AccentVioletLight,
-    onTertiary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFF3E5DE),
+    onSecondaryContainer = Color(0xFF744633),
+    tertiary = Color(0xFF9AA88F),
+    onTertiary = Color(0xFF20231F),
     background = BackgroundDeepLight,
     onBackground = TextPrimaryLight,
     surface = SurfaceLight,
@@ -132,7 +132,7 @@ private val LightExtendedColors = ExtendedColors(
 @Composable
 fun ExpenseTrackerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Set dynamicColor to false by default to preserve the refined financial branding
+    // Dynamic system colors remain opt-in so the journal palette stays consistent.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -181,7 +181,7 @@ object ExpenseTrackerTheme {
         get() = ExpenseTrackerElevation
 }
 
-// Backward compatibility alias for tests
+// Backward compatibility alias for tests.
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
