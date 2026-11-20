@@ -97,8 +97,9 @@ fun TransactionsScreenContent(
             .background(MaterialTheme.colorScheme.background)
             .testTag("transactions_list"),
         contentPadding = PaddingValues(
-            horizontal = ExpenseTrackerSpacing.screenHorizontal,
+            start = ExpenseTrackerSpacing.screenHorizontal,
             top = ExpenseTrackerSpacing.xl,
+            end = ExpenseTrackerSpacing.screenHorizontal,
             bottom = 112.dp
         ),
         verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg),
