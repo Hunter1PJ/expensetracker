@@ -36,6 +36,12 @@ object AppLanguageManager {
         _languageChanges.value = languageTag
     }
 
+    fun applySavedLocale(context: Context): String {
+        val languageTag = selectedLanguageTag(context)
+        applyDefaultLocale(languageTag)
+        return languageTag
+    }
+
     fun wrap(context: Context): Context = wrap(context, selectedLanguageTag(context))
 
     fun wrap(context: Context, languageTag: String): Context {

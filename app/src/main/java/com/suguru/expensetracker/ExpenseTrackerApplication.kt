@@ -1,7 +1,6 @@
 package com.suguru.expensetracker
 
 import android.app.Application
-import android.content.Context
 import com.suguru.expensetracker.presentation.util.AppLanguageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -34,9 +33,6 @@ import kotlinx.coroutines.sync.withLock
 data class GuestImportPrompt(val uid: String)
 
 class ExpenseTrackerApplication : Application() {
-    override fun attachBaseContext(base: Context) {
-        super.attachBaseContext(AppLanguageManager.wrap(base))
-    }
 
     private val containers = LinkedHashMap<String, AppContainer>()
     private val workspaceMutex = Mutex()
@@ -59,6 +55,7 @@ class ExpenseTrackerApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppLanguageManager.applySavedLocale(this)
         applicationScope.launch {
             AppLanguageManager.languageChanges.collect { languageTag ->
                 if (languageTag != null) _activeAppContainer.value?.widgetRefreshCoordinator?.refreshAll()

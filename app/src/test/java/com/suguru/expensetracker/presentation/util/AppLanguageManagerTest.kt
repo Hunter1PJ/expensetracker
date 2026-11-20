@@ -125,4 +125,26 @@ class AppLanguageManagerTest {
         val expected = deviceLanguage?.takeIf { it in setOf("uz", "en", "ru") } ?: "en"
         assertEquals(expected, AppLanguageManager.selectedLanguageTag(context))
     }
+
+    @Test
+    fun expenseTrackerApplicationDoesNotWrapBaseContextInContextWrapper() {
+        val app = com.suguru.expensetracker.ExpenseTrackerApplication()
+        val attachMethod = android.content.ContextWrapper::class.java
+            .getDeclaredMethod("attachBaseContext", Context::class.java)
+        attachMethod.isAccessible = true
+        attachMethod.invoke(app, context)
+
+        org.junit.Assert.assertSame(context, app.baseContext)
+    }
+
+    @Test
+    fun applySavedLocaleUpdatesDefaultLocaleWithoutWrappingContext() {
+        AppLanguageManager.setLanguage(context, "uz")
+        java.util.Locale.setDefault(java.util.Locale.ENGLISH)
+
+        val applied = AppLanguageManager.applySavedLocale(context)
+
+        assertEquals("uz", applied)
+        assertEquals("uz", java.util.Locale.getDefault().language)
+    }
 }
