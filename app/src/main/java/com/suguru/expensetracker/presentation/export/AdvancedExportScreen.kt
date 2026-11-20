@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -251,38 +253,61 @@ fun AdvancedExportScreen(
                 ) {
                     SectionHeader(title = stringResource(com.suguru.expensetracker.R.string.ui_export_choose_format))
 
-                    FormatOptionCard(
-                        title = stringResource(com.suguru.expensetracker.R.string.ui_export_basic_csv),
-                        subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_basic_csv_desc),
-                        badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
-                        badgeColor = MaterialTheme.colorScheme.primary,
-                        icon = Icons.Default.TableChart,
-                        isSelected = uiState.selectedFormat == ExportFormat.BASIC_CSV,
-                        onClick = { viewModel.selectFormat(ExportFormat.BASIC_CSV) },
-                        testTag = "format_basic_csv"
-                    )
-
-                    FormatOptionCard(
-                        title = stringResource(com.suguru.expensetracker.R.string.ui_export_filtered_csv),
-                        subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_filtered_csv_desc),
-                        badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
-                        badgeColor = MaterialTheme.colorScheme.primary,
-                        icon = Icons.Default.FilterList,
-                        isSelected = uiState.selectedFormat == ExportFormat.ADVANCED_CSV,
-                        onClick = { viewModel.selectFormat(ExportFormat.ADVANCED_CSV) },
-                        testTag = "format_advanced_csv"
-                    )
-
-                    FormatOptionCard(
-                        title = stringResource(com.suguru.expensetracker.R.string.ui_export_pdf),
-                        subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_pdf_desc),
-                        badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
-                        badgeColor = MaterialTheme.colorScheme.primary,
-                        icon = Icons.Default.PictureAsPdf,
-                        isSelected = uiState.selectedFormat == ExportFormat.PDF_REPORT,
-                        onClick = { viewModel.selectFormat(ExportFormat.PDF_REPORT) },
-                        testTag = "format_pdf_report"
-                    )
+                    ExpenseTrackerCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = ExpenseTrackerRadius.card,
+                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                        contentPadding = PaddingValues(vertical = ExpenseTrackerSpacing.xs),
+                        testTag = "export_format_panel"
+                    ) {
+                        Column {
+                            FormatOptionCard(
+                                title = stringResource(com.suguru.expensetracker.R.string.ui_export_basic_csv),
+                                subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_basic_csv_desc),
+                                badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
+                                badgeColor = MaterialTheme.colorScheme.primary,
+                                icon = Icons.Default.TableChart,
+                                isSelected = uiState.selectedFormat == ExportFormat.BASIC_CSV,
+                                onClick = { viewModel.selectFormat(ExportFormat.BASIC_CSV) },
+                                testTag = "format_basic_csv"
+                            )
+        
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                            )
+                            FormatOptionCard(
+                                title = stringResource(com.suguru.expensetracker.R.string.ui_export_filtered_csv),
+                                subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_filtered_csv_desc),
+                                badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
+                                badgeColor = MaterialTheme.colorScheme.primary,
+                                icon = Icons.Default.FilterList,
+                                isSelected = uiState.selectedFormat == ExportFormat.ADVANCED_CSV,
+                                onClick = { viewModel.selectFormat(ExportFormat.ADVANCED_CSV) },
+                                testTag = "format_advanced_csv"
+                            )
+        
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                            )
+                            FormatOptionCard(
+                                title = stringResource(com.suguru.expensetracker.R.string.ui_export_pdf),
+                                subtitle = stringResource(com.suguru.expensetracker.R.string.ui_export_pdf_desc),
+                                badgeText = stringResource(com.suguru.expensetracker.R.string.label_free),
+                                badgeColor = MaterialTheme.colorScheme.primary,
+                                icon = Icons.Default.PictureAsPdf,
+                                isSelected = uiState.selectedFormat == ExportFormat.PDF_REPORT,
+                                onClick = { viewModel.selectFormat(ExportFormat.PDF_REPORT) },
+                                testTag = "format_pdf_report"
+                            )
+                        }
+                    }
                 }
 
                 // 2. Filters Section (Active for Advanced CSV & PDF Report)
@@ -313,131 +338,142 @@ fun AdvancedExportScreen(
                             }
                         }
 
-                        // Date Range Filter Card
-                        InteractiveCard(
-                            onClick = { showDatePickerDialog = true },
+                        ExpenseTrackerCard(
                             modifier = Modifier.fillMaxWidth(),
                             shape = ExpenseTrackerRadius.card,
                             containerColor = ExpenseTrackerTheme.extendedColors.surface,
                             borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                            contentPadding = PaddingValues(ExpenseTrackerSpacing.md),
-                            testTag = "export_date_filter_card"
+                            contentPadding = PaddingValues(ExpenseTrackerSpacing.lg),
+                            testTag = "export_filters_panel"
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-                            ) {
-                                IconAvatar(
-                                    icon = Icons.Default.CalendarMonth,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    size = 36.dp
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = stringResource(com.suguru.expensetracker.R.string.budget_period_label),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                    val dateLabel = if (uiState.filter.startDate != null && uiState.filter.endDate != null) {
-                                        "${uiState.filter.startDate} → ${uiState.filter.endDate}"
-                                    } else {
-                                        "All Time (Tap to select dates)"
+                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)) {
+                                // Date Range Filter Card
+                                InteractiveCard(
+                                    onClick = { showDatePickerDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = ExpenseTrackerRadius.card,
+                                    containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                                    borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                                    contentPadding = PaddingValues(ExpenseTrackerSpacing.md),
+                                    testTag = "export_date_filter_card"
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                                    ) {
+                                        IconAvatar(
+                                            icon = Icons.Default.CalendarMonth,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            size = 36.dp
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = stringResource(com.suguru.expensetracker.R.string.budget_period_label),
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                            val dateLabel = if (uiState.filter.startDate != null && uiState.filter.endDate != null) {
+                                                "${uiState.filter.startDate} → ${uiState.filter.endDate}"
+                                            } else {
+                                                "All Time (Tap to select dates)"
+                                            }
+                                            Text(
+                                                text = dateLabel,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                            )
+                                        }
                                     }
+                                }
+        
+                                // Transaction Types Filter Chips
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
                                     Text(
-                                        text = dateLabel,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = stringResource(com.suguru.expensetracker.R.string.export_transaction_type),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = ExpenseTrackerTheme.extendedColors.textSecondary
                                     )
-                                }
-                            }
-                        }
-
-                        // Transaction Types Filter Chips
-                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
-                            Text(
-                                text = stringResource(com.suguru.expensetracker.R.string.export_transaction_type),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = ExpenseTrackerTheme.extendedColors.textSecondary
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
-                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                            ) {
-                                TransactionType.entries.forEach { type ->
-                                    val isSelected = uiState.filter.transactionTypes.contains(type)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = { viewModel.toggleTransactionTypeFilter(type) },
-                                        label = { Text(type.name) },
-                                        leadingIcon = if (isSelected) {
-                                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                        } else null,
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    )
-                                }
-                            }
-                        }
-
-                        // Currencies Filter Chips
-                        if (uiState.availableCurrencies.size > 1) {
-                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
-                                Text(
-                                    text = stringResource(com.suguru.expensetracker.R.string.currency_label),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
-                                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                                ) {
-                                    uiState.availableCurrencies.forEach { curr ->
-                                        val isSelected = uiState.filter.currencyCodes.contains(curr)
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { viewModel.toggleCurrencyFilter(curr) },
-                                            label = { Text(curr) },
-                                            leadingIcon = if (isSelected) {
-                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                            } else null
-                                        )
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
+                                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                                    ) {
+                                        TransactionType.entries.forEach { type ->
+                                            val isSelected = uiState.filter.transactionTypes.contains(type)
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = { viewModel.toggleTransactionTypeFilter(type) },
+                                                label = { Text(type.name) },
+                                                leadingIcon = if (isSelected) {
+                                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                                } else null,
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        }
 
-                        // Categories Filter Chips
-                        if (uiState.availableCategories.isNotEmpty()) {
-                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
-                                Text(
-                                    text = stringResource(com.suguru.expensetracker.R.string.category_label),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
-                                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                                ) {
-                                    uiState.availableCategories.take(12).forEach { cat ->
-                                        val isSelected = uiState.filter.categoryIds.contains(cat.id)
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { viewModel.toggleCategoryFilter(cat.id) },
-                                            label = { Text(cat.name) },
-                                            leadingIcon = if (isSelected) {
-                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                            } else null
+                                // Currencies Filter Chips
+                                if (uiState.availableCurrencies.size > 1) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
+                                        Text(
+                                            text = stringResource(com.suguru.expensetracker.R.string.currency_label),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = ExpenseTrackerTheme.extendedColors.textSecondary
                                         )
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
+                                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                                        ) {
+                                            uiState.availableCurrencies.forEach { curr ->
+                                                val isSelected = uiState.filter.currencyCodes.contains(curr)
+                                                FilterChip(
+                                                    selected = isSelected,
+                                                    onClick = { viewModel.toggleCurrencyFilter(curr) },
+                                                    label = { Text(curr) },
+                                                    leadingIcon = if (isSelected) {
+                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                                    } else null
+                                                )
+                                            }
+                                        }
                                     }
                                 }
+
+                                // Categories Filter Chips
+                                if (uiState.availableCategories.isNotEmpty()) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
+                                        Text(
+                                            text = stringResource(com.suguru.expensetracker.R.string.category_label),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                        )
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
+                                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                                        ) {
+                                            uiState.availableCategories.take(12).forEach { cat ->
+                                                val isSelected = uiState.filter.categoryIds.contains(cat.id)
+                                                FilterChip(
+                                                    selected = isSelected,
+                                                    onClick = { viewModel.toggleCategoryFilter(cat.id) },
+                                                    label = { Text(cat.name) },
+                                                    leadingIcon = if (isSelected) {
+                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                                    } else null
+                                                )
+                                            }
+                                        }
+                                    }
+                        }
                             }
                         }
                     }
@@ -606,73 +642,64 @@ private fun FormatOptionCard(
     onClick: () -> Unit,
     testTag: String
 ) {
-    val borderColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        ExpenseTrackerTheme.extendedColors.borderSubtle
-    }
-
-    val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-    } else {
-        ExpenseTrackerTheme.extendedColors.surface
-    }
-
-    InteractiveCard(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = ExpenseTrackerRadius.card,
-        containerColor = containerColor,
-        borderColor = borderColor,
-        contentPadding = PaddingValues(ExpenseTrackerSpacing.md),
-        testTag = testTag
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
+            .testTag(testTag)
+            .padding(horizontal = ExpenseTrackerSpacing.lg, vertical = ExpenseTrackerSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-        ) {
-            IconAvatar(
-                icon = icon,
-                contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.textSecondary,
-                size = 40.dp
-            )
+        IconAvatar(
+            icon = icon,
+            contentDescription = null,
+            tint = if (isSelected) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.textSecondary,
+            size = 38.dp
+        )
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                )
+                Surface(
+                    color = badgeColor.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = badgeColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
-                    Surface(
-                        color = badgeColor.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = badgeText,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = badgeColor,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
                 }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                    lineHeight = 16.sp
-                )
             }
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                lineHeight = 16.sp
+            )
+        }
+
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = stringResource(com.suguru.expensetracker.R.string.ui_selected),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

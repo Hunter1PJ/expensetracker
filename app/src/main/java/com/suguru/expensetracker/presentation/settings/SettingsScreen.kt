@@ -85,8 +85,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.WorkspacePremium
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
@@ -192,8 +190,8 @@ fun SettingsScreen(
                 )
                 Text(
                     text = stringResource(R.string.title_settings),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
@@ -226,14 +224,6 @@ fun SettingsScreen(
                 is SettingsUiState.Success -> {
                     val settings = state.settings
 
-                    // 1. Account / Cloud Backup Section
-                    if (createCloudBackupViewModel != null && onShowMessage != null) {
-                        CloudBackupSection(
-                            createCloudBackupViewModel = createCloudBackupViewModel,
-                            onShowMessage = onShowMessage
-                        )
-                    }
-
                     // 2. Financial Structures Section
                     Column(
                         modifier = Modifier
@@ -264,12 +254,26 @@ fun SettingsScreen(
                                 onClick = onNavigateToRecurring,
                                 testTag = "settings_item_recurring"
                             )
-                            SettingsDivider()
+                        }
+                    }
+
+                    // Data ownership, backup and export destinations
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 560.dp),
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                    ) {
+                        SectionHeader(
+                            title = stringResource(R.string.section_data_operations),
+                            testTag = "settings_data_operations_section"
+                        )
+                        SettingsGroupCard(testTag = "settings_data_operations_card") {
                             SettingsRow(
                                 title = stringResource(R.string.title_data_storage),
                                 subtitle = stringResource(R.string.desc_data_storage),
                                 icon = Icons.Default.Storage,
-                                iconTint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                                iconTint = MaterialTheme.colorScheme.primary,
                                 onClick = onNavigateToDataAndStorage,
                                 testTag = "settings_item_data_storage"
                             )
@@ -283,6 +287,13 @@ fun SettingsScreen(
                                 testTag = "settings_item_export"
                             )
                         }
+                    }
+
+                    if (createCloudBackupViewModel != null && onShowMessage != null) {
+                        CloudBackupSection(
+                            createCloudBackupViewModel = createCloudBackupViewModel,
+                            onShowMessage = onShowMessage
+                        )
                     }
 
                     // 2. AI Assistant (BYOK) Section
@@ -325,7 +336,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.title_ai_feature),
                                 subtitle = stringResource(R.string.desc_ai_feature),
                                 icon = Icons.Default.AutoAwesome,
-                                iconTint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                                iconTint = MaterialTheme.colorScheme.primary,
                                 checked = state.isAiFeatureEnabled,
                                 onCheckedChange = { viewModel.setAiFeatureEnabled(it) },
                                 switchTestTag = "toggle_ai_feature_switch",
@@ -372,7 +383,7 @@ fun SettingsScreen(
                                         state.keyVerificationState is KeyVerificationState.Invalid &&
                                             state.keyVerificationState.error is AiError.InvalidApiKey -> ExpenseTrackerTheme.extendedColors.financialDanger
                                         state.isAiConfigured -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                        else -> ExpenseTrackerTheme.extendedColors.primaryPurple
+                                        else -> MaterialTheme.colorScheme.primary
                                     },
                                     trailingText = stringResource(if (state.isAiConfigured) R.string.action_manage else R.string.action_setup),
                                     onClick = {
