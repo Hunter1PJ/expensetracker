@@ -1,0 +1,13 @@
+{
+  "name": "expensetracker-firestore-rules-tests",
+  "private": true,
+  "scripts": {
+    "test:rules": "node --test firestore.test.js",
+    "test:rules:emulator": "firebase emulators:exec --only firestore \"npm run test:rules\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0",
+    "firebase-tools": "^14.0.0"
+  }
+}
