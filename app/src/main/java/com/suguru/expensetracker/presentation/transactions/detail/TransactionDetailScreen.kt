@@ -63,7 +63,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.R
 import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.TransactionType
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.DangerButton
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerConfirmationDialog
@@ -118,13 +117,12 @@ fun TransactionDetailScreenContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        BackgroundGlowDecoration()
 
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("transaction_detail_screen"),
-            containerColor = Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
                     title = {
@@ -180,7 +178,7 @@ fun TransactionDetailScreenContent(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
+                        containerColor = MaterialTheme.colorScheme.background,
                         titleContentColor = MaterialTheme.colorScheme.onBackground
                     )
                 )
@@ -284,29 +282,26 @@ fun TransactionDetailScreenContent(
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
                         ) {
-                            // Avatar
-                            IconAvatar(
-                                icon = typeIcon,
-                                contentDescription = typeLabel,
-                                tint = typeColor,
-                                backgroundColor = typeBgColor,
-                                size = 52.dp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                            ) {
+                                IconAvatar(
+                                    icon = typeIcon,
+                                    contentDescription = typeLabel,
+                                    tint = typeColor,
+                                    backgroundColor = typeBgColor,
+                                    size = 40.dp
+                                )
+                                ExpenseTrackerStatusChip(
+                                    text = typeLabel.uppercase(),
+                                    backgroundColor = typeBgColor,
+                                    contentColor = typeColor
+                                )
+                            }
 
-                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
-
-                            // Type Status Chip
-                            ExpenseTrackerStatusChip(
-                                text = typeLabel.uppercase(),
-                                backgroundColor = typeBgColor,
-                                contentColor = typeColor
-                            )
-
-                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-                            // Amount Text
                             Text(
                                 text = uiState.amountFormatted,
                                 style = MaterialTheme.typography.displayMedium,

@@ -70,7 +70,6 @@ import com.suguru.expensetracker.domain.model.DateFormatPreference
 import com.suguru.expensetracker.domain.model.ThemeMode
 import com.suguru.expensetracker.domain.model.TimeFormatPreference
 import com.suguru.expensetracker.domain.model.WeekStart
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.ErrorBanner
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerBottomSheet
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
@@ -165,7 +164,6 @@ fun SettingsScreen(
             .fillMaxSize()
             .testTag("settings_screen")
     ) {
-        BackgroundGlowDecoration(alpha = 0.08f)
 
         Column(
             modifier = Modifier

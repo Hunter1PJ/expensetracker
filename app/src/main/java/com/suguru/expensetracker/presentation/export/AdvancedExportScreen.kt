@@ -71,7 +71,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.suguru.expensetracker.domain.model.TransactionType
 import com.suguru.expensetracker.presentation.export.localizedPdfReportLabels
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.IconAvatar
 import com.suguru.expensetracker.presentation.components.InteractiveCard
 import com.suguru.expensetracker.presentation.components.PrimaryButton
@@ -204,7 +203,6 @@ fun AdvancedExportScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            BackgroundGlowDecoration(alpha = 0.08f)
 
             Column(
                 modifier = Modifier

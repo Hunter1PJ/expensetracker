@@ -62,7 +62,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.DangerButton
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.IconAvatar
@@ -247,7 +246,6 @@ fun DataAndStorageScreen(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            BackgroundGlowDecoration(alpha = 0.08f)
 
             Column(
                 modifier = Modifier

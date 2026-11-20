@@ -14,16 +14,22 @@ This file is the source-of-truth checklist for the redesign. The 41-page `App pr
 
 ## Implementation progress — 20 November 2026
 
-The current branch now contains a first substantive Compose layout pass for four primary destinations:
+The current branch now contains screen-specific Compose layout work for these destinations and flows:
 
 - **Home:** balance and per-currency summary consolidated into one paper hero; the separate monthly metric block removed; primary entry, AI draft workflow and recent ledger retained.
 - **Transactions:** search, type/category filters, empty/loading states and date-grouped rows placed in one continuous archive scroll. No creation CTA was added. Historical Transfer filtering remains available.
 - **Statistics:** period, currency and comparison controls grouped into one compact paper panel; summary, interactive trend chart, comparison and category breakdown paths retained.
 - **Budgets:** Create Budget moved from the floating action button into the page header; currency filtering, overview, budget cards and deactivation confirmation retained.
+- **Add Transaction and Edit Transaction:** date and time changed from one combined control into two independent, equal-width paper controls; both existing picker callbacks and their original test tags remain. AI draft warnings and Expense/Income-only selection remain in Add; the historical Transfer read-only branch remains in Edit.
+- **Transaction Detail:** amount/type hero changed from centered stacked content to a left-aligned editorial hierarchy. Existing detail rows, edit/delete actions and delete confirmation remain.
+- **Categories:** Add Category moved from a floating button into the top-bar action slot; the original callback and `add_category_fab` test tag remain.
+- **Recurring Rules:** Add Rule moved into the top-bar actions beside Run Due Now; both callbacks and their original test tags remain.
 
-**Not yet considered redesigned or complete:** Settings, Add Transaction, Edit Transaction, Transaction Detail, Categories, Add/Edit Category, Add/Edit Budget, Recurring Rules, Add/Edit Recurring Rule, Data & Storage and Financial Export. Existing shared-theme styling on those screens is not a substitute for their screen-specific layout work.
+**Canvas cleanup only (not counted as full screen redesign):** residual glow decorations were removed from Settings, Data & Storage, and Financial Export. Their deeper screen-specific layout work is still pending.
 
-**Validation status:** only source-level delimiter and key test-tag checks were performed on the four changed Kotlin files. No Android Gradle build, unit tests, locale validation or Medium_Phone AVD visual review has been run. Do not treat this milestone as complete until the completion gate below passes.
+**Still pending screen-specific redesign:** Add/Edit Category, Add/Edit Budget, Add/Edit Recurring Rule, Settings, Data & Storage, Financial Export, and remaining modal/picker visual states. Do not treat shared-theme styling or canvas cleanup as completion.
+
+**Validation status:** a source-level delimiter scan passed for all eight changed Kotlin screens, and the required existing test-tag literals for their key controls were verified. The transaction form picker callbacks and moved Category/Recurring add actions were also checked in source. This is not a Kotlin/Android compile. No Android Gradle build, unit tests, locale validation or Medium_Phone AVD visual review has been run. Do not treat this milestone as complete until the completion gate below passes.
 
 ## Screens and required controls
 

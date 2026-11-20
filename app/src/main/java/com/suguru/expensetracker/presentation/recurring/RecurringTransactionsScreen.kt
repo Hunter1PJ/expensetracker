@@ -34,8 +34,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +62,6 @@ import com.suguru.expensetracker.R
 import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.RecurrenceFrequency
 import com.suguru.expensetracker.domain.model.TransactionType
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.EmptyState
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerConfirmationDialog
@@ -128,6 +125,16 @@ fun RecurringTransactionsScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = onNavigateToAddRule,
+                        modifier = Modifier.testTag("add_recurring_rule_fab")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.action_add_recurring),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     Button(
                         onClick = { viewModel.processDueNow() },
                         colors = ButtonDefaults.buttonColors(
@@ -158,21 +165,6 @@ fun RecurringTransactionsScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAddRule,
-                shape = ExpenseTrackerRadius.button,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
-                modifier = Modifier.testTag("add_recurring_rule_fab")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(R.string.action_add_recurring)
-                )
-            }
         }
     ) { innerPadding ->
         Box(
@@ -180,7 +172,6 @@ fun RecurringTransactionsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            BackgroundGlowDecoration(alpha = 0.08f)
 
             when (val state = uiState) {
                 is RecurringTransactionsUiState.Loading -> {
