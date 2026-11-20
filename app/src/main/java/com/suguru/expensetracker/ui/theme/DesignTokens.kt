@@ -38,10 +38,10 @@ object ExpenseTrackerSpacing {
     val space48: Dp = 48.dp
 
     // Screen padding convention
-    val screenHorizontal: Dp = 20.dp
+    val screenHorizontal: Dp = 16.dp
     val screenVertical: Dp = 16.dp
     val sectionSpacing: Dp = 24.dp
-    val cardContentPadding: Dp = 20.dp
+    val cardContentPadding: Dp = 16.dp
     val cardInnerSpacing: Dp = 12.dp
     val itemSpacing: Dp = 8.dp
 }
@@ -61,15 +61,15 @@ object ExpenseTrackerRadius {
     val pill: Dp = 999.dp
     val full: Dp = 999.dp
 
-    val card: RoundedCornerShape = RoundedCornerShape(large)
-    val cardHero: RoundedCornerShape = RoundedCornerShape(hero)
-    val cardInteractive: RoundedCornerShape = RoundedCornerShape(large)
-    val button: RoundedCornerShape = RoundedCornerShape(medium)
-    val chip: RoundedCornerShape = RoundedCornerShape(small)
+    val card: RoundedCornerShape = RoundedCornerShape(8.dp)
+    val cardHero: RoundedCornerShape = RoundedCornerShape(12.dp)
+    val cardInteractive: RoundedCornerShape = RoundedCornerShape(8.dp)
+    val button: RoundedCornerShape = RoundedCornerShape(10.dp)
+    val chip: RoundedCornerShape = RoundedCornerShape(8.dp)
     val chipPill: RoundedCornerShape = RoundedCornerShape(pill)
-    val sheet: RoundedCornerShape = RoundedCornerShape(topStart = hero, topEnd = hero)
-    val searchBar: RoundedCornerShape = RoundedCornerShape(medium)
-    val dialog: RoundedCornerShape = RoundedCornerShape(xlarge)
+    val sheet: RoundedCornerShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    val searchBar: RoundedCornerShape = RoundedCornerShape(10.dp)
+    val dialog: RoundedCornerShape = RoundedCornerShape(16.dp)
 }
 
 object ExpenseTrackerIconSize {
@@ -83,18 +83,18 @@ object ExpenseTrackerIconSize {
 
 object ExpenseTrackerElevation {
     val flat: Dp = 0.dp
-    val low: Dp = 1.dp
-    val medium: Dp = 3.dp
-    val high: Dp = 6.dp
+    val low: Dp = 0.dp
+    val medium: Dp = 0.dp
+    val high: Dp = 1.dp
 }
 
 object ExpenseTrackerSurfaces {
     const val BORDER_WIDTH_DP = 1f
     const val ACTIVE_BORDER_WIDTH_DP = 1.5f
     const val HERO_BORDER_WIDTH_DP = 1.25f
-    const val CARD_ALPHA = 0.92f
-    const val GLOW_ALPHA_SUBTLE = 0.12f
-    const val GLOW_ALPHA_MEDIUM = 0.25f
+    const val CARD_ALPHA = 1f
+    const val GLOW_ALPHA_SUBTLE = 0f
+    const val GLOW_ALPHA_MEDIUM = 0f
 }
 
 object ExpenseTrackerAnimation {
