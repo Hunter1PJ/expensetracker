@@ -93,23 +93,7 @@ fun BudgetsScreen(
 
     Scaffold(
         modifier = modifier.testTag("budgets_screen"),
-        containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            if (!uiState.isLoading && uiState.budgets.isNotEmpty()) {
-                FloatingActionButton(
-                    onClick = onNavigateToAddBudget,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White,
-                    shape = ExpenseTrackerRadius.button,
-                    modifier = Modifier.testTag("fab_add_budget")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add_budget)
-                    )
-                }
-            }
-        }
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -180,26 +164,45 @@ fun BudgetsScreen(
                     ) {
                         // Header
                         item {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = stringResource(R.string.ui_budget_planning),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.5.sp,
-                                    color = ExpenseTrackerTheme.extendedColors.primaryPurple
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = stringResource(R.string.title_budgets),
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = stringResource(R.string.budget_spending_limits_intro),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.ui_budget_planning),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 1.2.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.title_budgets),
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.budget_spending_limits_intro),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                    )
+                                }
+                                TextButton(
+                                    onClick = onNavigateToAddBudget,
+                                    modifier = Modifier.testTag("fab_add_budget")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(stringResource(R.string.action_add_budget))
+                                }
                             }
                         }
 
