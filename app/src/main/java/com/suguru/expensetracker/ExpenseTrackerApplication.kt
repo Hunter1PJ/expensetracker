@@ -109,15 +109,20 @@ class ExpenseTrackerApplication : Application() {
         }
     }
 
+    private fun currentFirebaseUserUid(): String? {
+        if (!com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(this)) return null
+        return runCatching { Firebase.auth.currentUser?.uid }.getOrNull()
+    }
+
     fun containerFor(uid: String?): AppContainer = containerFor(WorkspaceId.forUid(uid))
 
     fun isActiveWorkspaceCurrent(): Boolean {
-        val uid = runCatching { Firebase.auth.currentUser?.uid }.getOrNull()
+        val uid = currentFirebaseUserUid()
         return _activeAppContainer.value?.workspaceId == WorkspaceId.forUid(uid)
     }
 
     fun isWorkspaceActive(uid: String): Boolean {
-        val authenticatedUid = runCatching { Firebase.auth.currentUser?.uid }.getOrNull()
+        val authenticatedUid = currentFirebaseUserUid()
         return authenticatedUid == uid &&
             _activeAppContainer.value?.workspaceId == WorkspaceId.FirebaseAccount(uid)
     }
@@ -128,7 +133,7 @@ class ExpenseTrackerApplication : Application() {
 
     suspend fun resolveGuestImport(uid: String, importGuestData: Boolean) {
         workspaceMutex.withLock {
-            if (Firebase.auth.currentUser?.uid != uid || _guestImportPrompt.value?.uid != uid) return
+            if (currentFirebaseUserUid() != uid || _guestImportPrompt.value?.uid != uid) return
             val prefs = getSharedPreferences(GUEST_IMPORT_PREFS, MODE_PRIVATE)
             val decisionKey = guestDecisionKey(uid)
 
@@ -170,7 +175,7 @@ class ExpenseTrackerApplication : Application() {
 
     private suspend fun resolveAuthenticatedWorkspace(oldUid: String?, newUid: String?) {
         workspaceMutex.withLock {
-            if (Firebase.auth.currentUser?.uid != newUid) return
+            if (currentFirebaseUserUid() != newUid) return
             if (!oldUid.isNullOrBlank() && oldUid != newUid) {
                 runCatching { containerFor(oldUid).cloudBackupOrchestrator.onUserSignedOut(oldUid) }
                     .onFailure { Log.w(TAG, "Previous account cloud work cancellation failed.", it) }
@@ -207,7 +212,7 @@ class ExpenseTrackerApplication : Application() {
     }
 
     private suspend fun activateWorkspace(uid: String?) {
-        if (uid != null && Firebase.auth.currentUser?.uid != uid) return
+        if (uid != null && currentFirebaseUserUid() != uid) return
         val workspace = WorkspaceId.forUid(uid)
         val container = containerFor(workspace)
         _activeAppContainer.value = container
@@ -218,7 +223,7 @@ class ExpenseTrackerApplication : Application() {
                 if (error is CancellationException) throw error
                 Log.w(TAG, "Recurring transaction processing deferred for " + workspace.storageKey, error)
             }
-        if (uid != null && Firebase.auth.currentUser?.uid == uid) {
+        if (uid != null && currentFirebaseUserUid() == uid) {
             runCatching { container.cloudBackupOrchestrator.evaluateOnLaunchOrSignIn(uid) }
                 .onFailure { Log.w(TAG, "Initial cloud reconciliation failed.", it) }
         }
@@ -326,7 +331,7 @@ class ExpenseTrackerApplication : Application() {
                     if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
                         !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
                     ) return
-                    val uid = runCatching { Firebase.auth.currentUser?.uid }.getOrNull()
+                    val uid = currentFirebaseUserUid()
                     if (!uid.isNullOrBlank()) applicationScope.launch {
                         runCatching { containerFor(uid).cloudBackupOrchestrator.evaluateOnLaunchOrSignIn(uid) }
                             .onFailure { Log.w(TAG, "Connectivity restore eligibility check failed.", it) }

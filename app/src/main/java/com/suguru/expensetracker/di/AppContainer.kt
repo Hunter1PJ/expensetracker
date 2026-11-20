@@ -136,10 +136,19 @@ class AppContainer(
     private val _startupAiInvalidKey = kotlinx.coroutines.flow.MutableStateFlow(false)
     val startupAiInvalidKey: kotlinx.coroutines.flow.StateFlow<Boolean> = _startupAiInvalidKey
     @Volatile private var startupAiInvalidUid: String? = null
-    private val firebaseAuth by lazy { com.google.firebase.auth.FirebaseAuth.getInstance() }
-    private fun currentAiUid(): String? = runCatching { firebaseAuth.currentUser?.uid }.getOrNull()
+    private val firebaseAuth: com.google.firebase.auth.FirebaseAuth? by lazy {
+        if (com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(context)) {
+            runCatching { com.google.firebase.auth.FirebaseAuth.getInstance() }.getOrNull()
+        } else null
+    }
+    private fun currentAiUid(): String? = runCatching { firebaseAuth?.currentUser?.uid }.getOrNull()
     val authenticatedAiUidFlow: Flow<String?> by lazy {
-        firebaseAuth.authStateFlow().map { it?.uid }
+        val auth = firebaseAuth
+        if (auth != null) {
+            auth.authStateFlow().map { it?.uid }
+        } else {
+            kotlinx.coroutines.flow.flowOf(null)
+        }
     }
     val activeAiProfileFlow: Flow<String> by lazy {
         authenticatedAiUidFlow.map { it ?: com.suguru.expensetracker.domain.ai.AiRepository.GUEST_PROFILE_ID }
@@ -209,18 +218,28 @@ class AppContainer(
         context.applicationContext.getString(com.suguru.expensetracker.R.string.firestore_database_id)
     }
 
-    val firestoreDb: com.google.firebase.firestore.FirebaseFirestore by lazy {
-        com.google.firebase.firestore.FirebaseFirestore.getInstance(firestoreDatabaseId).apply {
-            firestoreSettings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
-                .setLocalCacheSettings(
-                    com.google.firebase.firestore.MemoryCacheSettings.newBuilder().build()
-                )
-                .build()
-        }
+    val firestoreDb: com.google.firebase.firestore.FirebaseFirestore? by lazy {
+        if (com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(context)) {
+            runCatching {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance(firestoreDatabaseId).apply {
+                    firestoreSettings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
+                        .setLocalCacheSettings(
+                            com.google.firebase.firestore.MemoryCacheSettings.newBuilder().build()
+                        )
+                        .build()
+                }
+            }.getOrNull()
+        } else null
     }
 
     val cloudBackupRemoteRepository: com.suguru.expensetracker.domain.repository.CloudBackupRemoteRepository by lazy {
-        com.suguru.expensetracker.data.remote.firestore.FirestoreCloudBackupRepository(firestoreDb)
+        val db = firestoreDb
+        val auth = firebaseAuth
+        if (db != null && auth != null) {
+            com.suguru.expensetracker.data.remote.firestore.FirestoreCloudBackupRepository(db, auth)
+        } else {
+            com.suguru.expensetracker.data.remote.firestore.DisabledCloudBackupRemoteRepository()
+        }
     }
 
     val cloudBackupOrchestrator: com.suguru.expensetracker.data.backup.AutomaticCloudBackupOrchestrator by lazy {
@@ -245,7 +264,7 @@ class AppContainer(
             },
             authenticatedUidProvider = {
                 val authenticatedUid = runCatching {
-                    com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                    firebaseAuth?.currentUser?.uid
                 }.getOrNull()
                 authenticatedUid?.takeIf { it == workspaceId.firebaseUid }
             },
@@ -260,7 +279,7 @@ class AppContainer(
     val secureKeyStorage: com.suguru.expensetracker.data.security.SecureKeyStorage by lazy {
         com.suguru.expensetracker.data.security.AndroidKeystoreSecureStorage(
             context = context.applicationContext,
-            currentUidProvider = { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid },
+            currentUidProvider = { firebaseAuth?.currentUser?.uid },
             uidScopedMode = true
         )
     }
@@ -740,7 +759,7 @@ class AppContainer(
                     (context.applicationContext as? com.suguru.expensetracker.ExpenseTrackerApplication)
                         ?.isWorkspaceActive(requestedUid) == true
             },
-            authenticatedUidProvider = { runCatching { firebaseAuth.currentUser?.uid }.getOrNull() }
+            authenticatedUidProvider = { runCatching { firebaseAuth?.currentUser?.uid }.getOrNull() }
         )
     }
 

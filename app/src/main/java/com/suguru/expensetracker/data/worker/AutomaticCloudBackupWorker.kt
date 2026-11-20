@@ -23,8 +23,9 @@ class AutomaticCloudBackupWorker(
     override suspend fun doWork(): Result {
         val application = applicationContext as? ExpenseTrackerApplication ?: return Result.failure()
         val uid = inputData.getString(KEY_UID)?.takeIf { it.isNotBlank() } ?: return Result.failure()
-        val authUid = runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
-            .getOrNull()
+        val authUid = if (com.suguru.expensetracker.presentation.auth.isFirebaseInitialized(applicationContext)) {
+            runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
+        } else null
         if (authUid != uid) return Result.success()
         if (!application.isWorkspaceActive(uid)) return Result.retry()
 
