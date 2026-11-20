@@ -134,11 +134,10 @@ fun HomeScreenContent(
         return
     }
 
-    // Selected currency code state for multi-currency presentation
+    // Keep each currency isolated; changing the selected currency never combines balances.
     var selectedCurrencyCode by rememberSaveable(uiState.currencySummaries) {
         mutableStateOf(uiState.currencySummaries.firstOrNull()?.currencyCode ?: "")
     }
-
     val activeCurrencySummary = uiState.currencySummaries.find { it.currencyCode == selectedCurrencyCode }
         ?: uiState.currencySummaries.firstOrNull()
 
@@ -147,12 +146,6 @@ fun HomeScreenContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Ambient soft purple background glow near the hero area
-        BackgroundGlowDecoration(
-            glowColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
-            alpha = 0.12f
-        )
-
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -161,45 +154,35 @@ fun HomeScreenContent(
                 horizontal = ExpenseTrackerSpacing.screenHorizontal,
                 vertical = ExpenseTrackerSpacing.screenVertical
             ),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
         ) {
-            // Optional error banner
             if (uiState.errorMessage != null) {
                 item {
                     ErrorBanner(
                         message = uiState.errorMessage.localized(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp)
                     )
                 }
             }
 
-            // --- 1. HEADER AREA ---
             item {
                 HomeHeaderSection(
                     monthLabel = uiState.currentMonthName,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp)
                 )
             }
 
-            // --- 2. HERO BALANCE AREA ---
             item {
                 HomeHeroBalanceSection(
                     currencySummaries = uiState.currencySummaries,
                     activeSummary = activeCurrencySummary,
                     onSelectCurrency = { selectedCurrencyCode = it },
                     periodLabel = uiState.currentMonthName,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp)
                 )
             }
 
-            // --- 2.5 PRIMARY TRANSACTION ENTRY ---
             item {
                 PrimaryButton(
                     text = stringResource(R.string.title_add_transaction),
@@ -212,54 +195,32 @@ fun HomeScreenContent(
                 )
             }
 
-            // --- 2.6 AI ASSISTANT ENTRY SECTION ---
             item {
                 HomeAiSection(
-                        isConfigured = uiState.isAiConfigured,
-                        isAiEnabled = uiState.isAiFeatureEnabled,
-                        isExtracting = uiState.isAiExtracting,
-                        extractionError = uiState.aiExtractionError,
-                        candidates = uiState.extractedCandidates,
-                        onConfigureInSettings = onNavigateToSettings,
-                        onExtract = onExtractTransactions,
-                        onClearCandidates = onClearCandidates,
-                        onNavigateToAddTransaction = onNavigateToAddTransaction,
-                        onEditCandidate = onNavigateToAddTransactionWithCandidate,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
+                    isConfigured = uiState.isAiConfigured,
+                    isAiEnabled = uiState.isAiFeatureEnabled,
+                    isExtracting = uiState.isAiExtracting,
+                    extractionError = uiState.aiExtractionError,
+                    candidates = uiState.extractedCandidates,
+                    onConfigureInSettings = onNavigateToSettings,
+                    onExtract = onExtractTransactions,
+                    onClearCandidates = onClearCandidates,
+                    onNavigateToAddTransaction = onNavigateToAddTransaction,
+                    onEditCandidate = onNavigateToAddTransactionWithCandidate,
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp)
                 )
             }
 
-            // --- 3. THIS MONTH SECTION ---
-            item {
-                if (activeCurrencySummary != null) {
-                    HomeMonthlyOverviewSection(
-                        activeSummary = activeCurrencySummary,
-                        currentMonthLabel = uiState.currentMonthName,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp)
-                    )
-                }
-            }
-
-            // --- 4. RECENT ACTIVITY SECTION ---
             item {
                 HomeRecentActivitySection(
                     transactions = uiState.recentTransactions,
                     onSeeAll = onNavigateToTransactions,
                     onNavigateToDetail = onNavigateToTransactionDetail,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 540.dp)
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp)
                 )
             }
 
-            // Bottom clearance spacer so content is not obscured by FAB or bottom navigation
-            item {
-                Spacer(modifier = Modifier.height(72.dp))
-            }
+            item { Spacer(modifier = Modifier.height(72.dp)) }
         }
     }
 }
@@ -327,99 +288,136 @@ private fun HomeHeroBalanceSection(
     } else {
         stringResource(R.string.home_total_balance)
     }
+    val netColor = when {
+        activeSummary?.isNetPositive == true -> ExpenseTrackerTheme.extendedColors.financialPositive
+        activeSummary?.isNetNegative == true -> ExpenseTrackerTheme.extendedColors.financialNegative
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
-    val displayBalance = activeSummary?.balanceFormatted ?: "$0.00"
+    Card(
+        modifier = modifier.testTag("balance_card"),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(ExpenseTrackerSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                )
+                Text(
+                    text = activeSummary?.currencyCode ?: periodLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ExpenseTrackerTheme.extendedColors.textMuted
+                )
+            }
 
-    HeroFinancialCard(
-        title = title,
-        balanceText = displayBalance,
-        periodLabel = if (isMultiCurrency) activeSummary?.currencyCode else periodLabel,
-        incomeText = activeSummary?.incomeFormatted,
-        expenseText = activeSummary?.expenseFormatted,
-        currencySelector = if (isMultiCurrency) {
-            {
+            Text(
+                text = activeSummary?.balanceFormatted ?: "—",
+                modifier = Modifier.testTag("current_balance_text"),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!isMultiCurrency && activeSummary != null) {
+                Text(
+                    text = activeSummary.currencyCode,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                )
+            }
+
+            if (isMultiCurrency) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
                 ) {
                     currencySummaries.forEach { summary ->
-                        val isSelected = summary.currencyCode == activeSummary?.currencyCode
                         ExpenseTrackerFilterChip(
                             text = summary.currencyCode,
-                            selected = isSelected,
+                            selected = summary.currencyCode == activeSummary?.currencyCode,
                             onClick = { onSelectCurrency(summary.currencyCode) },
                             testTag = "hero_currency_chip_${summary.currencyCode}"
                         )
                     }
                 }
             }
-        } else null,
-        balanceTestTag = "current_balance_text",
-        testTag = "balance_card",
-        modifier = modifier,
-        customContent = if (isMultiCurrency) {
-            {
-                // Compact multi-currency balance list so user sees all currencies at a glance
-                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                ) {
-                    currencySummaries.forEach { item ->
-                        val isSelected = item.currencyCode == activeSummary?.currencyCode
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(ExpenseTrackerRadius.xs))
-                                .clickable { onSelectCurrency(item.currencyCode) }
-                                .background(
-                                    if (isSelected) {
-                                        ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.14f)
-                                    } else {
-                                        Color.Transparent
-                                    }
-                                )
-                                .padding(horizontal = ExpenseTrackerSpacing.sm, vertical = ExpenseTrackerSpacing.xs),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(ExpenseTrackerRadius.xs),
-                                color = if (isSelected) {
-                                    ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.35f)
-                                } else {
-                                    ExpenseTrackerTheme.extendedColors.surfaceHighlight
-                                }
-                            ) {
-                                Text(
-                                    text = item.currencyCode,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) {
-                                        ExpenseTrackerTheme.extendedColors.accentViolet
-                                    } else {
-                                        ExpenseTrackerTheme.extendedColors.textSecondary
-                                    },
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
 
-                            Text(
-                                text = item.balanceFormatted,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) {
-                                    ExpenseTrackerTheme.extendedColors.textPrimary
-                                } else {
-                                    ExpenseTrackerTheme.extendedColors.textSecondary
-                                }
-                            )
-                        }
-                    }
+            HorizontalDivider(color = ExpenseTrackerTheme.extendedColors.borderSubtle)
+
+            if (activeSummary != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().testTag("monthly_summary_section"),
+                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                ) {
+                    HomeBalanceMetric(
+                        title = stringResource(R.string.home_income),
+                        value = activeSummary.incomeFormatted,
+                        valueColor = ExpenseTrackerTheme.extendedColors.financialPositive,
+                        modifier = Modifier.weight(1f),
+                        testTag = "home_income_metric_card"
+                    )
+                    HomeBalanceMetric(
+                        title = stringResource(R.string.home_expense),
+                        value = activeSummary.expenseFormatted,
+                        valueColor = ExpenseTrackerTheme.extendedColors.financialNegative,
+                        modifier = Modifier.weight(1f),
+                        testTag = "home_expense_metric_card"
+                    )
+                    HomeBalanceMetric(
+                        title = stringResource(R.string.home_net),
+                        value = activeSummary.netFormatted,
+                        valueColor = netColor,
+                        modifier = Modifier.weight(1f),
+                        testTag = "home_net_metric_card"
+                    )
                 }
             }
-        } else null
-    )
+        }
+    }
+}
+
+@Composable
+private fun HomeBalanceMetric(
+    title: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier,
+    testTag: String
+) {
+    Column(
+        modifier = modifier.testTag(testTag),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = ExpenseTrackerTheme.extendedColors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 /**
@@ -694,7 +692,7 @@ private fun HomeAiSection(
         modifier = modifier.testTag("home_ai_assistant_card"),
         shape = ExpenseTrackerRadius.card,
         containerColor = ExpenseTrackerTheme.extendedColors.surface,
-        borderColor = if (isConfigured && isAiEnabled) ExpenseTrackerTheme.extendedColors.accentViolet.copy(alpha = 0.4f) else ExpenseTrackerTheme.extendedColors.borderSubtle,
+        borderColor = if (isConfigured && isAiEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else ExpenseTrackerTheme.extendedColors.borderSubtle,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
     ) {
         Column(
@@ -714,8 +712,8 @@ private fun HomeAiSection(
                     IconAvatar(
                         icon = androidx.compose.material.icons.Icons.Default.AccountBalanceWallet,
                         contentDescription = stringResource(R.string.section_ai_assistant),
-                        tint = ExpenseTrackerTheme.extendedColors.primaryPurple,
-                        backgroundColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.16f),
+                        tint = MaterialTheme.colorScheme.primary,
+                        backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
                         size = 32.dp
                     )
                     Text(
@@ -912,7 +910,7 @@ private fun HomeAiSection(
                                             Text(
                                                 text = stringResource(R.string.home_ai_category_prefix, candidate.suggestedCategoryName),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = ExpenseTrackerTheme.extendedColors.accentViolet
+                                                color = MaterialTheme.colorScheme.primary
                                             )
                                         }
                                     }
