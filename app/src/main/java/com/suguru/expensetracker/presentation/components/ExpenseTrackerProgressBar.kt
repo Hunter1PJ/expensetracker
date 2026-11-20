@@ -12,11 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.suguru.expensetracker.ui.theme.ExpenseTrackerGradients
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 enum class ProgressVariant {
@@ -46,14 +45,9 @@ fun ExpenseTrackerProgressBar(
     val shape = RoundedCornerShape(height / 2)
 
     val fillBrush = when (variant) {
-        ProgressVariant.NORMAL -> ExpenseTrackerGradients.primaryHorizontal
-        ProgressVariant.WARNING -> Brush.horizontalGradient(
-            colors = listOf(
-                ExpenseTrackerTheme.extendedColors.financialWarning,
-                ExpenseTrackerTheme.extendedColors.financialWarning
-            )
-        )
-        ProgressVariant.EXCEEDED -> ExpenseTrackerGradients.negativeGradient
+        ProgressVariant.NORMAL -> SolidColor(MaterialTheme.colorScheme.primary)
+        ProgressVariant.WARNING -> SolidColor(ExpenseTrackerTheme.extendedColors.financialWarning)
+        ProgressVariant.EXCEEDED -> SolidColor(ExpenseTrackerTheme.extendedColors.financialNegative)
     }
 
     Box(
