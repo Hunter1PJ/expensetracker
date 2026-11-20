@@ -45,8 +45,8 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Premium Hero Financial Card displaying the main balance, decorative purple gradient,
- * subtle violet highlight, animated balance transitions, and optional breakdown pills.
+ * Editorial balance card with a quiet paper surface, animated balance transitions,
+ * and optional income/expense breakdowns.
  */
 @Composable
 fun HeroFinancialCard(
@@ -67,23 +67,7 @@ fun HeroFinancialCard(
             .clip(ExpenseTrackerRadius.cardHero)
             .background(ExpenseTrackerGradients.heroCard)
             .border(1.25.dp, ExpenseTrackerGradients.heroCardBorder, ExpenseTrackerRadius.cardHero)
-            .drawBehind {
-                val glowRadius = size.width * 0.55f
-                val glowCenter = Offset(size.width * 0.88f, size.height * 0.12f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x28A855F7),
-                            Color.Transparent
-                        ),
-                        center = glowCenter,
-                        radius = glowRadius
-                    ),
-                    center = glowCenter,
-                    radius = glowRadius
-                )
-            }
-            .padding(ExpenseTrackerSpacing.xxl)
+            .padding(ExpenseTrackerSpacing.lg)
             .testTag(testTag)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
