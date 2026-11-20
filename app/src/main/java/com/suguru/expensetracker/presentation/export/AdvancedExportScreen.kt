@@ -415,34 +415,6 @@ fun AdvancedExportScreen(
                             }
                         }
 
-                        // Accounts Filter Chips
-                        if (uiState.availableAccounts.isNotEmpty()) {
-                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
-                                Text(
-                                    text = stringResource(com.suguru.expensetracker.R.string.account_label),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs),
-                                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)
-                                ) {
-                                    uiState.availableAccounts.forEach { acc ->
-                                        val isSelected = uiState.filter.accountIds.contains(acc.id)
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { viewModel.toggleAccountFilter(acc.id) },
-                                            label = { Text(acc.name) },
-                                            leadingIcon = if (isSelected) {
-                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                            } else null
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
                         // Categories Filter Chips
                         if (uiState.availableCategories.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
