@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.suguru.expensetracker.ExpenseTrackerApplication
@@ -527,14 +528,20 @@ fun ExpenseTrackerApp(
                                 label = {
                                     Text(
                                         text = stringResource(destination.labelRes),
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            letterSpacing = 0.sp
+                                        ),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Clip,
                                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = ExpenseTrackerTheme.extendedColors.primaryBright,
-                                    selectedTextColor = MaterialTheme.colorScheme.onBackground,
-                                    indicatorColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.22f),
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                                     unselectedIconColor = ExpenseTrackerTheme.extendedColors.textSecondary,
                                     unselectedTextColor = ExpenseTrackerTheme.extendedColors.textSecondary
                                 ),
