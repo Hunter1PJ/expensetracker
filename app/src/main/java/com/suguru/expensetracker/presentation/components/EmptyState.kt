@@ -30,7 +30,7 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Reusable minimal Empty State component.
+ * Reusable centered empty state with a quiet paper icon medallion and editorial title.
  */
 @Composable
 fun EmptyState(
