@@ -72,7 +72,6 @@ import com.suguru.expensetracker.R
 import com.suguru.expensetracker.presentation.util.localized
 import com.suguru.expensetracker.domain.model.RecurrenceFrequency
 import com.suguru.expensetracker.domain.model.TransactionType
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.ErrorBanner
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.LoadingState
@@ -153,8 +152,8 @@ fun AddEditRecurringTransactionScreenContent(
                                     else -> R.string.title_add_recurring
                                 }
                             ),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
@@ -202,7 +201,6 @@ fun AddEditRecurringTransactionScreenContent(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                BackgroundGlowDecoration(alpha = 0.08f)
 
                 Column(
                     modifier = Modifier
@@ -330,9 +328,10 @@ fun AddEditRecurringTransactionScreenContent(
                                 .widthIn(max = 540.dp),
                             containerColor = ExpenseTrackerTheme.extendedColors.surface,
                             borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                            contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                            contentPadding = PaddingValues(ExpenseTrackerSpacing.xl)
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
                                 SectionHeader(title = stringResource(R.string.ui_recurring_type_amount))
 
                                 SingleChoiceSegmentedButtonRow(
@@ -391,19 +390,16 @@ fun AddEditRecurringTransactionScreenContent(
                                         .fillMaxWidth()
                                         .testTag("amount_input")
                                 )
-                            }
-                        }
+                                }
 
-                        // Card 2: Category
-                        ExpenseTrackerCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .widthIn(max = 540.dp),
-                            containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                            borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                            contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                Spacer(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                                )
+
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
                                 SectionHeader(title = stringResource(R.string.category_label))
 
                                 var categoryExpanded by remember { mutableStateOf(false) }
@@ -461,6 +457,7 @@ fun AddEditRecurringTransactionScreenContent(
                                             )
                                         }
                                     }
+                                }
                                 }
                             }
                         }
@@ -540,32 +537,41 @@ fun AddEditRecurringTransactionScreenContent(
                                 }
 
                                 // Start Date
-                                OutlinedTextField(
-                                    value = uiState.startDate.toString(),
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text(stringResource(R.string.start_date_label)) },
-                                    trailingIcon = {
-                                        IconButton(onClick = { showStartDatePicker = true }) {
-                                            Icon(
-                                                imageVector = Icons.Default.CalendarToday,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                    },
-                                    shape = ExpenseTrackerRadius.button,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                        unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle
-                                    ),
+                                ExpenseTrackerCard(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { showStartDatePicker = true }
-                                        .testTag("start_date_picker")
-                                )
+                                        .testTag("start_date_picker"),
+                                    shape = ExpenseTrackerRadius.button,
+                                    containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                    borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                                    contentPadding = PaddingValues(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.md)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = stringResource(R.string.start_date_label),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                            )
+                                            Text(
+                                                text = uiState.startDate.toString(),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarToday,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
 
                                 // End Date switch
                                 Row(
@@ -595,32 +601,41 @@ fun AddEditRecurringTransactionScreenContent(
                                 }
 
                                 if (uiState.hasEndDate) {
-                                    OutlinedTextField(
-                                        value = uiState.endDate?.toString() ?: "",
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        label = { Text(stringResource(R.string.end_date_label)) },
-                                        trailingIcon = {
-                                            IconButton(onClick = { showEndDatePicker = true }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.CalendarToday,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary
-                                                )
-                                            }
-                                        },
-                                        shape = ExpenseTrackerRadius.button,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                            unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                            unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle
-                                        ),
+                                    ExpenseTrackerCard(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable { showEndDatePicker = true }
-                                            .testTag("end_date_picker")
-                                    )
+                                            .testTag("end_date_picker"),
+                                        shape = ExpenseTrackerRadius.button,
+                                        containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                                        contentPadding = PaddingValues(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.md)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                Text(
+                                                    text = stringResource(R.string.end_date_label),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                                )
+                                                Text(
+                                                    text = uiState.endDate?.toString().orEmpty(),
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onBackground
+                                                )
+                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.CalendarToday,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
 
                                 // Note input
@@ -694,6 +709,7 @@ fun AddEditRecurringTransactionScreenContent(
         )
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -731,6 +747,7 @@ fun AddEditRecurringTransactionScreenContent(
         )
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
             confirmButton = {
                 TextButton(
                     onClick = {

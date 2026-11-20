@@ -62,7 +62,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.DangerButton
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.IconAvatar
@@ -216,8 +215,8 @@ fun DataAndStorageScreen(
                     Column {
                         Text(
                             text = stringResource(R.string.title_data_storage),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
@@ -247,7 +246,6 @@ fun DataAndStorageScreen(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            BackgroundGlowDecoration(alpha = 0.08f)
 
             Column(
                 modifier = Modifier
@@ -367,243 +365,253 @@ fun DataAndStorageScreen(
                         testTag = "section_backup_export_info"
                     )
 
-                    // Last Backup Metadata Card
                     ExpenseTrackerCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = ExpenseTrackerRadius.card,
                         containerColor = ExpenseTrackerTheme.extendedColors.surface,
                         borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                        contentPadding = PaddingValues(
-                            horizontal = ExpenseTrackerSpacing.lg,
-                            vertical = ExpenseTrackerSpacing.md
-                        )
+                        contentPadding = PaddingValues(horizontal = ExpenseTrackerSpacing.lg, vertical = ExpenseTrackerSpacing.xs),
+                        testTag = "data_operations_panel"
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
+                            // Last Backup Metadata Card
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = ExpenseTrackerSpacing.md)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.History,
-                                    contentDescription = null,
-                                    tint = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.data_last_full_backup),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
-                            }
-                            Text(
-                                text = uiState.lastBackupAt?.let { formatLastBackupAt(it) } ?: stringResource(R.string.cloud_never),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (uiState.lastBackupAt != null) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.textMuted,
-                                modifier = Modifier.testTag("last_backup_info")
-                            )
-                        }
-
-                        if (uiState.lastBackupFileName != null) {
-                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
-                            Text(
-                                text = stringResource(R.string.data_file_name, uiState.lastBackupFileName.orEmpty()),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ExpenseTrackerTheme.extendedColors.textMuted,
-                                modifier = Modifier.testTag("last_backup_file_name_info")
-                            )
-                        }
-                    }
-
-                    // Backup Card
-                    ExpenseTrackerCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = ExpenseTrackerRadius.card,
-                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg),
-                        testTag = "create_backup_card"
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-                            ) {
-                                IconAvatar(
-                                    icon = Icons.Default.Backup,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    size = 40.dp
-                                )
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.History,
+                                            contentDescription = null,
+                                            tint = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.data_last_full_backup),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                        )
+                                    }
                                     Text(
-                                        text = stringResource(R.string.data_create_full_backup),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onBackground
+                                        text = uiState.lastBackupAt?.let { formatLastBackupAt(it) } ?: stringResource(R.string.cloud_never),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (uiState.lastBackupAt != null) MaterialTheme.colorScheme.primary else ExpenseTrackerTheme.extendedColors.textMuted,
+                                        modifier = Modifier.testTag("last_backup_info")
                                     )
+                                }
+        
+                                if (uiState.lastBackupFileName != null) {
+                                    Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
                                     Text(
-                                        text = stringResource(R.string.data_backup_includes),
+                                        text = stringResource(R.string.data_file_name, uiState.lastBackupFileName.orEmpty()),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                        lineHeight = 18.sp
+                                        color = ExpenseTrackerTheme.extendedColors.textMuted,
+                                        modifier = Modifier.testTag("last_backup_file_name_info")
                                     )
                                 }
                             }
-
-                            // Privacy & Integrity Callout
-                            Box(
+        
+                            Spacer(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
-                                    .padding(
-                                        horizontal = ExpenseTrackerSpacing.md,
-                                        vertical = ExpenseTrackerSpacing.sm
-                                    )
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        text = "• " + stringResource(R.string.data_backup_privacy),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                    )
-                                    Text(
-                                        text = "• " + stringResource(R.string.data_integrity_check),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ExpenseTrackerTheme.extendedColors.textMuted
-                                    )
-                                }
-                            }
-
-                            PrimaryButton(
-                                text = if (uiState.isLoading && uiState.message?.resourceId == R.string.data_progress_backup) stringResource(R.string.data_preparing_backup) else stringResource(R.string.data_create_backup),
-                                onClick = { viewModel.createBackup() },
-                                enabled = !uiState.isLoading,
-                                leadingIcon = Icons.Default.Backup,
-                                testTag = "create_backup_button",
-                                modifier = Modifier.fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
                             )
-                        }
-                    }
-
-                    // Restore Backup Card
-                    ExpenseTrackerCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = ExpenseTrackerRadius.card,
-                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                        borderColor = ExpenseTrackerTheme.extendedColors.financialWarning.copy(alpha = 0.4f),
-                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg),
-                        testTag = "restore_backup_card"
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+        
+                            // Backup Card
+                            Column(
+                                modifier = Modifier.fillMaxWidth().testTag("create_backup_card").padding(vertical = ExpenseTrackerSpacing.lg)
                             ) {
-                                IconAvatar(
-                                    icon = Icons.Default.CloudDownload,
-                                    contentDescription = null,
-                                    tint = ExpenseTrackerTheme.extendedColors.financialWarning,
-                                    size = 40.dp
-                                )
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        text = stringResource(R.string.data_restore_from_backup),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onBackground
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                                    ) {
+                                        IconAvatar(
+                                            icon = Icons.Default.Backup,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            size = 40.dp
+                                        )
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = stringResource(R.string.data_create_full_backup),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.data_backup_includes),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                    }
+        
+                                    // Privacy & Integrity Callout
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(ExpenseTrackerTheme.extendedColors.surfaceHighlight)
+                                            .padding(
+                                                horizontal = ExpenseTrackerSpacing.md,
+                                                vertical = ExpenseTrackerSpacing.sm
+                                            )
+                                    ) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = "• " + stringResource(R.string.data_backup_privacy),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                            )
+                                            Text(
+                                                text = "• " + stringResource(R.string.data_integrity_check),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ExpenseTrackerTheme.extendedColors.textMuted
+                                            )
+                                        }
+                                    }
+        
+                                    PrimaryButton(
+                                        text = if (uiState.isLoading && uiState.message?.resourceId == R.string.data_progress_backup) stringResource(R.string.data_preparing_backup) else stringResource(R.string.data_create_backup),
+                                        onClick = { viewModel.createBackup() },
+                                        enabled = !uiState.isLoading,
+                                        leadingIcon = Icons.Default.Backup,
+                                        testTag = "create_backup_button",
+                                        modifier = Modifier.fillMaxWidth()
                                     )
-                                    Text(
-                                        text = stringResource(R.string.data_restore_explanation),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                        lineHeight = 18.sp
-                                    )
-                                }
                             }
-
-                            Box(
+                        }
+    
+                            Spacer(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(ExpenseTrackerTheme.extendedColors.financialWarning.copy(alpha = 0.08f))
-                                    .padding(
-                                        horizontal = ExpenseTrackerSpacing.md,
-                                        vertical = ExpenseTrackerSpacing.sm
-                                    )
-                            ) {
-                                Text(
-                                    text = "⚠️ " + stringResource(R.string.data_restore_risk),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ExpenseTrackerTheme.extendedColors.financialWarning,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-
-                            SecondaryButton(
-                                text = stringResource(R.string.data_choose_backup_file),
-                                onClick = { restoreBackupLauncher.launch(arrayOf("application/json")) },
-                                enabled = !uiState.isLoading,
-                                leadingIcon = Icons.Default.FileOpen,
-                                testTag = "restore_backup_button",
-                                modifier = Modifier.fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
                             )
+        
+                            // Restore Backup Card
+                            Column(
+                                modifier = Modifier.fillMaxWidth().testTag("restore_backup_card").padding(vertical = ExpenseTrackerSpacing.lg)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                                    ) {
+                                        IconAvatar(
+                                            icon = Icons.Default.CloudDownload,
+                                            contentDescription = null,
+                                            tint = ExpenseTrackerTheme.extendedColors.financialWarning,
+                                            size = 40.dp
+                                        )
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = stringResource(R.string.data_restore_from_backup),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.data_restore_explanation),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                    }
+        
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(ExpenseTrackerTheme.extendedColors.financialWarning.copy(alpha = 0.08f))
+                                            .padding(
+                                                horizontal = ExpenseTrackerSpacing.md,
+                                                vertical = ExpenseTrackerSpacing.sm
+                                            )
+                                    ) {
+                                        Text(
+                                            text = "⚠️ " + stringResource(R.string.data_restore_risk),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = ExpenseTrackerTheme.extendedColors.financialWarning,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+        
+                                    SecondaryButton(
+                                        text = stringResource(R.string.data_choose_backup_file),
+                                        onClick = { restoreBackupLauncher.launch(arrayOf("application/json")) },
+                                        enabled = !uiState.isLoading,
+                                        leadingIcon = Icons.Default.FileOpen,
+                                        testTag = "restore_backup_button",
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                         }
                     }
 
-                    // Export CSV Card
-                    ExpenseTrackerCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = ExpenseTrackerRadius.card,
-                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg),
-                        testTag = "export_csv_card"
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                    Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                    )
+
+                            // Export CSV Card
+                            Column(
+                                modifier = Modifier.fillMaxWidth().testTag("export_csv_card").padding(vertical = ExpenseTrackerSpacing.lg)
                             ) {
-                                IconAvatar(
-                                    icon = Icons.Default.FileDownload,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.tertiary,
-                                    size = 40.dp
-                                )
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        text = stringResource(R.string.data_export_csv_title),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.data_export_csv_desc),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ExpenseTrackerTheme.extendedColors.textSecondary,
-                                        lineHeight = 18.sp
+                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+                                    ) {
+                                        IconAvatar(
+                                            icon = Icons.Default.FileDownload,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            size = 40.dp
+                                        )
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = stringResource(R.string.data_export_csv_title),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.data_export_csv_desc),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = ExpenseTrackerTheme.extendedColors.textSecondary,
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                    }
+        
+                                    SecondaryButton(
+                                        text = if (uiState.isLoading && uiState.message?.resourceId == R.string.data_progress_csv) stringResource(R.string.data_preparing_csv) else stringResource(R.string.data_export_csv),
+                                        onClick = { viewModel.exportCsv() },
+                                        enabled = !uiState.isLoading,
+                                        leadingIcon = Icons.Default.FileDownload,
+                                        testTag = "export_csv_button",
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
                             }
-
-                            SecondaryButton(
-                                text = if (uiState.isLoading && uiState.message?.resourceId == R.string.data_progress_csv) stringResource(R.string.data_preparing_csv) else stringResource(R.string.data_export_csv),
-                                onClick = { viewModel.exportCsv() },
-                                enabled = !uiState.isLoading,
-                                leadingIcon = Icons.Default.FileDownload,
-                                testTag = "export_csv_button",
-                                modifier = Modifier.fillMaxWidth()
-                            )
                         }
                     }
                 }

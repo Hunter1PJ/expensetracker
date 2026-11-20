@@ -47,13 +47,13 @@ fun PrimaryButton(
         shape = ExpenseTrackerRadius.button,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
             disabledContentColor = ExpenseTrackerTheme.extendedColors.textMuted
         ),
         elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 2.dp,
-            pressedElevation = 1.dp
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp
         ),
         contentPadding = PaddingValues(
             horizontal = ExpenseTrackerSpacing.xxl,
@@ -176,7 +176,7 @@ fun DangerButton(
         shape = ExpenseTrackerRadius.button,
         colors = ButtonDefaults.buttonColors(
             containerColor = ExpenseTrackerTheme.extendedColors.financialDanger,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onError,
             disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
             disabledContentColor = ExpenseTrackerTheme.extendedColors.textMuted
         ),

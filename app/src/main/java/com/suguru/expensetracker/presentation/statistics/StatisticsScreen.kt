@@ -118,12 +118,6 @@ fun StatisticsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Ambient background glow decoration
-        BackgroundGlowDecoration(
-            glowColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
-            alpha = 0.12f
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -135,47 +129,46 @@ fun StatisticsScreen(
                 .testTag("statistics_screen"),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Section
-            StatisticsHeader()
+            // Editorial report heading
+            StatisticsHeader(modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp))
 
-            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
+            // Period, currency and comparison controls are grouped as one compact control surface.
+            ExpenseTrackerCard(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                shape = RoundedCornerShape(12.dp),
+                containerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
+                borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                    PeriodSelectorRow(
+                        selectedPeriod = uiState.selectedPeriod,
+                        onPeriodSelected = { viewModel.onPeriodSelected(it) },
+                        modifier = Modifier.fillMaxWidth().testTag("period_selector")
+                    )
 
-            // Period Selector Row
-            PeriodSelectorRow(
-                selectedPeriod = uiState.selectedPeriod,
-                onPeriodSelected = { viewModel.onPeriodSelected(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("period_selector")
-            )
+                    if (uiState.availableCurrencies.size > 1) {
+                        CurrencySelectorRow(
+                            currencies = uiState.availableCurrencies,
+                            selectedCurrency = uiState.selectedCurrencyCode,
+                            onCurrencySelected = { viewModel.onCurrencySelected(it) },
+                            modifier = Modifier.fillMaxWidth().testTag("currency_selector")
+                        )
+                    }
 
-            // Currency Selector Row (if multiple available)
-            if (uiState.availableCurrencies.size > 1) {
-                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-                CurrencySelectorRow(
-                    currencies = uiState.availableCurrencies,
-                    selectedCurrency = uiState.selectedCurrencyCode,
-                    onCurrencySelected = { viewModel.onCurrencySelected(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("currency_selector")
-                )
+                    HorizontalDivider(color = ExpenseTrackerTheme.extendedColors.borderSubtle)
+
+                    CompareControlsRow(
+                        isComparisonEnabled = uiState.isComparisonEnabled,
+                        comparisonMode = uiState.comparisonMode,
+                        onToggleComparison = { viewModel.onToggleComparison() },
+                        onModeSelected = { viewModel.onComparisonModeSelected(it) },
+                        modifier = Modifier.fillMaxWidth().testTag("compare_controls_row")
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
-            // Compare Controls Row
-            CompareControlsRow(
-                isComparisonEnabled = uiState.isComparisonEnabled,
-                comparisonMode = uiState.comparisonMode,
-                onToggleComparison = { viewModel.onToggleComparison() },
-                onModeSelected = { viewModel.onComparisonModeSelected(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("compare_controls_row")
-            )
-
-            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.lg))
 
             if (uiState.isLoading) {
                 StatisticsLoadingState(
@@ -406,7 +399,7 @@ private fun StatisticsHeader(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.5.sp,
-            color = ExpenseTrackerTheme.extendedColors.accentViolet
+            color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xxs))
         Text(
@@ -519,26 +512,10 @@ private fun HeroStatisticsCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(ExpenseTrackerRadius.cardHero)
-            .background(ExpenseTrackerGradients.heroCard)
-            .border(1.25.dp, ExpenseTrackerGradients.heroCardBorder, ExpenseTrackerRadius.cardHero)
-            .drawBehind {
-                val glowRadius = size.width * 0.6f
-                val glowCenter = Offset(size.width * 0.85f, size.height * 0.15f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x28A855F7),
-                            Color.Transparent
-                        ),
-                        center = glowCenter,
-                        radius = glowRadius
-                    ),
-                    center = glowCenter,
-                    radius = glowRadius
-                )
-            }
-            .padding(ExpenseTrackerSpacing.xxl)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ExpenseTrackerTheme.extendedColors.surfaceHigh)
+            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, RoundedCornerShape(12.dp))
+            .padding(ExpenseTrackerSpacing.xl)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Eyebrow and metadata row
@@ -582,7 +559,7 @@ private fun HeroStatisticsCard(
                             Text(
                                 text = pluralStringResource(R.plurals.statistics_transaction_count, transactionCount, transactionCount),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = ExpenseTrackerTheme.extendedColors.accentViolet
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -723,7 +700,7 @@ private fun TransfersOnlyBanner(
             Icon(
                 imageVector = Icons.Default.Repeat,
                 contentDescription = stringResource(R.string.ui_stats_transfers),
-                tint = ExpenseTrackerTheme.extendedColors.accentIndigo,
+                tint = ExpenseTrackerTheme.extendedColors.financialNeutral,
                 modifier = Modifier.size(20.dp)
             )
             Text(
@@ -843,7 +820,7 @@ private fun TrendChartCard(
                                     .fillMaxWidth()
                                     .clip(ExpenseTrackerRadius.chip)
                                     .background(ExpenseTrackerTheme.extendedColors.surfaceHigh)
-                                    .border(1.dp, ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.5f), ExpenseTrackerRadius.chip)
+                                    .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, ExpenseTrackerRadius.chip)
                                     .clickable { selectedPointIndex = null }
                                     .padding(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.xs)
                             ) {
@@ -1241,7 +1218,7 @@ private fun CustomRangePickerDialog(
                     text = stringResource(R.string.statistics_start_date_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = ExpenseTrackerTheme.extendedColors.accentViolet
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
                 DatePickerSelectorRow(
@@ -1256,7 +1233,7 @@ private fun CustomRangePickerDialog(
                     text = stringResource(R.string.statistics_end_date_heading),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = ExpenseTrackerTheme.extendedColors.accentViolet
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
                 DatePickerSelectorRow(

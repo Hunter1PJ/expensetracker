@@ -93,32 +93,13 @@ fun BudgetsScreen(
 
     Scaffold(
         modifier = modifier.testTag("budgets_screen"),
-        containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            if (!uiState.isLoading && uiState.budgets.isNotEmpty()) {
-                FloatingActionButton(
-                    onClick = onNavigateToAddBudget,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White,
-                    shape = ExpenseTrackerRadius.button,
-                    modifier = Modifier.testTag("fab_add_budget")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add_budget)
-                    )
-                }
-            }
-        }
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Subtle ambient violet glow decoration
-            BackgroundGlowDecoration()
-
             when {
                 uiState.isLoading -> {
                     LoadingState(
@@ -174,32 +155,51 @@ fun BudgetsScreen(
                             .testTag("budgets_list"),
                         contentPadding = PaddingValues(
                             horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                            vertical = ExpenseTrackerSpacing.screenVertical
+                            vertical = ExpenseTrackerSpacing.xl
                         ),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
                     ) {
                         // Header
                         item {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = stringResource(R.string.ui_budget_planning),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.5.sp,
-                                    color = ExpenseTrackerTheme.extendedColors.primaryPurple
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = stringResource(R.string.title_budgets),
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = stringResource(R.string.budget_spending_limits_intro),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.ui_budget_planning),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 1.2.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.title_budgets),
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.budget_spending_limits_intro),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                    )
+                                }
+                                TextButton(
+                                    onClick = onNavigateToAddBudget,
+                                    modifier = Modifier.testTag("fab_add_budget")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(stringResource(R.string.action_add_budget))
+                                }
                             }
                         }
 
@@ -347,25 +347,9 @@ private fun BudgetOverviewHero(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(ExpenseTrackerRadius.cardHero)
-            .background(ExpenseTrackerGradients.heroCard)
-            .border(1.25.dp, ExpenseTrackerGradients.heroCardBorder, ExpenseTrackerRadius.cardHero)
-            .drawBehind {
-                val glowRadius = size.width * 0.55f
-                val glowCenter = Offset(size.width * 0.88f, size.height * 0.12f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x28A855F7),
-                            Color.Transparent
-                        ),
-                        center = glowCenter,
-                        radius = glowRadius
-                    ),
-                    center = glowCenter,
-                    radius = glowRadius
-                )
-            }
+            .clip(RoundedCornerShape(12.dp))
+            .background(ExpenseTrackerTheme.extendedColors.surfaceHigh)
+            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, RoundedCornerShape(12.dp))
             .padding(ExpenseTrackerSpacing.xxl)
             .testTag("budget_overview_hero")
     ) {
@@ -612,7 +596,7 @@ private fun OverallBudgetCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("budget_card_${progress.budget.id}"),
-        shape = ExpenseTrackerRadius.card,
+        shape = RoundedCornerShape(12.dp),
         containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
         borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.xl)
@@ -828,7 +812,7 @@ private fun CategoryBudgetCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("budget_card_${progress.budget.id}"),
-        shape = ExpenseTrackerRadius.card,
+        shape = RoundedCornerShape(12.dp),
         containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
         borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)

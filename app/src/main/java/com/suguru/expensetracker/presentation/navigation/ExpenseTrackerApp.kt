@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.suguru.expensetracker.ExpenseTrackerApplication
@@ -446,58 +447,7 @@ fun ExpenseTrackerApp(
                     .testTag("expense_tracker_root_scaffold"),
                 snackbarHost = { SnackbarHost(snackbarHostState) },
                 containerColor = MaterialTheme.colorScheme.background,
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text(
-                                    text = if (currentDestination == NavDestination.Home) {
-                                        stringResource(R.string.app_name)
-                                    } else {
-                                        stringResource(currentDestination.labelRes)
-                                    },
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = stringResource(R.string.foundation_subtitle).uppercase(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.5.sp,
-                                    color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                )
-                            }
-                        },
-                        actions = {
-                            // Initials Avatar
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = ExpenseTrackerSpacing.md)
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(ExpenseTrackerTheme.extendedColors.surfaceElevated)
-                                    .border(
-                                        width = 1.dp,
-                                        color = ExpenseTrackerTheme.extendedColors.cardBorder,
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "ET",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.background,
-                            titleContentColor = MaterialTheme.colorScheme.onBackground
-                        )
-                    )
-                },
+                topBar = {},
                 bottomBar = {
                     NavigationBar(
                         containerColor = ExpenseTrackerTheme.extendedColors.surface,
@@ -527,14 +477,20 @@ fun ExpenseTrackerApp(
                                 label = {
                                     Text(
                                         text = stringResource(destination.labelRes),
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            letterSpacing = 0.sp
+                                        ),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Clip,
                                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = ExpenseTrackerTheme.extendedColors.primaryBright,
-                                    selectedTextColor = MaterialTheme.colorScheme.onBackground,
-                                    indicatorColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.22f),
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                                     unselectedIconColor = ExpenseTrackerTheme.extendedColors.textSecondary,
                                     unselectedTextColor = ExpenseTrackerTheme.extendedColors.textSecondary
                                 ),

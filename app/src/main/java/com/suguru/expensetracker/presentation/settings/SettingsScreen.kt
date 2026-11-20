@@ -70,8 +70,8 @@ import com.suguru.expensetracker.domain.model.DateFormatPreference
 import com.suguru.expensetracker.domain.model.ThemeMode
 import com.suguru.expensetracker.domain.model.TimeFormatPreference
 import com.suguru.expensetracker.domain.model.WeekStart
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.ErrorBanner
+import com.suguru.expensetracker.presentation.components.AvatarShape
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerBottomSheet
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.IconAvatar
@@ -86,8 +86,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.WorkspacePremium
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
@@ -165,7 +163,6 @@ fun SettingsScreen(
             .fillMaxSize()
             .testTag("settings_screen")
     ) {
-        BackgroundGlowDecoration(alpha = 0.08f)
 
         Column(
             modifier = Modifier
@@ -176,7 +173,7 @@ fun SettingsScreen(
                     vertical = ExpenseTrackerSpacing.screenVertical
                 ),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
+            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxl)
         ) {
             // Screen Header with Eyebrow
             Column(
@@ -194,8 +191,8 @@ fun SettingsScreen(
                 )
                 Text(
                     text = stringResource(R.string.title_settings),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
@@ -228,14 +225,6 @@ fun SettingsScreen(
                 is SettingsUiState.Success -> {
                     val settings = state.settings
 
-                    // 1. Account / Cloud Backup Section
-                    if (createCloudBackupViewModel != null && onShowMessage != null) {
-                        CloudBackupSection(
-                            createCloudBackupViewModel = createCloudBackupViewModel,
-                            onShowMessage = onShowMessage
-                        )
-                    }
-
                     // 2. Financial Structures Section
                     Column(
                         modifier = Modifier
@@ -266,12 +255,26 @@ fun SettingsScreen(
                                 onClick = onNavigateToRecurring,
                                 testTag = "settings_item_recurring"
                             )
-                            SettingsDivider()
+                        }
+                    }
+
+                    // Data ownership, backup and export destinations
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 560.dp),
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                    ) {
+                        SectionHeader(
+                            title = stringResource(R.string.section_data_operations),
+                            testTag = "settings_data_operations_section"
+                        )
+                        SettingsGroupCard(testTag = "settings_data_operations_card") {
                             SettingsRow(
                                 title = stringResource(R.string.title_data_storage),
                                 subtitle = stringResource(R.string.desc_data_storage),
                                 icon = Icons.Default.Storage,
-                                iconTint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                                iconTint = MaterialTheme.colorScheme.primary,
                                 onClick = onNavigateToDataAndStorage,
                                 testTag = "settings_item_data_storage"
                             )
@@ -285,6 +288,13 @@ fun SettingsScreen(
                                 testTag = "settings_item_export"
                             )
                         }
+                    }
+
+                    if (createCloudBackupViewModel != null && onShowMessage != null) {
+                        CloudBackupSection(
+                            createCloudBackupViewModel = createCloudBackupViewModel,
+                            onShowMessage = onShowMessage
+                        )
                     }
 
                     // 2. AI Assistant (BYOK) Section
@@ -327,7 +337,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.title_ai_feature),
                                 subtitle = stringResource(R.string.desc_ai_feature),
                                 icon = Icons.Default.AutoAwesome,
-                                iconTint = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                                iconTint = MaterialTheme.colorScheme.primary,
                                 checked = state.isAiFeatureEnabled,
                                 onCheckedChange = { viewModel.setAiFeatureEnabled(it) },
                                 switchTestTag = "toggle_ai_feature_switch",
@@ -374,7 +384,7 @@ fun SettingsScreen(
                                         state.keyVerificationState is KeyVerificationState.Invalid &&
                                             state.keyVerificationState.error is AiError.InvalidApiKey -> ExpenseTrackerTheme.extendedColors.financialDanger
                                         state.isAiConfigured -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                        else -> ExpenseTrackerTheme.extendedColors.accentViolet
+                                        else -> MaterialTheme.colorScheme.primary
                                     },
                                     trailingText = stringResource(if (state.isAiConfigured) R.string.action_manage else R.string.action_setup),
                                     onClick = {
@@ -863,6 +873,10 @@ fun SettingsScreen(
                     if (showLanguageDialog) {
                         AlertDialog(
                             onDismissRequest = { showLanguageDialog = false },
+                            shape = ExpenseTrackerRadius.dialog,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
                             title = { Text(stringResource(R.string.language_change_title)) },
                             text = {
                                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
@@ -903,6 +917,10 @@ fun SettingsScreen(
                                 }
                                 showApiKeyDialog = false
                             },
+                            shape = ExpenseTrackerRadius.dialog,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
                             title = {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -977,6 +995,10 @@ fun SettingsScreen(
                     if (showLegacyKeyMigrationDialog) {
                         AlertDialog(
                             onDismissRequest = { showLegacyKeyMigrationDialog = false },
+                            shape = ExpenseTrackerRadius.dialog,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
                             title = { Text(stringResource(R.string.dialog_migrate_legacy_key_title)) },
                             text = { Text(stringResource(R.string.dialog_migrate_legacy_key_message)) },
                             confirmButton = {
@@ -1016,8 +1038,8 @@ private fun SettingsGroupCard(
 ) {
     ExpenseTrackerCard(
         modifier = modifier.fillMaxWidth(),
-        shape = ExpenseTrackerRadius.card,
-        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+        shape = RoundedCornerShape(12.dp),
+        containerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
         borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
         contentPadding = PaddingValues(vertical = ExpenseTrackerSpacing.xs),
         testTag = testTag,
@@ -1070,7 +1092,8 @@ private fun SettingsRow(
                 icon = icon,
                 contentDescription = null,
                 tint = iconTint,
-                size = 38.dp
+                size = 38.dp,
+                shapeType = AvatarShape.ROUNDED_SQUARE
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

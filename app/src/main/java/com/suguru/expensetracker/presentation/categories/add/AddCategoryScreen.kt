@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,7 +59,6 @@ import com.suguru.expensetracker.domain.model.CategoryType
 import com.suguru.expensetracker.presentation.accounts.add.ColorPickerItem
 import com.suguru.expensetracker.presentation.accounts.add.IconPickerItem
 import com.suguru.expensetracker.presentation.common.FinanceVisuals
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.ErrorBanner
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.LoadingState
@@ -126,8 +126,8 @@ fun AddCategoryScreenContent(
                             } else {
                                 stringResource(R.string.title_add_category)
                             },
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
@@ -171,7 +171,6 @@ fun AddCategoryScreenContent(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                BackgroundGlowDecoration(alpha = 0.08f)
 
                 Column(
                     modifier = Modifier
@@ -211,124 +210,123 @@ fun AddCategoryScreenContent(
                             .widthIn(max = 540.dp),
                         containerColor = ExpenseTrackerTheme.extendedColors.surface,
                         borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                        contentPadding = PaddingValues(ExpenseTrackerSpacing.xl)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                            SectionHeader(title = stringResource(R.string.category_name_label))
-
-                            OutlinedTextField(
-                                value = uiState.name,
-                                onValueChange = onNameChanged,
-                                placeholder = {
-                                    Text(
-                                        text = stringResource(R.string.category_name_hint),
-                                        color = ExpenseTrackerTheme.extendedColors.textTertiary
-                                    )
-                                },
-                                singleLine = true,
-                                shape = ExpenseTrackerRadius.button,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                    unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("category_name_input_field")
-                            )
-
-                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
-                            SectionHeader(title = stringResource(R.string.category_type_label))
-
-                            val types = listOf(
-                                CategoryType.EXPENSE to stringResource(R.string.type_expense),
-                                CategoryType.INCOME to stringResource(R.string.type_income),
-                                CategoryType.BOTH to stringResource(R.string.type_both)
-                            )
-
-                            SingleChoiceSegmentedButtonRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("category_type_selector")
-                            ) {
-                                types.forEachIndexed { index, (type, label) ->
-                                    val isSelected = uiState.type == type
-                                    SegmentedButton(
-                                        selected = isSelected,
-                                        onClick = { onTypeChanged(type) },
-                                        shape = SegmentedButtonDefaults.itemShape(index = index, count = types.size),
-                                        colors = SegmentedButtonDefaults.colors(
-                                            activeContainerColor = when (type) {
-                                                CategoryType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegativeContainer
-                                                CategoryType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositiveContainer
-                                                CategoryType.BOTH -> MaterialTheme.colorScheme.primaryContainer
-                                            },
-                                            activeContentColor = MaterialTheme.colorScheme.onBackground,
-                                            inactiveContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
-                                            inactiveContentColor = ExpenseTrackerTheme.extendedColors.textSecondary
-                                        ),
-                                        modifier = Modifier.testTag("category_type_${type.name.lowercase()}")
-                                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                SectionHeader(title = stringResource(R.string.category_name_label))
+    
+                                OutlinedTextField(
+                                    value = uiState.name,
+                                    onValueChange = onNameChanged,
+                                    placeholder = {
                                         Text(
-                                            text = label,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                            text = stringResource(R.string.category_name_hint),
+                                            color = ExpenseTrackerTheme.extendedColors.textTertiary
                                         )
+                                    },
+                                    singleLine = true,
+                                    shape = ExpenseTrackerRadius.button,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                        unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("category_name_input_field")
+                                )
+    
+                                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+                                SectionHeader(title = stringResource(R.string.category_type_label))
+    
+                                val types = listOf(
+                                    CategoryType.EXPENSE to stringResource(R.string.type_expense),
+                                    CategoryType.INCOME to stringResource(R.string.type_income),
+                                    CategoryType.BOTH to stringResource(R.string.type_both)
+                                )
+    
+                                SingleChoiceSegmentedButtonRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("category_type_selector")
+                                ) {
+                                    types.forEachIndexed { index, (type, label) ->
+                                        val isSelected = uiState.type == type
+                                        SegmentedButton(
+                                            selected = isSelected,
+                                            onClick = { onTypeChanged(type) },
+                                            shape = SegmentedButtonDefaults.itemShape(index = index, count = types.size),
+                                            colors = SegmentedButtonDefaults.colors(
+                                                activeContainerColor = when (type) {
+                                                    CategoryType.EXPENSE -> ExpenseTrackerTheme.extendedColors.financialNegativeContainer
+                                                    CategoryType.INCOME -> ExpenseTrackerTheme.extendedColors.financialPositiveContainer
+                                                    CategoryType.BOTH -> MaterialTheme.colorScheme.primaryContainer
+                                                },
+                                                activeContentColor = MaterialTheme.colorScheme.onBackground,
+                                                inactiveContainerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+                                                inactiveContentColor = ExpenseTrackerTheme.extendedColors.textSecondary
+                                            ),
+                                            modifier = Modifier.testTag("category_type_${type.name.lowercase()}")
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    // Card 2: Category Icon & Color
-                    ExpenseTrackerCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp),
-                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                            SectionHeader(title = stringResource(R.string.icon_label))
-
-                            FlowRow(
+                            Spacer(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("category_icon_picker"),
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                            ) {
-                                FinanceVisuals.CATEGORY_ICONS.forEach { iconOption ->
-                                    val isSelected = uiState.selectedIconName == iconOption.id
-                                    IconPickerItem(
-                                        iconOption = iconOption,
-                                        isSelected = isSelected,
-                                        onClick = { onIconChanged(iconOption.id) },
-                                        testTag = "category_icon_${iconOption.id}"
-                                    )
+                                    .height(1.dp)
+                                    .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                            )
+
+                            Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                SectionHeader(title = stringResource(R.string.icon_label))
+    
+                                FlowRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("category_icon_picker"),
+                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                                ) {
+                                    FinanceVisuals.CATEGORY_ICONS.forEach { iconOption ->
+                                        val isSelected = uiState.selectedIconName == iconOption.id
+                                        IconPickerItem(
+                                            iconOption = iconOption,
+                                            isSelected = isSelected,
+                                            onClick = { onIconChanged(iconOption.id) },
+                                            testTag = "category_icon_${iconOption.id}"
+                                        )
+                                    }
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
-                            SectionHeader(title = stringResource(R.string.color_label))
-
-                            FlowRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("category_color_picker"),
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
-                                verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
-                            ) {
-                                FinanceVisuals.CURATED_COLORS.forEach { colorOption ->
-                                    val isSelected = uiState.selectedColorHex.equals(colorOption.hex, ignoreCase = true)
-                                    ColorPickerItem(
-                                        colorOption = colorOption,
-                                        isSelected = isSelected,
-                                        onClick = { onColorChanged(colorOption.hex) },
-                                        testTag = "category_color_${colorOption.hex.removePrefix("#").lowercase()}"
-                                    )
+    
+                                Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.xs))
+                                SectionHeader(title = stringResource(R.string.color_label))
+    
+                                FlowRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("category_color_picker"),
+                                    horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm),
+                                    verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
+                                ) {
+                                    FinanceVisuals.CURATED_COLORS.forEach { colorOption ->
+                                        val isSelected = uiState.selectedColorHex.equals(colorOption.hex, ignoreCase = true)
+                                        ColorPickerItem(
+                                            colorOption = colorOption,
+                                            isSelected = isSelected,
+                                            onClick = { onColorChanged(colorOption.hex) },
+                                            testTag = "category_color_${colorOption.hex.removePrefix("#").lowercase()}"
+                                        )
+                                    }
                                 }
                             }
                         }

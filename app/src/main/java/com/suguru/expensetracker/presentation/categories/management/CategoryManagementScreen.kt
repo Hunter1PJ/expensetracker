@@ -29,8 +29,6 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,7 +55,6 @@ import com.suguru.expensetracker.R
 import com.suguru.expensetracker.domain.model.Category
 import com.suguru.expensetracker.domain.model.CategoryType
 import com.suguru.expensetracker.presentation.common.FinanceVisuals
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.EmptyState
 import com.suguru.expensetracker.presentation.components.ErrorBanner
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
@@ -121,8 +118,8 @@ fun CategoryManagementContent(
                     Column {
                         Text(
                             text = stringResource(R.string.title_category_management),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
@@ -146,27 +143,24 @@ fun CategoryManagementContent(
                         )
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = onNavigateToAddCategory,
+                        modifier = Modifier.testTag("add_category_fab")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.action_add_category),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAddCategory,
-                shape = ExpenseTrackerRadius.button,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                modifier = Modifier.testTag("add_category_fab")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(R.string.action_add_category),
-                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.lg)
-                )
-            }
         }
     ) { innerPadding ->
         Box(
@@ -174,7 +168,6 @@ fun CategoryManagementContent(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            BackgroundGlowDecoration(alpha = 0.10f)
 
             Column(
                 modifier = Modifier

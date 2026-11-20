@@ -26,7 +26,7 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Reusable Confirmation & Action Dialog adhering to the purple/indigo design system.
+ * Reusable confirmation dialog with clear destructive hierarchy and paper surfaces.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,12 +58,12 @@ fun ExpenseTrackerConfirmationDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(ExpenseTrackerSpacing.xxl)
+                    .padding(ExpenseTrackerSpacing.xl)
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 

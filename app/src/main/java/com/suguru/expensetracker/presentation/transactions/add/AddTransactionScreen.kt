@@ -38,6 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SelectableDates
@@ -156,8 +157,8 @@ fun AddTransactionScreenContent(
                 title = {
                     Text(
                         text = stringResource(R.string.title_add_transaction),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 },
@@ -206,8 +207,8 @@ fun AddTransactionScreenContent(
                         .fillMaxWidth()
                         .widthIn(max = 540.dp)
                         .testTag("ai_assisted_draft_banner"),
-                    containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.12f),
-                    borderColor = ExpenseTrackerTheme.extendedColors.accentViolet.copy(alpha = 0.4f),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
                     contentPadding = PaddingValues(ExpenseTrackerSpacing.md)
                 ) {
                     Column(
@@ -235,7 +236,7 @@ fun AddTransactionScreenContent(
                                     ),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = ExpenseTrackerTheme.extendedColors.accentViolet,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
@@ -552,7 +553,6 @@ fun AddTransactionScreenContent(
                     SectionHeader(title = stringResource(R.string.date_time_label))
 
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.sm))
-
                     val localDateTime = uiState.transactionTime.atZone(ZoneId.systemDefault())
                     val formattedDate = remember(uiState.transactionTime) {
                         localDateTime.format(DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(java.util.Locale.getDefault()))
@@ -560,54 +560,38 @@ fun AddTransactionScreenContent(
                     val formattedTime = remember(uiState.transactionTime) {
                         localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
                     }
-
-                    ExpenseTrackerCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker = true }
-                            .testTag("date_picker_button"),
-                        shape = ExpenseTrackerRadius.button,
-                        containerColor = ExpenseTrackerTheme.extendedColors.cardBackground,
-                        borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
-                        contentPadding = PaddingValues(
-                            horizontal = ExpenseTrackerSpacing.lg,
-                            vertical = ExpenseTrackerSpacing.md
-                        )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                        horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        ExpenseTrackerCard(
+                            modifier = Modifier.weight(1f).clickable { showDatePicker = true }.testTag("date_picker_button"),
+                            shape = ExpenseTrackerRadius.button,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                            borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                            contentPadding = PaddingValues(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.lg)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarToday,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(ExpenseTrackerTheme.iconSize.sm)
-                                )
-                                Text(
-                                    text = formattedDate,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
+                                Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(ExpenseTrackerTheme.iconSize.sm))
+                                Text(formattedDate, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground, maxLines = 2)
                             }
-                            TextButton(
-                                onClick = { showTimePicker = true },
-                                modifier = Modifier.testTag("time_picker_button")
-                            ) {
-                                Icon(Icons.Default.AccessTime, contentDescription = null)
-                                Spacer(Modifier.width(ExpenseTrackerSpacing.xs))
-                                Text(formattedTime)
+                        }
+                    
+                        ExpenseTrackerCard(
+                            modifier = Modifier.weight(1f).clickable { showTimePicker = true }.testTag("time_picker_button"),
+                            shape = ExpenseTrackerRadius.button,
+                            containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                            borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                            contentPadding = PaddingValues(horizontal = ExpenseTrackerSpacing.md, vertical = ExpenseTrackerSpacing.lg)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.sm)) {
+                                Icon(Icons.Default.AccessTime, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(ExpenseTrackerTheme.iconSize.sm))
+                                Text(formattedTime, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
                             }
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
 
                 // 8. Save Button
@@ -671,6 +655,10 @@ fun AddTransactionScreenContent(
 
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
+            colors = DatePickerDefaults.colors(
+                containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+            ),
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -696,7 +684,12 @@ fun AddTransactionScreenContent(
                 }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated
+                )
+            )
         }
     }
 
@@ -709,6 +702,10 @@ fun AddTransactionScreenContent(
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
+            shape = ExpenseTrackerRadius.dialog,
+            containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text(stringResource(R.string.time_picker_dialog_title)) },
             text = { TimePicker(state = timePickerState) },
             confirmButton = {

@@ -24,8 +24,8 @@ import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerTheme
 
 /**
- * Reusable Premium Text Field with dark elevated surface, subtle borders,
- * and purple focused states.
+ * Reusable journal-style field with a calm paper surface, clear focus border,
+ * and accessible validation states.
  */
 @Composable
 fun ExpenseTrackerTextField(
@@ -91,7 +91,7 @@ fun ExpenseTrackerTextField(
             shape = ExpenseTrackerRadius.button,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
-                unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surface,
+                unfocusedContainerColor = ExpenseTrackerTheme.extendedColors.surfaceLow,
                 disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceLow,
                 errorContainerColor = ExpenseTrackerTheme.extendedColors.surface,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,

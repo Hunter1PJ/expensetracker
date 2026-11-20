@@ -93,7 +93,7 @@ fun InteractiveCard(
             contentColor = contentColor
         ),
         border = BorderStroke(1.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
@@ -109,8 +109,8 @@ fun InteractiveCard(
 fun HeroCard(
     modifier: Modifier = Modifier,
     shape: Shape = ExpenseTrackerRadius.cardHero,
-    backgroundBrush: Brush = ExpenseTrackerGradients.heroCard,
-    borderBrush: Brush = ExpenseTrackerGradients.heroCardBorder,
+    backgroundBrush: Brush = Brush.linearGradient(listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface)),
+    borderBrush: Brush = Brush.linearGradient(listOf(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.colorScheme.outlineVariant)),
     contentPadding: PaddingValues = PaddingValues(ExpenseTrackerSpacing.xxl),
     testTag: String? = null,
     content: @Composable ColumnScope.() -> Unit
