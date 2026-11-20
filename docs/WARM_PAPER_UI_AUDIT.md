@@ -34,6 +34,23 @@ The current branch now contains screen-specific Compose layout work for these de
 
 **Modal/picker styling pass:** the remaining standard Material dialogs and date/time pickers have now been aligned to Warm Paper surfaces. Reusable destructive confirmations, the Statistics custom-range dialog and Settings bottom sheets already used the paper styling and were left intact. No new Settings controls were invented from the static reference mockup; only existing app capabilities were reorganized.
 
+
+**Structural redesign correction — 20 November 2026:**
+
+A review of the live Compose app against the selected 390dp Stitch mockups found that the earlier pass was too conservative: several screens still inherited the generic Material top bar and raised list cards. The following structural changes are now applied to the primary destinations:
+
+- **App shell:** removed the generic duplicate top app bar from the primary-destination scaffold. Home, Transactions, Statistics, Budgets and Settings now lead with their own screen-specific editorial headers; the five-item bottom navigation and its callbacks/test tags are unchanged.
+- **Home:** the balance hero is now a larger secondary-paper panel with an editorial currency figure and three separated income/expense/net columns. Recent transactions are an open ledger list with divider rules instead of one enclosing raised card. The AI assistant keeps its existing input, Parse, Configure, candidate editing and Preview → Edit → Confirm → Save callbacks inside a quiet paper panel.
+- **Transactions:** date groups now render as open ledger rows rather than large enclosing cards. Date headers use a journal heading treatment; search, all four type filters (including historical Transfer), category filtering, clear-filters and detail navigation remain wired.
+- **Statistics:** the report summary and selector panels use the secondary-paper surface, restrained 12dp corners and the editorial type hierarchy. Existing period/currency/comparison state, chart interactions and breakdowns remain unchanged.
+- **Budgets:** removed the leftover ambient glow decoration; the overview and per-budget panels use restrained paper surfaces and 12dp geometry. Currency filtering, edit/deactivate menus and confirmation paths remain.
+- **Settings:** grouped settings surfaces now use the paper panel treatment; setting glyphs use rounded-square tiles. All navigation, theme/language/currency/time options, AI-key management and backup/export callbacks remain.
+- **Shared type and rows:** display styles now use the system serif family and body/control styles use the system sans-serif family. Financial ledger icons use rounded-square category tiles. This is a system-font approximation of the Newsreader/Manrope Stitch pairing; no font dependency or binary asset was added.
+
+**Interaction preservation check:** the eight modified Kotlin files were compared with their branch-head versions before this commit. No original literal `testTag` was lost (Home +1 new list tag, Transactions +1 new group tag); callback-like `on…` and `viewModel.…` anchors remained present. A lexer-aware delimiter scan passed for all eight files. This is source-level validation only; no Kotlin compiler, Gradle build, unit test or AVD screenshot review was available in the remote workbench.
+
+**Appearance note:** the existing Light/Dark/System preference is preserved. The selected Stitch reference is the light Warm Paper presentation; when the app follows Android System and the device is in dark mode, the corresponding dark palette is shown. Set Appearance → Theme Mode → Light to compare against the light Stitch reference.
+
 **Still pending:** direct visual review of every modal/picker on the Medium_Phone AVD, full-screen AVD review, accessibility/hit-target review and English/Uzbek Latin/Russian verification. All screen destinations now have a screen-specific layout pass, but they are not considered complete until the completion gate below passes.
 
 **Validation status:** a lexer-aware source-level delimiter scan passed across the 15 unique Kotlin screen files plus the shared bottom-sheet component (16 Kotlin files). Exact `testTag` literals and callback/handler anchors in the six modified dialog-bearing screens were compared with the live branch sources and remained unchanged; duplicate imports were also checked. This remains source-only validation, not an Android/Kotlin compile. No Android Gradle build, unit tests, locale validation or Medium_Phone AVD visual review has been run. Do not treat this milestone as complete until the completion gate below passes.

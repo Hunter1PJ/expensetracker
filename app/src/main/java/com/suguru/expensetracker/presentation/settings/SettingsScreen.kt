@@ -71,6 +71,7 @@ import com.suguru.expensetracker.domain.model.ThemeMode
 import com.suguru.expensetracker.domain.model.TimeFormatPreference
 import com.suguru.expensetracker.domain.model.WeekStart
 import com.suguru.expensetracker.presentation.components.ErrorBanner
+import com.suguru.expensetracker.presentation.components.AvatarShape
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerBottomSheet
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.IconAvatar
@@ -172,7 +173,7 @@ fun SettingsScreen(
                     vertical = ExpenseTrackerSpacing.screenVertical
                 ),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
+            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xxl)
         ) {
             // Screen Header with Eyebrow
             Column(
@@ -1037,8 +1038,8 @@ private fun SettingsGroupCard(
 ) {
     ExpenseTrackerCard(
         modifier = modifier.fillMaxWidth(),
-        shape = ExpenseTrackerRadius.card,
-        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+        shape = RoundedCornerShape(12.dp),
+        containerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
         borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
         contentPadding = PaddingValues(vertical = ExpenseTrackerSpacing.xs),
         testTag = testTag,
@@ -1091,7 +1092,8 @@ private fun SettingsRow(
                 icon = icon,
                 contentDescription = null,
                 tint = iconTint,
-                size = 38.dp
+                size = 38.dp,
+                shapeType = AvatarShape.ROUNDED_SQUARE
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

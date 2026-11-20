@@ -77,7 +77,8 @@ fun FinancialListRow(
                 contentDescription = title,
                 tint = iconTint,
                 backgroundColor = iconBackground,
-                size = 40.dp
+                size = 40.dp,
+                shapeType = AvatarShape.ROUNDED_SQUARE
             )
             Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.md))
         }

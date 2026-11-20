@@ -135,8 +135,10 @@ fun StatisticsScreen(
             // Period, currency and comparison controls are grouped as one compact control surface.
             ExpenseTrackerCard(
                 modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(ExpenseTrackerSpacing.md)
+                shape = RoundedCornerShape(12.dp),
+                containerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
+                borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
                     PeriodSelectorRow(
@@ -510,10 +512,10 @@ private fun HeroStatisticsCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, RoundedCornerShape(18.dp))
-            .padding(ExpenseTrackerSpacing.lg)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ExpenseTrackerTheme.extendedColors.surfaceHigh)
+            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, RoundedCornerShape(12.dp))
+            .padding(ExpenseTrackerSpacing.xl)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Eyebrow and metadata row

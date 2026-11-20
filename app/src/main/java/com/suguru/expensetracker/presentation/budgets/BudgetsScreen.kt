@@ -100,9 +100,6 @@ fun BudgetsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Subtle ambient violet glow decoration
-            BackgroundGlowDecoration()
-
             when {
                 uiState.isLoading -> {
                     LoadingState(
@@ -158,9 +155,9 @@ fun BudgetsScreen(
                             .testTag("budgets_list"),
                         contentPadding = PaddingValues(
                             horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                            vertical = ExpenseTrackerSpacing.screenVertical
+                            vertical = ExpenseTrackerSpacing.xl
                         ),
-                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
+                        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
                     ) {
                         // Header
                         item {
@@ -350,9 +347,9 @@ private fun BudgetOverviewHero(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(ExpenseTrackerRadius.cardHero)
+            .clip(RoundedCornerShape(12.dp))
             .background(ExpenseTrackerTheme.extendedColors.surfaceHigh)
-            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, ExpenseTrackerRadius.cardHero)
+            .border(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle, RoundedCornerShape(12.dp))
             .padding(ExpenseTrackerSpacing.xxl)
             .testTag("budget_overview_hero")
     ) {
@@ -599,7 +596,7 @@ private fun OverallBudgetCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("budget_card_${progress.budget.id}"),
-        shape = ExpenseTrackerRadius.card,
+        shape = RoundedCornerShape(12.dp),
         containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
         borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.xl)
@@ -815,7 +812,7 @@ private fun CategoryBudgetCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("budget_card_${progress.budget.id}"),
-        shape = ExpenseTrackerRadius.card,
+        shape = RoundedCornerShape(12.dp),
         containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
         borderColor = ExpenseTrackerTheme.extendedColors.cardBorder,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)

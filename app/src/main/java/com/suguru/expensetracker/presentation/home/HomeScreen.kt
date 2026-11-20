@@ -152,10 +152,10 @@ fun HomeScreenContent(
                 .testTag("home_screen_content"),
             contentPadding = PaddingValues(
                 horizontal = ExpenseTrackerSpacing.screenHorizontal,
-                vertical = ExpenseTrackerSpacing.screenVertical
+                vertical = ExpenseTrackerSpacing.xl
             ),
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
+            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xl)
         ) {
             if (uiState.errorMessage != null) {
                 item {
@@ -249,7 +249,7 @@ private fun HomeHeaderSection(
             Text(
                 text = stringResource(R.string.home_header_title),
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
@@ -294,16 +294,16 @@ private fun HomeHeroBalanceSection(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Card(
+    ExpenseTrackerCard(
         modifier = modifier.testTag("balance_card"),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, ExpenseTrackerTheme.extendedColors.borderSubtle),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        shape = RoundedCornerShape(12.dp),
+        containerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
+        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+        contentPadding = PaddingValues(ExpenseTrackerSpacing.xl)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(ExpenseTrackerSpacing.lg),
-            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -326,8 +326,8 @@ private fun HomeHeroBalanceSection(
             Text(
                 text = activeSummary?.balanceFormatted ?: "—",
                 modifier = Modifier.testTag("current_balance_text"),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -370,12 +370,20 @@ private fun HomeHeroBalanceSection(
                         modifier = Modifier.weight(1f),
                         testTag = "home_income_metric_card"
                     )
+                    Box(
+                        modifier = Modifier.width(1.dp).height(34.dp)
+                            .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                    )
                     HomeBalanceMetric(
                         title = stringResource(R.string.home_expense),
                         value = activeSummary.expenseFormatted,
                         valueColor = ExpenseTrackerTheme.extendedColors.financialNegative,
                         modifier = Modifier.weight(1f),
                         testTag = "home_expense_metric_card"
+                    )
+                    Box(
+                        modifier = Modifier.width(1.dp).height(34.dp)
+                            .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
                     )
                     HomeBalanceMetric(
                         title = stringResource(R.string.home_net),
@@ -544,8 +552,8 @@ private fun HomeRecentActivitySection(
         ) {
             Text(
                 text = stringResource(R.string.home_recent_transactions),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
 
@@ -604,12 +612,8 @@ private fun HomeRecentActivitySection(
                 }
             }
         } else {
-            ExpenseTrackerCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = ExpenseTrackerRadius.card,
-                containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                contentPadding = PaddingValues(0.dp)
+            Column(
+                modifier = Modifier.fillMaxWidth().testTag("recent_transactions_list")
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     transactions.forEachIndexed { index, tx ->
@@ -690,8 +694,8 @@ private fun HomeAiSection(
 
     ExpenseTrackerCard(
         modifier = modifier.testTag("home_ai_assistant_card"),
-        shape = ExpenseTrackerRadius.card,
-        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+        shape = RoundedCornerShape(12.dp),
+        containerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
         borderColor = if (isConfigured && isAiEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else ExpenseTrackerTheme.extendedColors.borderSubtle,
         contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
     ) {

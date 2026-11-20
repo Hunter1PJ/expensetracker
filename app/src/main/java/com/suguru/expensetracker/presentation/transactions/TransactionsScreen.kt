@@ -98,10 +98,10 @@ fun TransactionsScreenContent(
             .testTag("transactions_list"),
         contentPadding = PaddingValues(
             horizontal = ExpenseTrackerSpacing.screenHorizontal,
-            top = ExpenseTrackerSpacing.md,
-            bottom = 104.dp
+            top = ExpenseTrackerSpacing.xl,
+            bottom = 112.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Archive identity and search are a single scrollable header, matching the journal design.
@@ -263,12 +263,9 @@ fun TransactionsScreenContent(
                         DateGroupHeader(title = title, modifier = Modifier.widthIn(max = 540.dp))
                     }
                     item(key = "group_${dateGroup.date}") {
-                        ExpenseTrackerCard(
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
-                            shape = RoundedCornerShape(ExpenseTrackerRadius.lg),
-                            containerColor = ExpenseTrackerTheme.extendedColors.surface,
-                            borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
-                            contentPadding = PaddingValues(0.dp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp)
+                                .testTag("transaction_group_${dateGroup.date}")
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 dateGroup.transactions.forEachIndexed { index, item ->
@@ -342,10 +339,10 @@ private fun DateGroupHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.2.sp,
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.primary
         )
     }
