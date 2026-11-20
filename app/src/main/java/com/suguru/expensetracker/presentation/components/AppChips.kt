@@ -45,7 +45,7 @@ fun ExpenseTrackerFilterChip(
     testTag: String = "filter_chip"
 ) {
     val containerColor = if (selected) {
-        ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.22f)
+        MaterialTheme.colorScheme.primaryContainer
     } else {
         ExpenseTrackerTheme.extendedColors.surfaceHigh
     }
@@ -57,7 +57,7 @@ fun ExpenseTrackerFilterChip(
     }
 
     val textColor = if (selected) {
-        MaterialTheme.colorScheme.onBackground
+        MaterialTheme.colorScheme.onPrimaryContainer
     } else {
         ExpenseTrackerTheme.extendedColors.textSecondary
     }
@@ -140,7 +140,7 @@ fun TransactionTypeChip(
     val typeLabel = stringResource(typeLabelRes)
 
     val containerColor = if (selected) {
-        typeColor.copy(alpha = 0.2f)
+        typeColor.copy(alpha = 0.12f)
     } else {
         ExpenseTrackerTheme.extendedColors.surfaceHigh
     }
