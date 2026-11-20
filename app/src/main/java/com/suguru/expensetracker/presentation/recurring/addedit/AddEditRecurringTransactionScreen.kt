@@ -153,8 +153,8 @@ fun AddEditRecurringTransactionScreenContent(
                                     else -> R.string.title_add_recurring
                                 }
                             ),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
