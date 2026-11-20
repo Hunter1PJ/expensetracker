@@ -176,7 +176,7 @@ fun DangerButton(
         shape = ExpenseTrackerRadius.button,
         colors = ButtonDefaults.buttonColors(
             containerColor = ExpenseTrackerTheme.extendedColors.financialDanger,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            contentColor = Color.White,
             disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
             disabledContentColor = ExpenseTrackerTheme.extendedColors.textMuted
         ),
