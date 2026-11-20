@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,7 +63,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,7 +83,6 @@ import com.suguru.expensetracker.domain.util.MoneyParser
 import com.suguru.expensetracker.presentation.common.FinanceVisuals
 import com.suguru.expensetracker.presentation.components.AppIconButton
 import com.suguru.expensetracker.presentation.components.AvatarShape
-import com.suguru.expensetracker.presentation.components.BackgroundGlowDecoration
 import com.suguru.expensetracker.presentation.components.ErrorBanner
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerFilterChip
@@ -147,7 +146,6 @@ fun AddEditBudgetScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            BackgroundGlowDecoration()
 
             if (uiState.isLoading) {
                 LoadingState(message = stringResource(R.string.ui_budget_loading_details), testTag = "add_edit_budget_loading")
@@ -180,6 +178,13 @@ fun AddEditBudgetScreen(
                         }
                     }
 
+                    ExpenseTrackerCard(
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)) {
                     // 1. Scope Selector
                     Column(
                         modifier = Modifier
@@ -210,9 +215,9 @@ fun AddEditBudgetScreen(
                                     onClick = { viewModel.onScopeChanged(scope) },
                                     shape = SegmentedButtonDefaults.itemShape(index = index, count = scopes.size),
                                     colors = SegmentedButtonDefaults.colors(
-                                        activeContainerColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.25f),
+                                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                         activeContentColor = ExpenseTrackerTheme.extendedColors.textPrimary,
-                                        activeBorderColor = ExpenseTrackerTheme.extendedColors.primaryPurple,
+                                        activeBorderColor = MaterialTheme.colorScheme.primary,
                                         inactiveContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHigh,
                                         inactiveContentColor = ExpenseTrackerTheme.extendedColors.textSecondary,
                                         inactiveBorderColor = ExpenseTrackerTheme.extendedColors.borderSubtle
@@ -231,6 +236,13 @@ fun AddEditBudgetScreen(
 
                     // 2. Category Selector (if CATEGORY scope)
                     if (uiState.scope == BudgetScope.CATEGORY) {
+                        Spacer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                        )
+
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -269,6 +281,8 @@ fun AddEditBudgetScreen(
                                 }
                             }
                         }
+                        }
+                    }
                     }
 
                     // 3. Amount & Currency Card
@@ -385,6 +399,13 @@ fun AddEditBudgetScreen(
                         }
                     }
 
+                    ExpenseTrackerCard(
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 540.dp),
+                        containerColor = ExpenseTrackerTheme.extendedColors.surface,
+                        borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
+                        contentPadding = PaddingValues(ExpenseTrackerSpacing.lg)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.lg)) {
                     // 4. Period Type Selector
                     Column(
                         modifier = Modifier
@@ -419,6 +440,13 @@ fun AddEditBudgetScreen(
                             }
                         }
                     }
+
+                        Spacer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(ExpenseTrackerTheme.extendedColors.borderSubtle)
+                        )
 
                     // 5. Date Range Display or Date Pickers
                     Column(
@@ -517,6 +545,9 @@ fun AddEditBudgetScreen(
                         }
                     }
 
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(ExpenseTrackerSpacing.md))
 
                     // 6. Save Button
@@ -532,7 +563,7 @@ fun AddEditBudgetScreen(
                         shape = ExpenseTrackerRadius.button,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
                             disabledContainerColor = ExpenseTrackerTheme.extendedColors.surfaceHighlight,
                             disabledContentColor = ExpenseTrackerTheme.extendedColors.textMuted
                         ),
@@ -545,7 +576,7 @@ fun AddEditBudgetScreen(
                         if (uiState.isSubmitting) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(ExpenseTrackerSpacing.sm))

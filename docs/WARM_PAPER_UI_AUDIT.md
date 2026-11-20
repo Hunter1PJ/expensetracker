@@ -24,12 +24,15 @@ The current branch now contains screen-specific Compose layout work for these de
 - **Transaction Detail:** amount/type hero changed from centered stacked content to a left-aligned editorial hierarchy. Existing detail rows, edit/delete actions and delete confirmation remain.
 - **Categories:** Add Category moved from a floating button into the top-bar action slot; the original callback and `add_category_fab` test tag remain.
 - **Recurring Rules:** Add Rule moved into the top-bar actions beside Run Due Now; both callbacks and their original test tags remain.
+- **Add/Edit Category:** name/type and icon/color selection are now grouped into one paper panel with a subtle divider; name, type, icon, color and save controls remain wired.
+- **Add/Edit Budget:** scope and optional category are grouped into one panel; period and date range into another. The scope accent uses the forest-green theme primary; currency dropdown, amount, period chips, date pickers and save remain wired.
+- **Add/Edit Recurring Rule:** type/amount and category are grouped into one panel; the recurrence schedule remains separate. Start/end dates use paper date cards; the optional end-date switch, edit-mode locked frequency, read-only historical Transfer branch and save behavior remain.
 
 **Canvas cleanup only (not counted as full screen redesign):** residual glow decorations were removed from Settings, Data & Storage, and Financial Export. Their deeper screen-specific layout work is still pending.
 
-**Still pending screen-specific redesign:** Add/Edit Category, Add/Edit Budget, Add/Edit Recurring Rule, Settings, Data & Storage, Financial Export, and remaining modal/picker visual states. Do not treat shared-theme styling or canvas cleanup as completion.
+**Still pending screen-specific redesign:** Settings, Data & Storage, Financial Export, and remaining modal/picker visual states. The three form groups above are layout-updated but still require AVD and locale verification. Do not treat shared-theme styling or canvas cleanup as completion.
 
-**Validation status:** a source-level delimiter scan passed for all eight changed Kotlin screens, and the required existing test-tag literals for their key controls were verified. The transaction form picker callbacks and moved Category/Recurring add actions were also checked in source. This is not a Kotlin/Android compile. No Android Gradle build, unit tests, locale validation or Medium_Phone AVD visual review has been run. Do not treat this milestone as complete until the completion gate below passes.
+**Validation status:** a source-level delimiter scan passed for the eight screens in the preceding pass and the three form screens in this pass (11 Kotlin screens total). Required key test-tag literals, form picker triggers and moved primary-action callbacks were checked in source. This is not a Kotlin/Android compile. No Android Gradle build, unit tests, locale validation or Medium_Phone AVD visual review has been run. Do not treat this milestone as complete until the completion gate below passes.
 
 ## Screens and required controls
 
