@@ -207,7 +207,7 @@ fun AddTransactionScreenContent(
                         .widthIn(max = 540.dp)
                         .testTag("ai_assisted_draft_banner"),
                     containerColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.12f),
-                    borderColor = ExpenseTrackerTheme.extendedColors.accentViolet.copy(alpha = 0.4f),
+                    borderColor = ExpenseTrackerTheme.extendedColors.primaryPurple.copy(alpha = 0.28f),
                     contentPadding = PaddingValues(ExpenseTrackerSpacing.md)
                 ) {
                     Column(
@@ -235,7 +235,7 @@ fun AddTransactionScreenContent(
                                     ),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = ExpenseTrackerTheme.extendedColors.accentViolet,
+                                    color = ExpenseTrackerTheme.extendedColors.primaryPurple,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
