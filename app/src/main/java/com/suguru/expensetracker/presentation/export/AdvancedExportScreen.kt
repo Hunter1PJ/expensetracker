@@ -175,8 +175,8 @@ fun AdvancedExportScreen(
                 title = {
                     Text(
                         text = stringResource(com.suguru.expensetracker.R.string.title_financial_export),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 },
