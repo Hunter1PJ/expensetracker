@@ -374,7 +374,7 @@ fun SettingsScreen(
                                         state.keyVerificationState is KeyVerificationState.Invalid &&
                                             state.keyVerificationState.error is AiError.InvalidApiKey -> ExpenseTrackerTheme.extendedColors.financialDanger
                                         state.isAiConfigured -> ExpenseTrackerTheme.extendedColors.financialPositive
-                                        else -> ExpenseTrackerTheme.extendedColors.accentViolet
+                                        else -> ExpenseTrackerTheme.extendedColors.primaryPurple
                                     },
                                     trailingText = stringResource(if (state.isAiConfigured) R.string.action_manage else R.string.action_setup),
                                     onClick = {
