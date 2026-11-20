@@ -141,6 +141,13 @@ enum class NavDestination(
         icon = Icons.Outlined.Settings,
         testTag = "nav_item_advanced_export",
         isBottomBarItem = false
+    ),
+    About(
+        route = "about",
+        labelRes = R.string.about_title,
+        icon = Icons.Outlined.Settings,
+        testTag = "nav_item_about",
+        isBottomBarItem = false
     );
 
     companion object {

@@ -50,6 +50,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,7 @@ import com.suguru.expensetracker.presentation.components.ExpenseTrackerBottomShe
 import com.suguru.expensetracker.presentation.components.ExpenseTrackerCard
 import com.suguru.expensetracker.presentation.components.IconAvatar
 import com.suguru.expensetracker.presentation.components.LoadingState
+import com.suguru.expensetracker.presentation.components.LocalizedWindowContent
 import com.suguru.expensetracker.presentation.components.SectionHeader
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerRadius
 import com.suguru.expensetracker.ui.theme.ExpenseTrackerSpacing
@@ -125,6 +127,7 @@ fun SettingsScreen(
     onNavigateToRecurring: () -> Unit,
     onNavigateToDataAndStorage: () -> Unit,
     onNavigateToExport: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {},
     createCloudBackupViewModel: ((String) -> CloudBackupViewModel)? = null,
     onShowMessage: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -137,21 +140,27 @@ fun SettingsScreen(
     var showLegacyKeyMigrationDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    var selectedLanguage by remember { mutableStateOf(AppLanguageManager.selectedLanguageTag(context)) }
+    val selectedLanguageTag by AppLanguageManager.languageChanges.collectAsState(
+        initial = AppLanguageManager.selectedLanguageTag(context)
+    )
+    val selectedLanguage = selectedLanguageTag ?: AppLanguageManager.selectedLanguageTag(context)
     var apiKeyInput by remember { mutableStateOf("") }
     val apiKeySavedMessage = stringResource(R.string.ai_settings_key_saved)
     val legacyKeyMigratedMessage = stringResource(R.string.ai_legacy_key_migrated)
     val apiKeyVerifiedMessage = stringResource(R.string.ai_settings_key_verified)
+    val currentApiKeySavedMessage by rememberUpdatedState(apiKeySavedMessage)
+    val currentLegacyKeyMigratedMessage by rememberUpdatedState(legacyKeyMigratedMessage)
+    val currentApiKeyVerifiedMessage by rememberUpdatedState(apiKeyVerifiedMessage)
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
-                SettingsEvent.ApiKeySaved -> snackbarHostState.showSnackbar(apiKeySavedMessage)
+                SettingsEvent.ApiKeySaved -> snackbarHostState.showSnackbar(currentApiKeySavedMessage)
                 SettingsEvent.ApiKeyVerified -> {
                     showApiKeyDialog = false
-                    snackbarHostState.showSnackbar(apiKeyVerifiedMessage)
+                    snackbarHostState.showSnackbar(currentApiKeyVerifiedMessage)
                 }
-                SettingsEvent.LegacyKeyMigrated -> snackbarHostState.showSnackbar(legacyKeyMigratedMessage)
+                SettingsEvent.LegacyKeyMigrated -> snackbarHostState.showSnackbar(currentLegacyKeyMigratedMessage)
             }
         }
     }
@@ -514,7 +523,7 @@ fun SettingsScreen(
                         )
 
                         ExpenseTrackerCard(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().clickable(onClick = onNavigateToAbout),
                             shape = ExpenseTrackerRadius.card,
                             containerColor = ExpenseTrackerTheme.extendedColors.surface,
                             borderColor = ExpenseTrackerTheme.extendedColors.borderSubtle,
@@ -805,33 +814,40 @@ fun SettingsScreen(
                             containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
                             titleContentColor = MaterialTheme.colorScheme.onSurface,
                             textContentColor = MaterialTheme.colorScheme.onSurface,
-                            title = { Text(stringResource(R.string.language_change_title)) },
+                            title = {
+                                LocalizedWindowContent {
+                                    Text(stringResource(R.string.language_change_title))
+                                }
+                            },
                             text = {
-                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
-                                    listOf(
-                                        "uz" to R.string.language_uzbek,
-                                        "en" to R.string.language_english,
-                                        "ru" to R.string.language_russian
-                                    ).forEach { (tag, labelRes) ->
-                                        TextButton(
-                                            onClick = {
-                                                AppLanguageManager.setLanguage(context, tag)
-                                                selectedLanguage = tag
-                                                showLanguageDialog = false
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                text = stringResource(labelRes),
-                                                fontWeight = if (selectedLanguage == tag) FontWeight.Bold else FontWeight.Normal
-                                            )
+                                LocalizedWindowContent {
+                                    Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.xs)) {
+                                        listOf(
+                                            "uz" to R.string.language_uzbek,
+                                            "en" to R.string.language_english,
+                                            "ru" to R.string.language_russian
+                                        ).forEach { (tag, labelRes) ->
+                                            TextButton(
+                                                onClick = {
+                                                    AppLanguageManager.setLanguage(context, tag)
+                                                    showLanguageDialog = false
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = stringResource(labelRes),
+                                                    fontWeight = if (selectedLanguage == tag) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             },
                             confirmButton = {
-                                TextButton(onClick = { showLanguageDialog = false }) {
-                                    Text(stringResource(R.string.action_cancel))
+                                LocalizedWindowContent {
+                                    TextButton(onClick = { showLanguageDialog = false }) {
+                                        Text(stringResource(R.string.action_cancel))
+                                    }
                                 }
                             }
                         )
@@ -850,72 +866,78 @@ fun SettingsScreen(
                             titleContentColor = MaterialTheme.colorScheme.onSurface,
                             textContentColor = MaterialTheme.colorScheme.onSurface,
                             title = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.dialog_api_key_title),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    IconButton(
-                                        onClick = { showApiKeyDialog = false },
-                                        modifier = Modifier.testTag("close_api_key_dialog_button")
+                                LocalizedWindowContent {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.ui_close))
+                                        Text(
+                                            text = stringResource(R.string.dialog_api_key_title),
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        IconButton(
+                                            onClick = { showApiKeyDialog = false },
+                                            modifier = Modifier.testTag("close_api_key_dialog_button")
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.ui_close))
+                                        }
                                     }
                                 }
                             },
                             text = {
-                                Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
-                                    Text(
-                                        text = stringResource(R.string.dialog_api_key_desc),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = ExpenseTrackerTheme.extendedColors.textSecondary
-                                    )
+                                LocalizedWindowContent {
+                                    Column(verticalArrangement = Arrangement.spacedBy(ExpenseTrackerSpacing.md)) {
+                                        Text(
+                                            text = stringResource(R.string.dialog_api_key_desc),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = ExpenseTrackerTheme.extendedColors.textSecondary
+                                        )
 
-                                    OutlinedTextField(
-                                        value = apiKeyInput,
-                                        onValueChange = { apiKeyInput = it },
-                                        placeholder = {
-                                            Text(if (state.isAiConfigured) state.maskedApiKey ?: "••••••••" else stringResource(R.string.hint_api_key))
-                                        },
-                                        singleLine = true,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .testTag("gemini_api_key_input")
-                                    )
-
-                                    if (state.isAiConfigured) {
-                                        TextButton(
-                                            onClick = {
-                                                viewModel.deleteGeminiApiKey()
-                                                showApiKeyDialog = false
+                                        OutlinedTextField(
+                                            value = apiKeyInput,
+                                            onValueChange = { apiKeyInput = it },
+                                            placeholder = {
+                                                Text(if (state.isAiConfigured) state.maskedApiKey ?: "••••••••" else stringResource(R.string.hint_api_key))
                                             },
-                                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                                contentColor = ExpenseTrackerTheme.extendedColors.financialDanger
-                                            ),
-                                            modifier = Modifier.testTag("delete_api_key_button")
-                                        ) {
-                                            Text(stringResource(R.string.action_delete_key))
+                                            singleLine = true,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("gemini_api_key_input")
+                                        )
+
+                                        if (state.isAiConfigured) {
+                                            TextButton(
+                                                onClick = {
+                                                    viewModel.deleteGeminiApiKey()
+                                                    showApiKeyDialog = false
+                                                },
+                                                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                                    contentColor = ExpenseTrackerTheme.extendedColors.financialDanger
+                                                ),
+                                                modifier = Modifier.testTag("delete_api_key_button")
+                                            ) {
+                                                Text(stringResource(R.string.action_delete_key))
+                                            }
                                         }
                                     }
                                 }
                             },
                             confirmButton = {
-                                Button(
-                                    onClick = {
-                                        if (apiKeyInput.isNotBlank()) {
-                                            viewModel.saveGeminiApiKey(apiKeyInput)
-                                        }
-                                        showApiKeyDialog = false
-                                    },
-                                    enabled = apiKeyInput.isNotBlank(),
-                                    modifier = Modifier.testTag("save_api_key_button")
-                                ) {
-                                    Text(stringResource(R.string.action_save_key))
+                                LocalizedWindowContent {
+                                    Button(
+                                        onClick = {
+                                            if (apiKeyInput.isNotBlank()) {
+                                                viewModel.saveGeminiApiKey(apiKeyInput)
+                                            }
+                                            showApiKeyDialog = false
+                                        },
+                                        enabled = apiKeyInput.isNotBlank(),
+                                        modifier = Modifier.testTag("save_api_key_button")
+                                    ) {
+                                        Text(stringResource(R.string.action_save_key))
+                                    }
                                 }
                             },
                         )
@@ -927,17 +949,29 @@ fun SettingsScreen(
                             containerColor = ExpenseTrackerTheme.extendedColors.surfaceElevated,
                             titleContentColor = MaterialTheme.colorScheme.onSurface,
                             textContentColor = MaterialTheme.colorScheme.onSurface,
-                            title = { Text(stringResource(R.string.dialog_migrate_legacy_key_title)) },
-                            text = { Text(stringResource(R.string.dialog_migrate_legacy_key_message)) },
+                            title = {
+                                LocalizedWindowContent {
+                                    Text(stringResource(R.string.dialog_migrate_legacy_key_title))
+                                }
+                            },
+                            text = {
+                                LocalizedWindowContent {
+                                    Text(stringResource(R.string.dialog_migrate_legacy_key_message))
+                                }
+                            },
                             confirmButton = {
-                                TextButton(onClick = {
-                                    showLegacyKeyMigrationDialog = false
-                                    viewModel.migrateLegacyGeminiApiKey()
-                                }) { Text(stringResource(R.string.action_migrate_legacy_key)) }
+                                LocalizedWindowContent {
+                                    TextButton(onClick = {
+                                        showLegacyKeyMigrationDialog = false
+                                        viewModel.migrateLegacyGeminiApiKey()
+                                    }) { Text(stringResource(R.string.action_migrate_legacy_key)) }
+                                }
                             },
                             dismissButton = {
-                                TextButton(onClick = { showLegacyKeyMigrationDialog = false }) {
-                                    Text(stringResource(R.string.action_cancel))
+                                LocalizedWindowContent {
+                                    TextButton(onClick = { showLegacyKeyMigrationDialog = false }) {
+                                        Text(stringResource(R.string.action_cancel))
+                                    }
                                 }
                             }
                         )

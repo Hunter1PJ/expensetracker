@@ -50,15 +50,17 @@ fun ExpenseTrackerBottomSheet(
             )
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = ExpenseTrackerSpacing.xxl,
-                    end = ExpenseTrackerSpacing.xxl,
-                    bottom = ExpenseTrackerSpacing.xxxl
-                ),
-            content = content
-        )
+        LocalizedWindowContent {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = ExpenseTrackerSpacing.xxl,
+                        end = ExpenseTrackerSpacing.xxl,
+                        bottom = ExpenseTrackerSpacing.xxxl
+                    ),
+                content = content
+            )
+        }
     }
 }

@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +69,7 @@ import com.suguru.expensetracker.presentation.recurring.RecurringTransactionsVie
 import com.suguru.expensetracker.presentation.recurring.addedit.AddEditRecurringTransactionScreen
 import com.suguru.expensetracker.presentation.recurring.addedit.AddEditRecurringTransactionViewModel
 import com.suguru.expensetracker.presentation.settings.SettingsScreen
+import com.suguru.expensetracker.presentation.settings.AboutScreen
 import com.suguru.expensetracker.presentation.startup.StartupProvisioningState
 import com.suguru.expensetracker.presentation.startup.allowsNavigation
 import com.suguru.expensetracker.presentation.startup.SupportedStartupCurrencies
@@ -117,6 +119,7 @@ fun ExpenseTrackerApp(
     // provisioning state transitions without being torn down and reset.
     var currentDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
     var previousDestination by rememberSaveable { mutableStateOf(NavDestination.Home) }
+    val screenStateHolder = rememberSaveableStateHolder()
 
     val startupAiInvalidKey by (resolvedContainer?.startupAiInvalidKey
         ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
@@ -205,6 +208,13 @@ fun ExpenseTrackerApp(
     var selectedEditBudgetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedEditRecurringRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedTransactionId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val screenStateKey = when (currentDestination) {
+        NavDestination.EditCategory -> "${currentDestination.route}_${selectedEditCategoryId}"
+        NavDestination.EditBudget -> "${currentDestination.route}_${selectedEditBudgetId}"
+        NavDestination.EditRecurringTransaction -> "${currentDestination.route}_${selectedEditRecurringRuleId}"
+        NavDestination.TransactionDetail, NavDestination.EditTransaction -> "${currentDestination.route}_${selectedTransactionId}"
+        else -> currentDestination.route
+    }
     var activeAiCandidate by remember { mutableStateOf<com.suguru.expensetracker.domain.parser.TransactionCandidate?>(null) }
 
     androidx.compose.runtime.LaunchedEffect(initialDestination, initialBudgetId, initialTransactionType) {
@@ -228,7 +238,12 @@ fun ExpenseTrackerApp(
         resolvedContainer?.settingsRepository?.settings ?: kotlinx.coroutines.flow.flowOf()
     }.collectAsState(initial = null)
 
-    when (currentDestination) {
+    screenStateHolder.SaveableStateProvider(screenStateKey) {
+        when (currentDestination) {
+        NavDestination.About -> {
+            AboutScreen(onNavigateBack = { currentDestination = NavDestination.Settings })
+        }
+
         NavDestination.AddTransaction -> {
             AddTransactionScreen(
                 viewModel = resolvedAddTransactionViewModel,
@@ -612,6 +627,10 @@ fun ExpenseTrackerApp(
                                 previousDestination = NavDestination.Settings
                                 currentDestination = NavDestination.AdvancedExport
                             },
+                            onNavigateToAbout = {
+                                previousDestination = NavDestination.Settings
+                                currentDestination = NavDestination.About
+                            },
                             createCloudBackupViewModel = { uid ->
                                 resolvedContainer?.createCloudBackupViewModel(uid) ?: throw IllegalStateException("AppContainer required")
                             },
@@ -628,6 +647,7 @@ fun ExpenseTrackerApp(
                     }
                 }
             }
+        }
         }
     }
 }

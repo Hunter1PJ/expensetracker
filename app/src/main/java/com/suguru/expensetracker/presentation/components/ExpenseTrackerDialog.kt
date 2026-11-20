@@ -47,8 +47,9 @@ fun ExpenseTrackerConfirmationDialog(
         onDismissRequest = onDismissRequest,
         modifier = modifier.testTag(testTag)
     ) {
-        Card(
-            shape = ExpenseTrackerRadius.dialog,
+        LocalizedWindowContent {
+            Card(
+                shape = ExpenseTrackerRadius.dialog,
             colors = CardDefaults.cardColors(
                 containerColor = ExpenseTrackerTheme.extendedColors.surface,
                 contentColor = MaterialTheme.colorScheme.onSurface
@@ -105,6 +106,7 @@ fun ExpenseTrackerConfirmationDialog(
                     }
                 }
             }
+        }
         }
     }
 }
